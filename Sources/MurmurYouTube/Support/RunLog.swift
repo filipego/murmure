@@ -1,6 +1,19 @@
 import MurmurDictionary
 import Foundation
 
+struct TranscriptCorrectionRecord: Codable, Equatable, Sendable {
+    enum InputMethod: String, Codable, Equatable, Sendable {
+        case typed
+        case voiceAssisted
+    }
+
+    let heardText: String
+    let intendedText: String
+    let correctedAt: Date
+    let inputMethod: InputMethod
+    let rememberedRule: CorrectionRuleSuggestion?
+}
+
 /// One completed dictation.
 struct DictationRun: Codable, Sendable, Identifiable {
     /// Stable identity, so a single run can be deleted without matching on its text.
@@ -16,7 +29,7 @@ struct DictationRun: Codable, Sendable, Identifiable {
     let audioSeconds: Double
     /// Release → final text ready. This is the latency you actually feel.
     let processSeconds: Double
-    let text: String
+    var text: String
     /// Relative path to the captured CAF file in Murmure Data/Recordings, when audio was
     /// retained for this run. Optional so older history files continue to decode unchanged.
     var audioFile: String?
@@ -30,6 +43,9 @@ struct DictationRun: Codable, Sendable, Identifiable {
     /// Optional for backwards compatibility: runs recorded before the dictionary existed
     /// decode with this nil rather than failing the whole line.
     var corrections: [AppliedCorrection]?
+    /// The user's latest edit, while retaining the first transcript they corrected.
+    /// Optional so history created before correction learning remains decodable.
+    var correction: TranscriptCorrectionRecord?
 
     var realtimeFactor: Double { audioSeconds / max(processSeconds, 0.0001) }
     var characters: Int { text.count }
@@ -43,7 +59,8 @@ struct DictationRun: Codable, Sendable, Identifiable {
         text: String,
         group: String? = nil,
         corrections: [AppliedCorrection]? = nil,
-        audioFile: String? = nil
+        audioFile: String? = nil,
+        correction: TranscriptCorrectionRecord? = nil
     ) {
         self.id = id
         self.date = date
@@ -54,6 +71,7 @@ struct DictationRun: Codable, Sendable, Identifiable {
         self.audioFile = audioFile
         self.group = group
         self.corrections = corrections
+        self.correction = correction
     }
 
     init(from decoder: any Decoder) throws {
@@ -67,6 +85,25 @@ struct DictationRun: Codable, Sendable, Identifiable {
         audioFile = try container.decodeIfPresent(String.self, forKey: .audioFile)
         group = try container.decodeIfPresent(String.self, forKey: .group)
         corrections = try container.decodeIfPresent([AppliedCorrection].self, forKey: .corrections)
+        correction = try container.decodeIfPresent(TranscriptCorrectionRecord.self, forKey: .correction)
+    }
+
+    func correcting(
+        intendedText: String,
+        inputMethod: TranscriptCorrectionRecord.InputMethod,
+        rememberedRule: CorrectionRuleSuggestion?,
+        at correctedAt: Date = Date()
+    ) -> DictationRun {
+        var updated = self
+        updated.text = intendedText
+        updated.correction = TranscriptCorrectionRecord(
+            heardText: correction?.heardText ?? text,
+            intendedText: intendedText,
+            correctedAt: correctedAt,
+            inputMethod: inputMethod,
+            rememberedRule: rememberedRule
+        )
+        return updated
     }
 }
 
@@ -97,6 +134,24 @@ enum RunLog {
         cachedRuns.append(contentsOf: runs)
         regenerate()
         RunStore.shared.reload()
+    }
+
+    @discardableResult
+    static func correct(
+        id: UUID,
+        intendedText: String,
+        inputMethod: TranscriptCorrectionRecord.InputMethod,
+        rememberedRule: CorrectionRuleSuggestion?
+    ) -> Bool {
+        guard let index = cachedRuns.firstIndex(where: { $0.id == id }) else { return false }
+        var runs = cachedRuns
+        runs[index] = runs[index].correcting(
+            intendedText: intendedText,
+            inputMethod: inputMethod,
+            rememberedRule: rememberedRule
+        )
+        rewrite(runs)
+        return true
     }
 
     private static func append(_ run: DictationRun) {

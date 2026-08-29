@@ -95,6 +95,13 @@ enum DS {
         static let bevel: CGFloat = 1
     }
 
+    enum Size {
+        static let correctionSheetWidth: CGFloat = 560
+        static let correctionSheetMinHeight: CGFloat = 520
+        static let correctionTextEditorHeight: CGFloat = 112
+        static let correctionOriginalMaxHeight: CGFloat = 96
+    }
+
     enum Shadow {
         static let raised = Spec(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
         static let pressed = Spec(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)

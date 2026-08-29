@@ -204,6 +204,7 @@ private struct HomePanel: View {
     @Bindable var controller: DictationController
     @State private var store = RunStore.shared
     @State private var query = ""
+    @State private var correctionRun: DictationRun?
 
     private var filteredRuns: [DictationRun] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -256,9 +257,14 @@ private struct HomePanel: View {
                                     .tracking(DS.Font.silkscreenTracking)
                                     .foregroundStyle(DS.Color.inkSecondary)
                                 ForEach(runs) { run in
-                                    HistoryRow(run: run) {
-                                        withAnimation(DS.Motion.panel) { RunLog.delete(run) }
-                                    }
+                                    HistoryRow(
+                                        run: run,
+                                        correctionDisabled: controller.state.isActive,
+                                        onCorrect: { openCorrection(run) },
+                                        onDelete: {
+                                            withAnimation(DS.Motion.panel) { RunLog.delete(run) }
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -268,6 +274,11 @@ private struct HomePanel: View {
             .padding(DS.Space.panel)
         }
         .scrollContentBackground(.hidden)
+        .sheet(item: $correctionRun, onDismiss: {
+            controller.resumeHotkeyAfterModalInput()
+        }) { run in
+            CorrectionEditor(run: run, dictationController: controller)
+        }
     }
 
     private var stats: some View {
@@ -277,6 +288,12 @@ private struct HomePanel: View {
             LocalStat(label: "Corrections", value: "\(corrections)")
             LocalStat(label: "Push to talk", value: Settings.shared.pushToTalkKey.displayName)
         }
+    }
+
+    private func openCorrection(_ run: DictationRun) {
+        guard !controller.state.isActive else { return }
+        controller.suspendHotkeyForModalInput()
+        correctionRun = run
     }
 }
 
@@ -308,6 +325,8 @@ private struct LocalStat: View {
 
 private struct HistoryRow: View {
     let run: DictationRun
+    let correctionDisabled: Bool
+    let onCorrect: () -> Void
     let onDelete: () -> Void
 
     @State private var didCopy = false
@@ -343,6 +362,15 @@ private struct HistoryRow: View {
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.warning)
                 }
+
+                if let correction = run.correction {
+                    HStack(spacing: DS.Space.tight) {
+                        Image(systemName: "checkmark.circle")
+                        Text(correction.rememberedRule == nil ? "Correction saved" : "Correction saved and remembered")
+                    }
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.inkSecondary)
+                }
             }
 
             HStack(spacing: DS.Space.tight) {
@@ -360,6 +388,17 @@ private struct HistoryRow: View {
                     .accessibilityLabel("Reveal audio recording")
                     .accessibilityHint("Opens the saved CAF recording in Finder")
                 }
+
+                Button(action: onCorrect) {
+                    Image(systemName: "pencil")
+                        .frame(width: DS.Space.roomy, height: DS.Space.roomy)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(DS.Color.inkSecondary)
+                .disabled(correctionDisabled)
+                .help(correctionDisabled ? "Finish the current dictation before correcting history" : "Correct dictation")
+                .accessibilityLabel("Correct dictation")
+                .accessibilityHint("Opens an editor for this saved dictation")
 
                 Button {
                     NSPasteboard.general.clearContents()

@@ -48,6 +48,8 @@ final class DictationController {
     private let hotkey = HotkeyMonitor()
     private let capture = AudioCapture()
     private let makeEngine: @Sendable () -> any TranscriptionEngine
+    private var wantsHotkeyActive = false
+    private var isHotkeySuspendedForModalInput = false
 
     /// Injected only by tests; production reads the setting per-utterance below.
     private let formatter: (any TextFormatter)?
@@ -90,6 +92,12 @@ final class DictationController {
     /// - Returns: `false` if the hotkey tap couldn't be installed (missing Accessibility).
     @discardableResult
     func activate() -> Bool {
+        wantsHotkeyActive = true
+        guard !isHotkeySuspendedForModalInput else { return true }
+        return armHotkey()
+    }
+
+    private func armHotkey() -> Bool {
         hotkey.key = Settings.shared.pushToTalkKey
         hotkey.onPress = { [weak self] in self?.beginDictation() }
         hotkey.onRelease = { [weak self] in self?.endDictation() }
@@ -97,6 +105,7 @@ final class DictationController {
     }
 
     func deactivate() {
+        wantsHotkeyActive = false
         hotkey.stop()
         cancelDictation()
     }
@@ -105,7 +114,22 @@ final class DictationController {
     @discardableResult
     func reloadHotkey() -> Bool {
         hotkey.stop()
-        return activate()
+        wantsHotkeyActive = true
+        guard !isHotkeySuspendedForModalInput else { return true }
+        return armHotkey()
+    }
+
+    func suspendHotkeyForModalInput() {
+        guard !isHotkeySuspendedForModalInput else { return }
+        isHotkeySuspendedForModalInput = true
+        hotkey.stop()
+    }
+
+    func resumeHotkeyAfterModalInput() {
+        guard isHotkeySuspendedForModalInput else { return }
+        isHotkeySuspendedForModalInput = false
+        guard wantsHotkeyActive else { return }
+        _ = armHotkey()
     }
 
     // MARK: - Button-driven recording

@@ -78,5 +78,11 @@ let package = Package(
             resources: [.copy("dictionary-test-vectors.json")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .testTarget(
+            name: "MurmurYouTubeTests",
+            dependencies: ["MurmurYouTube", "MurmurDictionary"],
+            path: "Tests/MurmurYouTubeTests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
     ]
 )

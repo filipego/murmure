@@ -81,6 +81,11 @@ final class DictionaryStore {
         save()
     }
 
+    func remember(_ suggestion: CorrectionRuleSuggestion) {
+        entries = CorrectionLearner.upserting(suggestion, into: entries)
+        save()
+    }
+
     /// Case- and diacritic-insensitive search across both sides of an entry.
     func filtered(by query: String) -> [DictionaryEntry] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
