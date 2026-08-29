@@ -298,6 +298,8 @@ private struct UpdateCard: View {
             "Updates are staged locally under Application Support."
         case .checking:
             "Checking the local update inbox…"
+        case .upToDate:
+            "Updates are staged locally under Application Support."
         case let .available(manifest):
             "Version \(manifest.version.marketing) (\(manifest.version.build)) is ready to install."
         case .installing:

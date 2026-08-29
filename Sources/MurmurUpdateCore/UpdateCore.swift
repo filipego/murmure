@@ -120,6 +120,7 @@ public struct UpdateManifest: Codable, Equatable, Sendable {
 public enum UpdateState: Equatable, Sendable {
     case idle
     case checking
+    case upToDate
     case available(UpdateManifest)
     case installing
     case failed(String)
