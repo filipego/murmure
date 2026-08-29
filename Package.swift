@@ -7,11 +7,15 @@ let package = Package(
     dependencies: [
         // Parakeet TDT as CoreML on the Neural Engine. Optional at runtime — Apple's
         // SpeechTranscriber remains the default and needs no dependency at all.
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.15.6")
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.15.6"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20")
     ],
     targets: [
         .target(
             name: "MurmurUpdateCore",
+            dependencies: [
+                .product(name: "ZIPFoundation", package: "ZIPFoundation")
+            ],
             path: "Sources/MurmurUpdateCore",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
