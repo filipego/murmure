@@ -93,6 +93,8 @@ final class AppUpdateCoordinator {
 
     /// Refreshes local staged state without making a network request.
     func refreshStagedUpdate() {
+        guard state != .checking, state != .installing else { return }
+
         do {
             if let manifest = try validatedStagedManifest() {
                 state = .available(manifest)
@@ -145,6 +147,8 @@ final class AppUpdateCoordinator {
 
     /// Launches the nested helper with structured arguments and asks the app to exit.
     func installAvailableUpdate() {
+        guard state != .checking, state != .installing else { return }
+
         let manifest: UpdateManifest
         if case let .available(value) = state {
             manifest = value

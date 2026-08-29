@@ -191,10 +191,91 @@ final class UpdateCoreTests: XCTestCase {
         XCTAssertEqual(try marker(in: destination), "old")
     }
 
+    func testBundleReplacerValidatesTheCompletedSiblingCopyBeforeMovingInstalledBundle() throws {
+        let root = try TemporaryDirectory()
+        defer { root.remove() }
+        let destination = try root.makeApp(
+            named: "Installed.app",
+            identifier: "ai.pivotstudio.murmur-youtube",
+            marketing: "0.1.0",
+            build: 1,
+            marker: "old"
+        )
+        let staged = try root.makeApp(
+            named: "Staged.app",
+            identifier: "ai.pivotstudio.murmur-youtube",
+            marketing: "0.2.0",
+            build: 2,
+            marker: "new"
+        )
+        let backup = root.url.appendingPathComponent("backup.app")
+        var validatedCopy: URL?
+
+        let result = try BundleReplacer.replace(
+            stagedURL: staged,
+            destinationURL: destination,
+            backupURL: backup,
+            validateCopiedBundle: { copy in
+                validatedCopy = copy
+                XCTAssertNotEqual(copy.standardizedFileURL, staged.standardizedFileURL)
+                XCTAssertEqual(
+                    copy.deletingLastPathComponent().standardizedFileURL,
+                    destination.deletingLastPathComponent().standardizedFileURL
+                )
+                XCTAssertEqual(try self.marker(in: copy), "new")
+                XCTAssertEqual(try self.marker(in: destination), "old")
+            }
+        )
+
+        XCTAssertEqual(result, .installed)
+        XCTAssertNotNil(validatedCopy)
+        XCTAssertEqual(try marker(in: destination), "new")
+        XCTAssertEqual(try marker(in: backup), "old")
+    }
+
+    func testBundleReplacerValidationFailureLeavesInstalledBundleUntouched() throws {
+        let root = try TemporaryDirectory()
+        defer { root.remove() }
+        let destination = try root.makeApp(
+            named: "Installed.app",
+            identifier: "ai.pivotstudio.murmur-youtube",
+            marketing: "0.1.0",
+            build: 1,
+            marker: "old"
+        )
+        let staged = try root.makeApp(
+            named: "Staged.app",
+            identifier: "ai.pivotstudio.murmur-youtube",
+            marketing: "0.2.0",
+            build: 2,
+            marker: "new"
+        )
+        let backup = root.url.appendingPathComponent("backup.app")
+
+        XCTAssertThrowsError(try BundleReplacer.replace(
+            stagedURL: staged,
+            destinationURL: destination,
+            backupURL: backup,
+            validateCopiedBundle: { copy in
+                XCTAssertTrue(FileManager.default.fileExists(atPath: copy.path))
+                XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+                throw CopyValidationError.rejected
+            }
+        )) { error in
+            XCTAssertEqual(error as? CopyValidationError, .rejected)
+        }
+        XCTAssertEqual(try marker(in: destination), "old")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: backup.path))
+    }
+
     private func marker(in app: URL) throws -> String {
         try String(contentsOf: app.appendingPathComponent("marker.txt"), encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
+}
+
+private enum CopyValidationError: Error, Equatable {
+    case rejected
 }
 
 private final class CopyFailureFileManager: FileManager {

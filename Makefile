@@ -40,7 +40,7 @@ ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
 
-.PHONY: all build app run install stage-update share clean icon
+.PHONY: all build app run install require-stable-update-signing stage-update share clean icon
 
 all: app
 
@@ -97,7 +97,13 @@ install: app
 ## Stage the freshly built app in the local update inbox. The coordinator only accepts a
 ## bundle inside this directory, so a manifest copied from another location cannot be used
 ## accidentally. `plutil` writes JSON with the exact Codable shape expected by Swift.
-stage-update: app
+require-stable-update-signing:
+	@if [ "$(SIGN_ID)" = "-" ]; then \
+		echo "stage-update requires a stable code-signing identity; install or select a Developer ID or Local Signing certificate." >&2; \
+		exit 1; \
+	fi
+
+stage-update: require-stable-update-signing app
 	@mkdir -p "$(INBOX)"
 	@set -e; STAGED="$(INBOX)/$(APPNAME)"; \
 		rm -rf "$$STAGED"; \

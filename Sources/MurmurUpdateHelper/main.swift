@@ -42,7 +42,13 @@ struct MurmurUpdateHelper {
             let result = try BundleReplacer.replace(
                 stagedURL: source,
                 destinationURL: destination,
-                backupURL: backup
+                backupURL: backup,
+                validateCopiedBundle: { copiedBundle in
+                    try ReleaseCodeSignatureValidator.validateReplacement(
+                        stagedBundleURL: copiedBundle,
+                        installedBundleURL: destination
+                    )
+                }
             )
             print(result == .installed ? "Murmure update installed." : "Murmure update already installed.")
 

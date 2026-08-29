@@ -244,6 +244,7 @@ public enum BundleReplacer {
         destinationURL: URL,
         backupURL: URL,
         expectedIdentifier: String = murmurBundleIdentifier,
+        validateCopiedBundle: (URL) throws -> Void = { _ in },
         fileManager: FileManager = .default
     ) throws -> BundleReplacementResult {
         let stagedVersion = try BundleValidator.validate(
@@ -294,6 +295,7 @@ public enum BundleReplacer {
             guard copiedVersion == stagedVersion else {
                 throw BundleValidationError.invalidVersion
             }
+            try validateCopiedBundle(temporaryURL)
 
             if destinationExists {
                 try fileManager.moveItem(at: destinationURL, to: backupURL)

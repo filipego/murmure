@@ -83,6 +83,74 @@ struct AppUpdateCoordinatorTests {
         }
     }
 
+    @Test("hosted checks remain serialized across refresh and install attempts")
+    @MainActor
+    func hostedChecksRemainSerialized() async throws {
+        let fixture = try CoordinatorFixture()
+        defer { fixture.remove() }
+        let firstManifest = try fixture.makeManifest(marketing: "0.1.12", build: 12)
+        let secondManifest = try fixture.makeManifest(marketing: "0.1.13", build: 13)
+        let stager = SuspendedHostedStager(results: [firstManifest, secondManifest])
+        let events = CoordinatorEventRecorder()
+        let coordinator = AppUpdateCoordinator(
+            bundleURL: fixture.installedBundle,
+            inboxURL: fixture.inbox,
+            hostedUpdateStager: { _, _, _ in await stager.stage() },
+            signatureValidator: { _, _ in events.append("signature") },
+            launchHelper: { _, _ in events.append("helper") },
+            terminateApplication: { events.append("terminate") }
+        )
+
+        let firstCheck = Task { await coordinator.checkForUpdates() }
+        await stager.waitForCallCount(1)
+        #expect(coordinator.state == .checking)
+
+        coordinator.refreshStagedUpdate()
+        coordinator.installAvailableUpdate()
+        let secondCheck = Task { await coordinator.checkForUpdates() }
+        for _ in 0..<10 { await Task.yield() }
+
+        #expect(await stager.callCount == 1)
+        #expect(coordinator.state == .checking)
+        #expect(events.values.isEmpty)
+
+        await stager.releaseAll()
+        await firstCheck.value
+        await secondCheck.value
+
+        #expect(coordinator.state == .available(firstManifest))
+    }
+
+    @Test("installation remains serialized across refresh and reentrant install attempts")
+    @MainActor
+    func installationRemainsSerialized() throws {
+        let fixture = try CoordinatorFixture()
+        defer { fixture.remove() }
+        let manifest = try fixture.makeManifest(marketing: "0.1.12", build: 12)
+        try fixture.writeManifest(manifest)
+        let helper = try fixture.makeHelper()
+        let events = CoordinatorEventRecorder()
+        let probe = CoordinatorBusyProbe(events: events)
+        let coordinator = AppUpdateCoordinator(
+            bundleURL: fixture.installedBundle,
+            inboxURL: fixture.inbox,
+            helperURL: helper,
+            hostedUpdateStager: { _, _, _ in nil },
+            signatureValidator: { _, _ in
+                events.append("signature")
+                probe.exerciseBusyActions()
+            },
+            launchHelper: { _, _ in events.append("helper") },
+            terminateApplication: { events.append("terminate") }
+        )
+        probe.coordinator = coordinator
+        coordinator.refreshStagedUpdate()
+
+        coordinator.installAvailableUpdate()
+
+        #expect(events.values == ["signature", "installing", "helper", "terminate"])
+    }
+
     @Test("install validates signature before helper launch and termination")
     @MainActor
     func installValidatesSignatureBeforeLaunchingHelper() throws {
@@ -162,12 +230,71 @@ private enum CoordinatorTestError: Error {
     case signatureFailure
 }
 
+private actor SuspendedHostedStager {
+    private let results: [UpdateManifest]
+    private(set) var callCount = 0
+    private var stageContinuations: [CheckedContinuation<Void, Never>] = []
+    private var callWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
+
+    init(results: [UpdateManifest]) {
+        self.results = results
+    }
+
+    func stage() async -> UpdateManifest? {
+        let resultIndex = callCount
+        callCount += 1
+        resumeSatisfiedCallWaiters()
+        await withCheckedContinuation { stageContinuations.append($0) }
+        return results[resultIndex]
+    }
+
+    func waitForCallCount(_ expected: Int) async {
+        guard callCount < expected else { return }
+        await withCheckedContinuation { callWaiters.append((expected, $0)) }
+    }
+
+    func releaseAll() {
+        let continuations = stageContinuations
+        stageContinuations.removeAll()
+        for continuation in continuations {
+            continuation.resume()
+        }
+    }
+
+    private func resumeSatisfiedCallWaiters() {
+        let satisfied = callWaiters.filter { $0.0 <= callCount }
+        callWaiters.removeAll { $0.0 <= callCount }
+        for (_, continuation) in satisfied {
+            continuation.resume()
+        }
+    }
+}
+
 @MainActor
 private final class CoordinatorEventRecorder {
     private(set) var values: [String] = []
 
     func append(_ value: String) {
         values.append(value)
+    }
+}
+
+@MainActor
+private final class CoordinatorBusyProbe {
+    weak var coordinator: AppUpdateCoordinator?
+    private let events: CoordinatorEventRecorder
+    private var exercised = false
+
+    init(events: CoordinatorEventRecorder) {
+        self.events = events
+    }
+
+    func exerciseBusyActions() {
+        guard !exercised else { return }
+        exercised = true
+        coordinator?.refreshStagedUpdate()
+        events.append(coordinator?.state == .installing ? "installing" : "changed")
+        coordinator?.installAvailableUpdate()
     }
 }
 
