@@ -164,6 +164,14 @@ struct GitHubReleaseContractTests {
         }
     }
 
+    @Test("accepts GitHub percent encoding in the release tag path")
+    func acceptsPercentEncodedTagInPath() throws {
+        let result = try Self.candidate(from: Self.releaseJSON(
+            assetURL: "https://github.com/filipego/murmure/releases/download/v0.1.12%2B12/Murmure.app.zip"
+        ))
+        #expect(result?.tag == "v0.1.12+12")
+    }
+
     @Test("rejects an archive URL with the wrong filename")
     func rejectsWrongFilename() {
         #expect(throws: GitHubReleaseContractError.archiveURLFilenameMismatch) {

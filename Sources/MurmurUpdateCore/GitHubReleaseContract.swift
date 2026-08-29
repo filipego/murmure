@@ -186,7 +186,7 @@ public enum GitHubReleaseContract {
               Array(path[1...4]) == ["filipego", "murmure", "releases", "download"] else {
             throw GitHubReleaseContractError.archiveURLRepositoryMismatch
         }
-        guard path.count >= 6, path[5] == tag else {
+        guard path.count >= 6, path[5].removingPercentEncoding == tag else {
             throw GitHubReleaseContractError.archiveURLTagMismatch
         }
         guard path.count == 7, path[6] == archiveName else {
