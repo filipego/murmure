@@ -161,6 +161,7 @@ public struct GitHubReleaseUpdater: Sendable {
             throw GitHubReleaseUpdaterError.archiveRedirectRejected
         }
 
+        _ = try Self.regularFileSize(at: response.fileURL)
         let archiveURL = transactionURL.appendingPathComponent("Murmure.app.zip")
         try fileManager.moveItem(at: response.fileURL, to: archiveURL)
         guard try Self.regularFileSize(at: archiveURL) == candidate.archiveSize else {

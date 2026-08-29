@@ -164,6 +164,51 @@ struct GitHubReleaseUpdaterTests {
         }
     }
 
+    @Test("rejects a downloaded directory without moving or removing it")
+    func rejectsDownloadedDirectoryWithoutMovingIt() async throws {
+        let fixture = try UpdateFixture()
+        defer { fixture.remove() }
+        let installed = try fixture.makeApp(named: "Installed.app", marketing: "0.1.11", build: 11)
+        let sourceDirectory = fixture.root.appendingPathComponent(
+            "hostile-download",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(at: sourceDirectory, withIntermediateDirectories: false)
+        let sentinel = sourceDirectory.appendingPathComponent("sentinel.txt")
+        try Data("preserve me".utf8).write(to: sentinel)
+        let metadata = Data(Self.releaseJSON(
+            size: 1,
+            digest: String(repeating: "0", count: 64)
+        ).utf8)
+        let transport = ScriptedUpdateTransport(
+            metadata: UpdateHTTPData(
+                data: metadata,
+                statusCode: 200,
+                finalURL: Self.metadataURL
+            ),
+            download: UpdateHTTPDownload(
+                fileURL: sourceDirectory,
+                statusCode: 200,
+                finalURL: Self.archiveURL
+            )
+        )
+        let updater = GitHubReleaseUpdater(
+            transport: transport,
+            signatureValidator: { _, _ in }
+        )
+
+        await #expect(throws: GitHubReleaseUpdaterError.downloadedFileInvalid) {
+            try await updater.stageLatestUpdate(
+                newerThan: AppVersion(marketing: "0.1.11", build: 11),
+                installedBundleURL: installed,
+                inboxURL: fixture.inbox
+            )
+        }
+        #expect(FileManager.default.fileExists(atPath: sourceDirectory.path))
+        #expect(try String(contentsOf: sentinel, encoding: .utf8) == "preserve me")
+        #expect(try fixture.transactionDirectories().isEmpty)
+    }
+
     @Test("digest mismatch preserves the existing manifest")
     func digestMismatchPreservesManifest() async throws {
         let fixture = try UpdateFixture()
