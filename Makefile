@@ -135,7 +135,7 @@ stage-update: require-stable-update-signing app
 share: app
 	@mkdir -p "$(DIST)"
 	@rm -f "$(DIST)/$(APPNAME).zip"
-	@ditto -c -k --sequesterRsrc --keepParent "$(BUNDLE)" "$(DIST)/$(APPNAME).zip"
+	@ditto -c -k --keepParent "$(BUNDLE)" "$(DIST)/$(APPNAME).zip"
 	@{ \
 		echo '# Murmure'; \
 		echo; \
