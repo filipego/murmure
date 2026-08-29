@@ -118,7 +118,9 @@ emergency folder).
 
 ### Install the prebuilt archive (recommended for friends)
 
-1. Download [`dist/Murmure.app.zip`](dist/Murmure.app.zip) from this repository and unzip it.
+1. Download the latest fixed release asset:
+   <https://github.com/filipego/murmure/releases/latest/download/Murmure.app.zip>
+   Then unzip it.
 2. Drag **Murmure.app** into `/Applications` and launch it.
 3. This development archive is signed but **not notarized**. If macOS blocks the first launch,
    Control-click the app, choose **Open**, and confirm. If needed, use System Settings → Privacy
@@ -149,14 +151,15 @@ source build still needs the two macOS permissions above. `make share` creates a
 Give a friend this prompt after they open Codex:
 
 ```text
-Install Murmure from https://github.com/filipego/murmure.git.
+Install Murmure from the fixed latest release asset:
+https://github.com/filipego/murmure/releases/latest/download/Murmure.app.zip
 
-Read README.md and AGENTS.md before changing anything. This is a native macOS 26 Swift app.
-Use the repository Makefile (`make install`), not a bare `swift build`. Check that the required
-Swift/Xcode toolchain is available, and ask for approval before running commands that write to
-/Applications. Do not delete or modify unrelated files, especially anything on an external
-drive. After installation, tell me exactly how to grant Microphone and Accessibility access,
-how to run one short test dictation, and where Murmure is storing local data.
+Unzip it, move Murmure.app to /Applications, and help me Control-click Open if macOS blocks
+the first launch. Do not delete or modify unrelated files, especially anything on an external
+drive. Then explain how I grant Microphone and Accessibility access, run one short test
+dictation, and confirm where Murmure stores local data. Use a source build from
+https://github.com/filipego/murmure.git only if the release asset is unavailable; in that case,
+read README.md and AGENTS.md and use `make install`, never a bare `swift build`.
 ```
 
 Codex can build and install the source, but the friend must approve any requested commands and
@@ -165,12 +168,13 @@ and recordings; do not share your `Murmure Data` folder, credentials, or signing
 
 ### Updates after sharing
 
-The in-app **Local update** button installs a validated bundle staged on that Mac (developers
-can create one with `make stage-update`). It is intentionally not a hosted updater. A friend
-who receives a newer GitHub archive must download the new archive and replace the old app, or
-ask Codex to pull the repository and run `make stage-update`; then they can use Settings → Local
-update → **Check for staged update** → **Install and relaunch**. Existing permissions survive
-when the same stable bundle identity is retained.
+After the first install, use **Settings → Updates → Check for updates**. When a newer verified
+release is available, choose **Install and relaunch**. Murmure makes an unauthenticated metadata
+request to the fixed public GitHub Releases endpoint and downloads only the signed app archive
+through GitHub's release delivery hosts. It never sends dictation text, audio, history,
+dictionary entries, or settings. Existing permissions survive because every release retains the
+same bundle identity and signing requirement. Developers can still use `make stage-update` as a
+local fallback when the same stable signing identity is available.
 
 ---
 
