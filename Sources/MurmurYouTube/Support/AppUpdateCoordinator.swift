@@ -3,6 +3,12 @@ import Foundation
 import MurmurUpdateCore
 import Observation
 
+typealias HostedUpdateStager = @Sendable (
+    AppVersion,
+    URL,
+    URL
+) async throws -> UpdateManifest?
+
 enum HubSection: String, CaseIterable, Identifiable {
     case home
     case dictionary
@@ -27,12 +33,12 @@ enum HubSection: String, CaseIterable, Identifiable {
     }
 }
 
-/// The small, observable adapter used by SwiftUI for local staged updates.
+/// The small, observable adapter used by SwiftUI for verified staged updates.
 ///
 /// Manifest parsing, path containment, and bundle validation live here so views only need to
-/// render a state and invoke two actions. No network, URLSession, or shell command belongs in
-/// this path; the nested helper receives an argv array and performs the replacement after the
-/// parent exits.
+/// render a state and invoke actions. Hosted transport and archive handling remain inside
+/// MurmurUpdateCore; the nested helper receives an argv array and performs the replacement after
+/// the parent exits.
 @MainActor
 @Observable
 final class AppUpdateCoordinator {
@@ -44,6 +50,8 @@ final class AppUpdateCoordinator {
     private let expectedIdentifier: String
     private let fileManager: FileManager
     private let helperURLOverride: URL?
+    private let hostedUpdateStager: HostedUpdateStager
+    private let signatureValidator: (URL, URL) throws -> Void
     private let launchHelper: (URL, [String]) throws -> Void
     private let terminateApplication: () -> Void
 
@@ -53,6 +61,8 @@ final class AppUpdateCoordinator {
         helperURL: URL? = nil,
         expectedIdentifier: String = murmurBundleIdentifier,
         fileManager: FileManager = .default,
+        hostedUpdateStager: @escaping HostedUpdateStager = AppUpdateCoordinator.stageHostedUpdate,
+        signatureValidator: @escaping (URL, URL) throws -> Void = ReleaseCodeSignatureValidator.validateReplacement,
         launchHelper: @escaping (URL, [String]) throws -> Void = AppUpdateCoordinator.launch,
         terminateApplication: @escaping () -> Void = { NSApp.terminate(nil) }
     ) {
@@ -61,6 +71,8 @@ final class AppUpdateCoordinator {
         self.helperURLOverride = helperURL?.standardizedFileURL
         self.expectedIdentifier = expectedIdentifier
         self.fileManager = fileManager
+        self.hostedUpdateStager = hostedUpdateStager
+        self.signatureValidator = signatureValidator
         self.launchHelper = launchHelper
         self.terminateApplication = terminateApplication
 
@@ -79,37 +91,10 @@ final class AppUpdateCoordinator {
 
     var manifestURL: URL { inboxURL.appendingPathComponent("manifest.json") }
 
-    /// Reads and validates the staged manifest under Application Support.
-    func checkForStagedUpdate() {
-        state = .checking
-
-        guard fileManager.fileExists(atPath: manifestURL.path) else {
-            state = .idle
-            return
-        }
-
+    /// Refreshes local staged state without making a network request.
+    func refreshStagedUpdate() {
         do {
-            let data = try Data(contentsOf: manifestURL)
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let manifest = try decoder.decode(UpdateManifest.self, from: data)
-
-            guard manifest.bundleIdentifier == expectedIdentifier else {
-                throw CoordinatorError.bundleIdentifierMismatch
-            }
-            guard isContained(manifest.stagedBundleURL, inside: inboxURL) else {
-                throw CoordinatorError.stagedPathOutsideInbox
-            }
-            let stagedURL = manifest.stagedBundleURL.standardizedFileURL
-            let stagedVersion = try BundleValidator.validate(
-                bundleURL: stagedURL,
-                expectedIdentifier: expectedIdentifier
-            )
-            guard stagedVersion == manifest.version else {
-                throw CoordinatorError.manifestVersionMismatch
-            }
-
-            if manifest.version > currentVersion {
+            if let manifest = try validatedStagedManifest() {
                 state = .available(manifest)
             } else {
                 state = .idle
@@ -119,13 +104,52 @@ final class AppUpdateCoordinator {
         }
     }
 
+    /// Retained for callers that refresh the local inbox when their view appears.
+    func checkForStagedUpdate() {
+        refreshStagedUpdate()
+    }
+
+    /// Checks GitHub Releases and falls back to a valid local staged update on hosted failure.
+    func checkForUpdates() async {
+        guard state != .checking, state != .installing else { return }
+        state = .checking
+
+        do {
+            if let hostedManifest = try await hostedUpdateStager(
+                currentVersion,
+                bundleURL,
+                inboxURL
+            ) {
+                state = .available(hostedManifest)
+                return
+            }
+
+            if let localManifest = try validatedStagedManifest() {
+                state = .available(localManifest)
+            } else {
+                state = .upToDate
+            }
+        } catch {
+            let hostedError = error
+            do {
+                if let localManifest = try validatedStagedManifest() {
+                    state = .available(localManifest)
+                } else {
+                    state = .failed(hostedError.localizedDescription)
+                }
+            } catch {
+                state = .failed(error.localizedDescription)
+            }
+        }
+    }
+
     /// Launches the nested helper with structured arguments and asks the app to exit.
     func installAvailableUpdate() {
         let manifest: UpdateManifest
         if case let .available(value) = state {
             manifest = value
         } else {
-            checkForStagedUpdate()
+            refreshStagedUpdate()
             guard case let .available(value) = state else { return }
             manifest = value
         }
@@ -143,6 +167,7 @@ final class AppUpdateCoordinator {
                 throw BundleValidationError.bundleMissing
             }
 
+            try signatureValidator(manifest.stagedBundleURL, bundleURL)
             let helper = try resolvedHelperURL()
             let arguments = [
                 "--source", manifest.stagedBundleURL.path,
@@ -154,6 +179,32 @@ final class AppUpdateCoordinator {
         } catch {
             state = .failed(error.localizedDescription)
         }
+    }
+
+    private func validatedStagedManifest() throws -> UpdateManifest? {
+        guard fileManager.fileExists(atPath: manifestURL.path) else { return nil }
+
+        let data = try Data(contentsOf: manifestURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let manifest = try decoder.decode(UpdateManifest.self, from: data)
+
+        guard manifest.bundleIdentifier == expectedIdentifier else {
+            throw CoordinatorError.bundleIdentifierMismatch
+        }
+        guard isContained(manifest.stagedBundleURL, inside: inboxURL) else {
+            throw CoordinatorError.stagedPathOutsideInbox
+        }
+        let stagedURL = manifest.stagedBundleURL.standardizedFileURL
+        let stagedVersion = try BundleValidator.validate(
+            bundleURL: stagedURL,
+            expectedIdentifier: expectedIdentifier
+        )
+        guard stagedVersion == manifest.version else {
+            throw CoordinatorError.manifestVersionMismatch
+        }
+
+        return manifest.version > currentVersion ? manifest : nil
     }
 
     private func resolvedHelperURL() throws -> URL {
@@ -215,6 +266,18 @@ final class AppUpdateCoordinator {
         process.executableURL = executableURL
         process.arguments = arguments
         try process.run()
+    }
+
+    private nonisolated static func stageHostedUpdate(
+        currentVersion: AppVersion,
+        installedBundleURL: URL,
+        inboxURL: URL
+    ) async throws -> UpdateManifest? {
+        try await GitHubReleaseUpdater().stageLatestUpdate(
+            newerThan: currentVersion,
+            installedBundleURL: installedBundleURL,
+            inboxURL: inboxURL
+        )
     }
 }
 

@@ -161,9 +161,56 @@ final class UpdateCoreTests: XCTestCase {
         XCTAssertEqual(try marker(in: backup), "keep")
     }
 
+    func testBundleReplacerCopiesBeforeMovingInstalledBundle() throws {
+        let root = try TemporaryDirectory()
+        defer { root.remove() }
+        let destination = try root.makeApp(
+            named: "Installed.app",
+            identifier: "ai.pivotstudio.murmur-youtube",
+            marketing: "0.1.0",
+            build: 1,
+            marker: "old"
+        )
+        let staged = try root.makeApp(
+            named: "Staged.app",
+            identifier: "ai.pivotstudio.murmur-youtube",
+            marketing: "0.2.0",
+            build: 2,
+            marker: "new"
+        )
+        let backup = root.url.appendingPathComponent("backup.app")
+        let markerURL = destination.appendingPathComponent("marker.txt")
+        let fileManager = CopyFailureFileManager(installedMarkerURL: markerURL)
+
+        XCTAssertThrowsError(try BundleReplacer.replace(
+            stagedURL: staged,
+            destinationURL: destination,
+            backupURL: backup,
+            fileManager: fileManager
+        ))
+        XCTAssertEqual(try marker(in: destination), "old")
+    }
+
     private func marker(in app: URL) throws -> String {
         try String(contentsOf: app.appendingPathComponent("marker.txt"), encoding: .utf8)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private final class CopyFailureFileManager: FileManager {
+    private let installedMarkerURL: URL
+
+    init(installedMarkerURL: URL) {
+        self.installedMarkerURL = installedMarkerURL
+        super.init()
+    }
+
+    override func copyItem(at srcURL: URL, to dstURL: URL) throws {
+        XCTAssertTrue(
+            fileExists(atPath: installedMarkerURL.path),
+            "The installed bundle must remain present until the staged copy succeeds"
+        )
+        throw CocoaError(.fileWriteUnknown)
     }
 }
 

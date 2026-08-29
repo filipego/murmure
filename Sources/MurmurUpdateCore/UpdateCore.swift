@@ -237,20 +237,20 @@ extension BundleReplacementError: LocalizedError {
 }
 
 /// Replaces a destination app atomically enough for the helper's short-lived update flow.
-/// The old bundle is moved to `backupURL` before the staged bundle is copied into place.
+/// The staged bundle is copied and validated beside the destination before the old bundle moves.
 public enum BundleReplacer {
     public static func replace(
         stagedURL: URL,
         destinationURL: URL,
         backupURL: URL,
-        expectedIdentifier: String = murmurBundleIdentifier
+        expectedIdentifier: String = murmurBundleIdentifier,
+        fileManager: FileManager = .default
     ) throws -> BundleReplacementResult {
         let stagedVersion = try BundleValidator.validate(
             bundleURL: stagedURL,
             expectedIdentifier: expectedIdentifier
         )
 
-        let fileManager = FileManager.default
         let destinationExists = fileManager.fileExists(atPath: destinationURL.path)
         if destinationExists {
             let destinationVersion = try BundleValidator.validate(
@@ -284,11 +284,22 @@ public enum BundleReplacer {
                     // destroy an earlier rollback copy; callers can choose a fresh path instead.
                     throw BundleReplacementError.backupAlreadyExists
                 }
+            }
+
+            try fileManager.copyItem(at: stagedURL, to: temporaryURL)
+            let copiedVersion = try BundleValidator.validate(
+                bundleURL: temporaryURL,
+                expectedIdentifier: expectedIdentifier
+            )
+            guard copiedVersion == stagedVersion else {
+                throw BundleValidationError.invalidVersion
+            }
+
+            if destinationExists {
                 try fileManager.moveItem(at: destinationURL, to: backupURL)
                 movedDestination = true
             }
 
-            try fileManager.copyItem(at: stagedURL, to: temporaryURL)
             try fileManager.moveItem(at: temporaryURL, to: destinationURL)
             return .installed
         } catch {

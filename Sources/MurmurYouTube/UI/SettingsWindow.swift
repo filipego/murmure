@@ -87,7 +87,7 @@ struct SettingsWindow: View {
         }
         .background(DS.Color.canvas)
         .task {
-            updates?.checkForStagedUpdate()
+            updates?.refreshStagedUpdate()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 permissionRefresh += 1
@@ -249,7 +249,7 @@ private struct UpdateCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.base) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Local update")
+                Text("Updates")
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.ink)
                 Spacer()
@@ -264,12 +264,13 @@ private struct UpdateCard: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: DS.Space.snug) {
-                Button("Check for staged update") {
-                    coordinator.checkForStagedUpdate()
+                Button("Check for updates") {
+                    Task { await coordinator.checkForUpdates() }
                 }
                 .buttonStyle(.bordered)
-                .accessibilityLabel("Check for staged update")
-                .accessibilityHint("Looks for a newer bundle in Murmure's local update inbox")
+                .disabled(coordinator.state == .checking || coordinator.state == .installing)
+                .accessibilityLabel("Check GitHub Releases for updates")
+                .accessibilityHint("Downloads and prepares a verified Murmure release when one is available")
 
                 if case .available = coordinator.state {
                     Button("Install and relaunch") {
@@ -279,7 +280,7 @@ private struct UpdateCard: View {
                     .tint(DS.Color.ink)
                     .disabled(!canInstall)
                     .accessibilityLabel("Install and relaunch")
-                    .accessibilityHint("Replaces the installed bundle with the validated staged update")
+                    .accessibilityHint("Replaces the installed bundle with the verified GitHub release")
                 }
             }
         }
@@ -297,9 +298,9 @@ private struct UpdateCard: View {
         case .idle:
             "Updates are staged locally under Application Support."
         case .checking:
-            "Checking the local update inbox…"
+            "Checking GitHub Releases and preparing any update…"
         case .upToDate:
-            "Updates are staged locally under Application Support."
+            "Murmure is up to date."
         case let .available(manifest):
             "Version \(manifest.version.marketing) (\(manifest.version.build)) is ready to install."
         case .installing:

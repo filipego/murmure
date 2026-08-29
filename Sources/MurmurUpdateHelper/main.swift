@@ -30,6 +30,10 @@ struct MurmurUpdateHelper {
                 throw HelperError.destinationMissing
             }
             _ = try BundleValidator.validate(bundleURL: destination)
+            try ReleaseCodeSignatureValidator.validateReplacement(
+                stagedBundleURL: source,
+                installedBundleURL: destination
+            )
 
             if let parentPID, parentPID > 0 {
                 try waitForParentExit(parentPID, timeout: options.timeout ?? defaultParentWait)
