@@ -11,7 +11,7 @@ struct GitHubReleaseContractTests {
             assetName: "Murmure.app.zip",
             assetURL: "https://github.com/filipego/murmure/releases/download/v0.1.12+12/Murmure.app.zip",
             size: 12_345,
-            digest: "sha256:" + String(repeating: "a", count: 64)
+            digest: "sha256:" + String(repeating: "A", count: 64)
         ).utf8)
 
         let result = try GitHubReleaseContract.candidate(
@@ -19,7 +19,12 @@ struct GitHubReleaseContractTests {
             newerThan: AppVersion(marketing: "0.1.11", build: 11)
         )
 
+        #expect(result?.releaseID == 42)
+        #expect(result?.tag == "v0.1.12+12")
         #expect(result?.version == AppVersion(marketing: "0.1.12", build: 12))
+        #expect(result?.archiveURL == URL(
+            string: "https://github.com/filipego/murmure/releases/download/v0.1.12+12/Murmure.app.zip"
+        ))
         #expect(result?.archiveSize == 12_345)
         #expect(result?.archiveSHA256 == String(repeating: "a", count: 64))
     }
@@ -37,6 +42,16 @@ struct GitHubReleaseContractTests {
     func rejectsMalformedTag() {
         #expect(throws: GitHubReleaseContractError.malformedTag) {
             try Self.candidate(from: Self.releaseJSON(tag: "0.1.12+12"))
+        }
+    }
+
+    @Test("rejects an overflowing marketing version component")
+    func rejectsOverflowingMarketingVersion() {
+        #expect(throws: GitHubReleaseContractError.malformedTag) {
+            try Self.candidate(from: Self.releaseJSON(
+                tag: "v999999999999999999999999+12",
+                assetURL: "https://github.com/filipego/murmure/releases/download/v999999999999999999999999+12/Murmure.app.zip"
+            ))
         }
     }
 

@@ -147,7 +147,7 @@ public enum GitHubReleaseContract {
             omittingEmptySubsequences: false
         )
         guard !numberParts.isEmpty,
-              numberParts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }) else {
+              numberParts.allSatisfy({ !$0.isEmpty && Int($0) != nil }) else {
             return false
         }
         if coreAndPrerelease.count == 2 {
