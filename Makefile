@@ -132,6 +132,11 @@ share: app
 		echo '2. If macOS blocks the first launch, Control-click the app, choose Open, and confirm.'; \
 		echo '3. Grant Microphone and Accessibility access, then restart Murmure after Accessibility.'; \
 		echo '4. Hold the configured push-to-talk key to dictate into the focused app.'; \
+		echo '5. To correct a saved dictation, use the pencil Correct action on its history row.'; \
+		echo '   Review “Murmure heard” and edit “I meant”; Play original is optional, and Dictate'; \
+		echo '   only fills the draft. Remember is on by default, and Save correction is the only'; \
+		echo '   action that persists history or a safe contextual local dictionary rule. An'; \
+		echo '   interrupted rule stays pending in history and retries safely on the next launch.'; \
 		echo; \
 		echo 'Murmure stores dictionary entries, settings, transcript history, the dashboard, and'; \
 		echo 'captured audio in its Murmure data folder. On this Mac that is'; \

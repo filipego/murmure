@@ -74,6 +74,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Settings.beginDeferredHydration()
         DictionaryStore.shared.beginDeferredHydration()
         RunLog.beginDeferredHydration()
+        RunLog.beginDeferredPendingRuleRecovery()
 
         // Parakeet's models take ~20s to load from disk, and that cost lands on whichever
         // dictation touches them first — so the first hold after every launch would stall

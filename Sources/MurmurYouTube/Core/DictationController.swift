@@ -51,6 +51,11 @@ final class DictationController {
     private var wantsHotkeyActive = false
     private var isHotkeySuspendedForModalInput = false
 
+    var canStartButtonRecording: Bool {
+        guard !isHotkeySuspendedForModalInput else { return false }
+        return state == .idle
+    }
+
     /// Injected only by tests; production reads the setting per-utterance below.
     private let formatter: (any TextFormatter)?
 
@@ -140,7 +145,7 @@ final class DictationController {
     /// into another app is a comparison affordance; during ordinary dictation it would mean
     /// every recording silently shipped your audio to a third party's servers.
     func startButtonRecording() {
-        guard case .idle = state else { return }
+        guard canStartButtonRecording else { return }
         if Settings.shared.compareMode { WisprTrigger.press() }
         beginDictation()
     }

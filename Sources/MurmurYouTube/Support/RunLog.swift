@@ -12,10 +12,74 @@ struct TranscriptCorrectionRecord: Codable, Equatable, Sendable {
     let correctedAt: Date
     let inputMethod: InputMethod
     let rememberedRule: CorrectionRuleSuggestion?
+    /// Durable handoff to dictionary persistence. It is promoted to `rememberedRule` only
+    /// after both files confirm their writes, and is retried automatically after hydration.
+    let pendingRule: CorrectionRuleSuggestion?
+}
+
+/// A dictionary rule whose correction is durable but whose dictionary/history completion has
+/// not finished yet. The correction record itself is the transaction journal, so recovery never
+/// needs a second external file.
+struct PendingCorrectionRule: Equatable, Sendable {
+    let runID: UUID
+    let intendedText: String
+    let inputMethod: TranscriptCorrectionRecord.InputMethod
+    let rule: CorrectionRuleSuggestion
+}
+
+enum PendingCorrectionRuleRecovery {
+    static func pendingRules(in runs: [DictationRun]) -> [PendingCorrectionRule] {
+        runs.compactMap { run in
+            guard let correction = run.correction,
+                  let rule = correction.pendingRule else {
+                return nil
+            }
+            return PendingCorrectionRule(
+                runID: run.id,
+                intendedText: correction.intendedText,
+                inputMethod: correction.inputMethod,
+                rule: rule
+            )
+        }
+    }
+
+    static func isCurrent(_ pending: PendingCorrectionRule, in runs: [DictationRun]) -> Bool {
+        guard let correction = runs.first(where: { $0.id == pending.runID })?.correction else {
+            return false
+        }
+        return correction.intendedText == pending.intendedText
+            && correction.inputMethod == pending.inputMethod
+            && correction.pendingRule == pending.rule
+    }
+}
+
+enum RunLogCorrectionRollback {
+    /// Restores only the failed attempt when it has not been superseded, retaining unrelated
+    /// cache changes that happened while the external write was in flight.
+    static func restore(
+        attempted: DictationRun,
+        original: DictationRun,
+        in runs: [DictationRun]
+    ) -> [DictationRun] {
+        guard let index = runs.firstIndex(where: { $0.id == attempted.id }),
+              runs[index] == attempted else {
+            return runs
+        }
+        var restored = runs
+        restored[index] = original
+        return restored
+    }
+}
+
+enum CorrectionSaveResult: Equatable, Sendable {
+    case saved
+    case historyFailed
+    case rulePending
+    case rememberedMetadataPending
 }
 
 /// One completed dictation.
-struct DictationRun: Codable, Sendable, Identifiable {
+struct DictationRun: Codable, Equatable, Sendable, Identifiable {
     /// Stable identity, so a single run can be deleted without matching on its text.
     ///
     /// Decoded leniently: runs written before this existed have no `id` field, and failing
@@ -92,6 +156,7 @@ struct DictationRun: Codable, Sendable, Identifiable {
         intendedText: String,
         inputMethod: TranscriptCorrectionRecord.InputMethod,
         rememberedRule: CorrectionRuleSuggestion?,
+        pendingRule: CorrectionRuleSuggestion? = nil,
         at correctedAt: Date = Date()
     ) -> DictationRun {
         var updated = self
@@ -101,7 +166,8 @@ struct DictationRun: Codable, Sendable, Identifiable {
             intendedText: intendedText,
             correctedAt: correctedAt,
             inputMethod: inputMethod,
-            rememberedRule: rememberedRule
+            rememberedRule: rememberedRule,
+            pendingRule: pendingRule
         )
         return updated
     }
@@ -116,59 +182,104 @@ struct DictationRun: Codable, Sendable, Identifiable {
 enum RunLog {
     private static var cachedRuns: [DictationRun] = []
     private static var hydrationStarted = false
+    private static var hydrationTask: Task<Void, Never>?
+    private static var pendingRuleRecoveryInFlight = false
+
+    private static let persistenceWriter = SerializedPersistenceWriter()
+    private static let dashboardWriter = SerializedPersistenceWriter()
+    private static let correctionTransactions = CorrectionTransactionCoordinator()
 
     static var directory: URL { MurmureDataStore.rootURL }
 
     static var dashboardURL: URL { MurmureDataStore.dashboardURL }
-    private static var runsURL: URL { MurmureDataStore.runsURL }
 
     static func record(_ run: DictationRun) {
-        append(run)
         cachedRuns.append(run)
+        _ = enqueueAppend(run)
         regenerate()
         RunStore.shared.reload()
     }
 
     static func record(_ runs: [DictationRun]) {
-        runs.forEach(append)
         cachedRuns.append(contentsOf: runs)
+        runs.forEach { _ = enqueueAppend($0) }
         regenerate()
         RunStore.shared.reload()
     }
 
-    @discardableResult
-    static func correct(
+    static func saveCorrection(
         id: UUID,
         intendedText: String,
         inputMethod: TranscriptCorrectionRecord.InputMethod,
         rememberedRule: CorrectionRuleSuggestion?
-    ) -> Bool {
-        guard let index = cachedRuns.firstIndex(where: { $0.id == id }) else { return false }
-        var runs = cachedRuns
-        runs[index] = runs[index].correcting(
-            intendedText: intendedText,
-            inputMethod: inputMethod,
-            rememberedRule: rememberedRule
-        )
-        rewrite(runs)
-        return true
+    ) async -> CorrectionSaveResult {
+        let result: CorrectionSaveResult = await correctionTransactions.perform {
+            guard await correct(
+                id: id,
+                intendedText: intendedText,
+                inputMethod: inputMethod,
+                rememberedRule: nil,
+                pendingRule: rememberedRule
+            ) else {
+                return CorrectionSaveResult.historyFailed
+            }
+            guard let rememberedRule else { return CorrectionSaveResult.saved }
+            guard await DictionaryStore.shared.remember(rememberedRule) else {
+                return CorrectionSaveResult.rulePending
+            }
+            guard await correct(
+                id: id,
+                intendedText: intendedText,
+                inputMethod: inputMethod,
+                rememberedRule: rememberedRule
+            ) else {
+                return CorrectionSaveResult.rememberedMetadataPending
+            }
+            return CorrectionSaveResult.saved
+        }
+        // A previous launch recovery may have stopped on a transient drive failure, and this
+        // transaction may itself have left a durable pending handoff. One bounded retry is safe
+        // and idempotent; a still-unavailable drive waits for the next save or launch.
+        beginDeferredPendingRuleRecovery()
+        return result
     }
 
-    private static func append(_ run: DictationRun) {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        guard var line = try? encoder.encode(run) else { return }
-        line.append(0x0A) // newline
-        let url = runsURL
-        Task.detached(priority: .utility) {
-            if let handle = try? FileHandle(forWritingTo: url) {
-                defer { try? handle.close() }
-                _ = try? handle.seekToEnd()
-                try? handle.write(contentsOf: line)
-            } else {
-                try? line.write(to: url)
+    @discardableResult
+    private static func correct(
+        id: UUID,
+        intendedText: String,
+        inputMethod: TranscriptCorrectionRecord.InputMethod,
+        rememberedRule: CorrectionRuleSuggestion?,
+        pendingRule: CorrectionRuleSuggestion? = nil
+    ) async -> Bool {
+        await ensureHistoryHydrated()
+        guard let index = cachedRuns.firstIndex(where: { $0.id == id }) else { return false }
+        let originalRuns = cachedRuns
+        var correctedRuns = cachedRuns
+        correctedRuns[index] = correctedRuns[index].correcting(
+            intendedText: intendedText,
+            inputMethod: inputMethod,
+            rememberedRule: rememberedRule,
+            pendingRule: pendingRule
+        )
+        cachedRuns = correctedRuns
+        regenerate()
+        RunStore.shared.reload()
+
+        guard await enqueueRewrite(correctedRuns).value else {
+            let rolledBack = RunLogCorrectionRollback.restore(
+                attempted: correctedRuns[index],
+                original: originalRuns[index],
+                in: cachedRuns
+            )
+            if rolledBack != cachedRuns {
+                cachedRuns = rolledBack
+                regenerate()
+                RunStore.shared.reload()
             }
+            return false
         }
+        return true
     }
 
     static func load() -> [DictationRun] {
@@ -179,14 +290,59 @@ enum RunLog {
     static func beginDeferredHydration() {
         guard !hydrationStarted else { return }
         hydrationStarted = true
-        Task.detached(priority: .utility) {
-            let loaded = readRunsFromDisk()
-            await MainActor.run {
-                // A recording can finish before the drive responds. Preserve that in-memory
-                // run and append the older disk history around it instead of replacing it.
-                let knownIDs = Set(cachedRuns.map(\.id))
-                cachedRuns.insert(contentsOf: loaded.filter { !knownIDs.contains($0.id) }, at: 0)
-                RunStore.shared.reload()
+        hydrationTask = Task { @MainActor in
+            let loaded = await Task.detached(priority: .utility) {
+                readRunsFromDisk()
+            }.value
+            // A recording can finish before the drive responds. Preserve that in-memory
+            // run and append the older disk history around it instead of replacing it.
+            let knownIDs = Set(cachedRuns.map(\.id))
+            cachedRuns.insert(contentsOf: loaded.filter { !knownIDs.contains($0.id) }, at: 0)
+            regenerate()
+            RunStore.shared.reload()
+        }
+    }
+
+    private static func ensureHistoryHydrated() async {
+        if !hydrationStarted { beginDeferredHydration() }
+        await hydrationTask?.value
+    }
+
+    /// Retries only corrections that were durably written as pending before dictionary
+    /// persistence began. A rule is never activated without either this journal entry or its
+    /// final remembered snapshot in history.
+    static func beginDeferredPendingRuleRecovery() {
+        guard !pendingRuleRecoveryInFlight else { return }
+        pendingRuleRecoveryInFlight = true
+        Task { @MainActor in
+            defer { pendingRuleRecoveryInFlight = false }
+            await ensureHistoryHydrated()
+            guard await DictionaryStore.shared.ensureHydrated() else {
+                Log.app.error("pending correction rule recovery is waiting for dictionary hydration")
+                return
+            }
+            await correctionTransactions.perform {
+                await reconcilePendingRules()
+            }
+        }
+    }
+
+    private static func reconcilePendingRules() async {
+        for pending in PendingCorrectionRuleRecovery.pendingRules(in: cachedRuns) {
+            guard PendingCorrectionRuleRecovery.isCurrent(pending, in: cachedRuns) else { continue }
+            guard await DictionaryStore.shared.remember(pending.rule) else {
+                Log.app.error("pending correction rule is waiting for dictionary persistence")
+                continue
+            }
+            guard PendingCorrectionRuleRecovery.isCurrent(pending, in: cachedRuns) else { continue }
+            guard await correct(
+                id: pending.runID,
+                intendedText: pending.intendedText,
+                inputMethod: pending.inputMethod,
+                rememberedRule: pending.rule
+            ) else {
+                Log.app.error("pending correction rule is waiting for history metadata persistence")
+                continue
             }
         }
     }
@@ -205,9 +361,15 @@ enum RunLog {
         let compareMode = Settings.shared.compareMode
         let key = Settings.shared.pushToTalkKey.displayName
         let url = dashboardURL
-        Task.detached(priority: .utility) {
+        _ = dashboardWriter.enqueue {
             let dashboard = DashboardHTML.render(runs: runs, compareMode: compareMode, key: key)
-            try? dashboard.write(to: url, atomically: true, encoding: .utf8)
+            do {
+                try dashboard.write(to: url, atomically: true, encoding: .utf8)
+                return true
+            } catch {
+                Log.app.error("dashboard save failed: \(error.localizedDescription)")
+                return false
+            }
         }
     }
 
@@ -219,43 +381,91 @@ enum RunLog {
     /// Deletes every run in a comparison group — the engines all transcribed one utterance,
     /// so removing that utterance means removing all of its rows.
     static func deleteGroup(_ group: String) {
-        rewrite(load().filter { $0.group != group })
+        Task { @MainActor in
+            await ensureHistoryHydrated()
+            rewrite(load().filter { $0.group != group })
+        }
     }
 
     static func delete(ids: Set<UUID>) {
-        rewrite(load().filter { !ids.contains($0.id) })
+        Task { @MainActor in
+            await ensureHistoryHydrated()
+            rewrite(load().filter { !ids.contains($0.id) })
+        }
     }
 
     static func clear() {
-        cachedRuns.removeAll(keepingCapacity: false)
-        let url = runsURL
-        Task.detached(priority: .utility) {
-            try? FileManager.default.removeItem(at: url)
+        Task { @MainActor in
+            await ensureHistoryHydrated()
+            rewrite([])
         }
+    }
+
+    /// Replaces the whole file through the same serialized snapshot writer used by recording.
+    /// This also persists ids assigned to older runs during hydration.
+    private static func rewrite(_ runs: [DictationRun]) {
+        cachedRuns = runs
+        _ = enqueueRewrite(runs)
         regenerate()
         RunStore.shared.reload()
     }
 
-    /// Replaces the whole file. Deleting can't be an append, and rewriting also persists the
-    /// ids that older runs were assigned on load.
-    private static func rewrite(_ runs: [DictationRun]) {
-        cachedRuns = runs
+    private static func enqueueAppend(_ run: DictationRun) -> Task<Bool, Never> {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
-        let body = runs.compactMap { run -> String? in
-            guard let data = try? encoder.encode(run) else { return nil }
-            return String(data: data, encoding: .utf8)
-        }.joined(separator: "\n")
-
-        // Atomic: a partial write here would lose history that the user didn't ask to delete.
-        let url = runsURL
-        let persistedBody = body.isEmpty ? "" : body + "\n"
-        Task.detached(priority: .utility) {
-            try? persistedBody.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            var encoded = try encoder.encode(run)
+            encoded.append(0x0A)
+            let line = encoded
+            let url = MurmureDataStore.runsURL
+            return persistenceWriter.enqueue {
+                do {
+                    if let handle = try? FileHandle(forWritingTo: url) {
+                        defer { try? handle.close() }
+                        _ = try handle.seekToEnd()
+                        try handle.write(contentsOf: line)
+                    } else {
+                        try line.write(to: url)
+                    }
+                    return true
+                } catch {
+                    Log.app.error("history append failed: \(error.localizedDescription)")
+                    return false
+                }
+            }
+        } catch {
+            Log.app.error("history append encoding failed: \(error.localizedDescription)")
+            return Task { false }
         }
+    }
 
-        regenerate()
-        RunStore.shared.reload()
+    private static func enqueueRewrite(_ runs: [DictationRun]) -> Task<Bool, Never> {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+
+        do {
+            let lines = try runs.map { run in
+                let data = try encoder.encode(run)
+                guard let line = String(data: data, encoding: .utf8) else {
+                    throw CocoaError(.fileWriteInapplicableStringEncoding)
+                }
+                return line
+            }
+            let snapshot = lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"
+            let url = MurmureDataStore.runsURL
+            return persistenceWriter.enqueue {
+                do {
+                    try snapshot.write(to: url, atomically: true, encoding: .utf8)
+                    return true
+                } catch {
+                    Log.app.error("history rewrite failed: \(error.localizedDescription)")
+                    return false
+                }
+            }
+        } catch {
+            Log.app.error("history rewrite encoding failed: \(error.localizedDescription)")
+            return Task { false }
+        }
     }
 }

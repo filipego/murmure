@@ -157,7 +157,7 @@ struct MainWindow: View {
             }
         }
         .keyboardShortcut(.space, modifiers: [])
-        .disabled(isFinishing)
+        .disabled(isFinishing || (!isListening && !controller.canStartButtonRecording))
         .accessibilityLabel(isListening ? "Stop recording" : (isFinishing ? "Transcribing" : "Start recording"))
         .accessibilityValue(recordingAccessibilityValue)
     }
@@ -366,7 +366,7 @@ private struct HistoryRow: View {
                 if let correction = run.correction {
                     HStack(spacing: DS.Space.tight) {
                         Image(systemName: "checkmark.circle")
-                        Text(correction.rememberedRule == nil ? "Correction saved" : "Correction saved and remembered")
+                        Text(correctionStatus(correction))
                     }
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.inkSecondary)
@@ -434,6 +434,12 @@ private struct HistoryRow: View {
                 .strokeBorder(DS.Color.seam, lineWidth: DS.Border.hairline)
         }
         .onHover { isHovering = $0 }
+    }
+
+    private func correctionStatus(_ correction: TranscriptCorrectionRecord) -> String {
+        if correction.rememberedRule != nil { return "Correction saved and remembered" }
+        if correction.pendingRule != nil { return "Correction saved; rule pending" }
+        return "Correction saved"
     }
 }
 

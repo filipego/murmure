@@ -104,6 +104,18 @@ The short version is:
    for a word the engine should recognize, or a **Correction** such as `banana -> Marina` when
    the same mistake repeats. Entries are saved to the Murmure data folder.
 
+### Correct and remember a dictation
+
+From a history row, choose the pencil **Correct** action. Review **Murmure heard** alongside the
+editable **I meant** text; **Play original** replays the retained recording when one exists.
+**Dictate** is optional and only fills the draft — it never saves by itself. **Remember for future
+dictations** is on by default, but only safe, contextual rewrites are added to the local
+dictionary. **Save correction** is the single persistence boundary: it updates the history row and
+then confirms the safe dictionary rule. If the drive or app interrupts that handoff, the history
+marks the rule pending and Murmure retries it safely on the next launch. Audio, history, and
+dictionary data stay local, on the external Murmure data drive when mounted (or in the app's local
+emergency folder).
+
 ### Install the prebuilt archive (recommended for friends)
 
 1. Download [`dist/Murmure.app.zip`](dist/Murmure.app.zip) from this repository and unzip it.

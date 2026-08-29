@@ -107,6 +107,7 @@ struct ComparisonWindow: View {
                 .buttonStyle(.borderedProminent)
                 .tint(isRecording ? DS.Color.record : DS.Color.ink)
                 .controlSize(.large)
+                .disabled(!isRecording && !controller.canStartButtonRecording)
             }
 
             Text(statusLine(isRecording: isRecording))

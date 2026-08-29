@@ -11,6 +11,7 @@ struct CorrectionEditor: View {
     @State private var draft: String
     @State private var remember = true
     @State private var usedVoice = false
+    @State private var isSaving = false
     @State private var message: String?
     @State private var originalAudio: NSSound?
 
@@ -47,6 +48,7 @@ struct CorrectionEditor: View {
         .background(DS.Color.canvas)
         .frame(width: DS.Size.correctionSheetWidth)
         .frame(minHeight: DS.Size.correctionSheetMinHeight)
+        .interactiveDismissDisabled(isSaving)
         .onAppear { dictationController.suspendHotkeyForModalInput() }
         .onDisappear {
             originalAudio?.stop()
@@ -80,6 +82,7 @@ struct CorrectionEditor: View {
                     Button("Play original", systemImage: "play.fill") { playOriginal(audioFile) }
                         .buttonStyle(.bordered)
                         .tint(DS.Color.ink)
+                        .disabled(voiceController.state.isBusy || isSaving)
                 }
             }
             ScrollView {
@@ -120,29 +123,32 @@ struct CorrectionEditor: View {
                     RoundedRectangle(cornerRadius: DS.Radius.control)
                         .strokeBorder(DS.Color.seam, lineWidth: DS.Border.hairline)
                 }
+                .disabled(voiceController.state.isBusy || isSaving)
+                .accessibilityLabel("I meant")
+                .accessibilityHint("Edit the text Murmure should have written")
         }
     }
 
     private var voiceButton: some View {
         Button {
-            if voiceController.state.isRecording {
+            if voiceController.state.canStop {
                 voiceController.stop()
-            } else {
+            } else if voiceController.state == .idle {
                 startVoice()
             }
         } label: {
-            Label(voiceButtonTitle, systemImage: voiceController.state.isRecording ? "stop.fill" : "mic.fill")
+            Label(voiceButtonTitle, systemImage: voiceController.state.canStop ? "stop.fill" : "mic.fill")
         }
         .buttonStyle(.bordered)
         .tint(voiceController.state.isRecording ? DS.Color.record : DS.Color.ink)
-        .disabled(voiceController.state == .starting || voiceController.state == .finishing)
+        .disabled(voiceController.state == .finishing || isSaving)
         .accessibilityLabel(voiceButtonTitle)
     }
 
     private var voiceButtonTitle: String {
         switch voiceController.state {
         case .idle: "Dictate"
-        case .starting: "Preparing…"
+        case .starting: "Stop"
         case .listening: "Stop"
         case .finishing: "Transcribing…"
         }
@@ -153,6 +159,7 @@ struct CorrectionEditor: View {
             Toggle("Remember for future dictations", isOn: $remember)
                 .font(DS.Font.bodyEmphasis)
                 .tint(DS.Color.ink)
+                .disabled(isSaving)
 
             if let suggestion = plan.suggestion {
                 VStack(alignment: .leading, spacing: DS.Space.tight) {
@@ -190,16 +197,30 @@ struct CorrectionEditor: View {
             Spacer()
             Button("Cancel", role: .cancel) { dismiss() }
                 .keyboardShortcut(.cancelAction)
-            Button("Save correction") { save() }
+                .disabled(isSaving)
+            Button("Save correction") {
+                Task { await save() }
+            }
                 .buttonStyle(.borderedProminent)
                 .tint(DS.Color.ink)
                 .keyboardShortcut(.defaultAction)
-                .disabled(voiceController.state.isBusy || draft == run.text)
+                .disabled(voiceController.state.isBusy || isSaving || !canSave)
         }
+    }
+
+    private var canSave: Bool {
+        CorrectionSavePolicy.canSave(
+            draft: draft,
+            run: run,
+            plan: plan,
+            remember: remember
+        )
     }
 
     private func startVoice() {
         message = nil
+        originalAudio?.stop()
+        originalAudio = nil
         voiceController.start { outcome in
             switch outcome {
             case .transcript(let text):
@@ -215,21 +236,34 @@ struct CorrectionEditor: View {
         }
     }
 
-    private func save() {
+    private func save() async {
+        guard canSave, !isSaving else { return }
+        isSaving = true
+        defer { isSaving = false }
+
         let rememberedRule = remember ? plan.suggestion : nil
-        guard RunLog.correct(
+        let inputMethod: TranscriptCorrectionRecord.InputMethod
+        if draft == run.text, let previousMethod = run.correction?.inputMethod {
+            inputMethod = previousMethod
+        } else {
+            inputMethod = usedVoice ? .voiceAssisted : .typed
+        }
+        let result = await RunLog.saveCorrection(
             id: run.id,
             intendedText: draft,
-            inputMethod: usedVoice ? .voiceAssisted : .typed,
+            inputMethod: inputMethod,
             rememberedRule: rememberedRule
-        ) else {
-            message = "This history item is no longer available."
-            return
+        )
+        switch result {
+        case .saved:
+            dismiss()
+        case .historyFailed:
+            message = "Couldn’t save this correction. Check that your history drive is available, then try again."
+        case .rulePending:
+            message = "Correction saved. The rule is pending; Murmure will retry now, then on your next save or launch if the drive stays unavailable."
+        case .rememberedMetadataPending:
+            message = "Correction and dictionary rule saved. Murmure will reconcile the history status automatically."
         }
-        if let rememberedRule {
-            DictionaryStore.shared.remember(rememberedRule)
-        }
-        dismiss()
     }
 
     private func playOriginal(_ audioFile: String) {
@@ -240,7 +274,11 @@ struct CorrectionEditor: View {
         }
         originalAudio?.stop()
         originalAudio = sound
-        sound.play()
+        guard sound.play() else {
+            originalAudio = nil
+            message = "The original audio could not be played."
+            return
+        }
     }
 
     private func historyOnlyExplanation(for reason: CorrectionLearningUnavailableReason?) -> String {
@@ -264,5 +302,32 @@ struct CorrectionEditor: View {
         case nil:
             "This correction will be saved in history without creating a dictionary rule."
         }
+    }
+}
+
+enum CorrectionSavePersistenceStep: Equatable {
+    case correctedHistory
+    case dictionary
+    case rememberedMetadata
+}
+
+enum CorrectionSavePolicy {
+    static func persistenceSteps(
+        remember: Bool,
+        suggestion: CorrectionRuleSuggestion?
+    ) -> [CorrectionSavePersistenceStep] {
+        guard remember, suggestion != nil else { return [.correctedHistory] }
+        return [.correctedHistory, .dictionary, .rememberedMetadata]
+    }
+
+    static func canSave(
+        draft: String,
+        run: DictationRun,
+        plan: CorrectionLearningPlan,
+        remember: Bool
+    ) -> Bool {
+        guard draft == run.text else { return true }
+        guard remember, let suggestion = plan.suggestion else { return false }
+        return suggestion != run.correction?.rememberedRule
     }
 }

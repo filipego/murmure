@@ -12,6 +12,7 @@ final class CorrectionVoiceController {
 
         var isBusy: Bool { self != .idle }
         var isRecording: Bool { self == .listening }
+        var canStop: Bool { self == .starting || self == .listening }
     }
 
     enum Outcome: Equatable, Sendable {
@@ -33,6 +34,7 @@ final class CorrectionVoiceController {
     private var completion: (@MainActor (Outcome) -> Void)?
     private var sessionID: UUID?
     private var streamFailure: String?
+    private var cancellationRequested = false
 
     init(makeEngine: @escaping @Sendable () -> any TranscriptionEngine = engineForCurrentSetting) {
         self.makeEngine = makeEngine
@@ -45,30 +47,31 @@ final class CorrectionVoiceController {
         self.completion = completion
         transcript = ""
         streamFailure = nil
+        cancellationRequested = false
         state = .starting
 
         Task { @MainActor in
             guard await Permissions.requestMicrophone() else {
-                await fail(
+                fail(
                     "Microphone access is off. Enable it in System Settings ▸ Privacy & Security ▸ Microphone.",
                     sessionID: id
                 )
                 return
             }
-            guard sessionID == id else { return }
+            guard sessionID == id, state == .starting else { return }
 
             do {
                 let engine = makeEngine()
                 self.engine = engine
                 let chunks = try await engine.start()
-                guard sessionID == id else {
+                guard sessionID == id, state == .starting else {
                     await engine.finish()
                     return
                 }
                 guard let format = await engine.preferredInputFormat() else {
                     throw TranscriptionError.noAudioFormat
                 }
-                guard sessionID == id else {
+                guard sessionID == id, state == .starting else {
                     await engine.finish()
                     return
                 }
@@ -89,7 +92,7 @@ final class CorrectionVoiceController {
                     onLevel: { _ in }
                 )
                 guard sessionID == id, state == .starting else {
-                    await teardown(sessionID: id)
+                    finish(.cancelled, sessionID: id)
                     return
                 }
 
@@ -100,82 +103,88 @@ final class CorrectionVoiceController {
                             self.transcript = chunk.text
                         }
                     } catch {
-                        self.streamFailure = error.localizedDescription
+                        let message = error.localizedDescription
+                        self.streamFailure = message
+                        Task { @MainActor [weak self] in
+                            self?.finish(.failure(message), sessionID: id)
+                        }
                     }
                 }
             } catch {
-                await fail(error.localizedDescription, sessionID: id)
+                fail(error.localizedDescription, sessionID: id)
             }
         }
     }
 
     func stop() {
-        guard state == .listening, let id = sessionID else { return }
-        state = .finishing
-        capture.stop()
-        audioContinuation?.finish()
-        audioContinuation = nil
-
-        Task { @MainActor in
-            await feedTask?.value
-            feedTask = nil
-            await engine?.finish()
-            await consumeTask?.value
-            consumeTask = nil
-            engine = nil
-            guard sessionID == id else { return }
-            if let streamFailure {
-                complete(.failure(streamFailure), sessionID: id)
-            } else if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                complete(.blankAudio, sessionID: id)
-            } else {
-                complete(.transcript(transcript), sessionID: id)
-            }
-        }
+        guard let id = sessionID else { return }
+        guard state == .starting || state == .listening else { return }
+        finish(state == .starting ? .cancelled : .stopped, sessionID: id)
     }
 
     func cancel() {
         guard let id = sessionID else { return }
-        capture.stop()
-        audioContinuation?.finish()
-        audioContinuation = nil
-        feedTask?.cancel()
-        feedTask = nil
-        consumeTask?.cancel()
-        consumeTask = nil
-        let engine = self.engine
-        self.engine = nil
-        Task { await engine?.finish() }
-        complete(.cancelled, sessionID: id)
+        if state == .finishing {
+            cancellationRequested = true
+            return
+        }
+        finish(.cancelled, sessionID: id)
     }
 
-    private func fail(_ message: String, sessionID id: UUID) async {
-        guard sessionID == id else { return }
-        capture.stop()
-        audioContinuation?.finish()
-        audioContinuation = nil
-        feedTask?.cancel()
-        feedTask = nil
-        consumeTask?.cancel()
-        consumeTask = nil
-        let engine = self.engine
-        self.engine = nil
-        await engine?.finish()
-        complete(.failure(message), sessionID: id)
+    private enum FinishReason {
+        case stopped
+        case failure(String)
+        case cancelled
     }
 
-    private func teardown(sessionID id: UUID) async {
+    private func fail(_ message: String, sessionID id: UUID) {
+        finish(.failure(message), sessionID: id)
+    }
+
+    private func finish(_ reason: FinishReason, sessionID id: UUID) {
+        guard sessionID == id, state != .finishing else { return }
+        state = .finishing
         capture.stop()
         audioContinuation?.finish()
         audioContinuation = nil
-        await feedTask?.value
-        feedTask = nil
-        await engine?.finish()
-        engine = nil
-        consumeTask?.cancel()
-        consumeTask = nil
-        guard sessionID == id else { return }
-        complete(.cancelled, sessionID: id)
+        let feedTask = self.feedTask
+        self.feedTask = nil
+        let consumeTask = self.consumeTask
+        self.consumeTask = nil
+        let engine = self.engine
+        self.engine = nil
+
+        if case .cancelled = reason {
+            feedTask?.cancel()
+            consumeTask?.cancel()
+        }
+
+        Task { @MainActor in
+            await feedTask?.value
+            await engine?.finish()
+            await consumeTask?.value
+            guard sessionID == id else { return }
+
+            if cancellationRequested {
+                complete(.cancelled, sessionID: id)
+                return
+            }
+
+            switch reason {
+            case .stopped:
+                if let streamFailure {
+                    complete(.failure(streamFailure), sessionID: id)
+                } else if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    complete(.blankAudio, sessionID: id)
+                } else {
+                    complete(.transcript(transcript), sessionID: id)
+                }
+            case .failure(let message):
+                complete(.failure(message), sessionID: id)
+            case .cancelled:
+                complete(.cancelled, sessionID: id)
+            }
+        }
     }
 
     private func complete(_ outcome: Outcome, sessionID id: UUID) {
@@ -186,6 +195,7 @@ final class CorrectionVoiceController {
         state = .idle
         transcript = ""
         streamFailure = nil
+        cancellationRequested = false
         completion?(outcome)
     }
 }

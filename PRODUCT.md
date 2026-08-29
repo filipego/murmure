@@ -31,7 +31,8 @@ The app runs as a normal macOS application with a menu-bar presence, a main hub 
 - Hold a configurable hotkey to record and release to finish.
 - Use Apple SpeechAnalyzer/SpeechTranscriber by default, with the existing Parakeet option available as a local alternative.
 - Run deterministic cleanup or Apple's on-device Foundation Models cleanup. No transcript text or audio is sent to a remote API by the default workflow.
-- Apply a local correction dictionary and keep a searchable transcription history.
+- Apply a local correction dictionary, keep searchable transcription history, and turn a
+  user-approved history edit into a narrow contextual rule only after local persistence succeeds.
 - Save transcript history, dictionary entries, settings, dashboard output, and captured CAF
   recordings under `/Volumes/Extreme Pro/Murmure Data` without touching unrelated files on
   the drive. If the drive is unavailable at launch, show the fallback clearly.
