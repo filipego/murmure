@@ -1,0 +1,175 @@
+import Foundation
+import Observation
+
+/// Which speech engine transcribes an utterance.
+enum SpeechEngineChoice: String, CaseIterable, Sendable, Codable {
+    case apple
+    case parakeet
+
+    var displayName: String {
+        switch self {
+        case .apple: "Apple (streaming)"
+        case .parakeet: "Parakeet (batch)"
+        }
+    }
+
+    /// Apple shows text while you talk; Parakeet only resolves on release.
+    var showsLiveText: Bool { self == .apple }
+}
+
+@MainActor
+@Observable
+final class Settings {
+    static let shared = Settings()
+
+    var pushToTalkKey: PushToTalkKey {
+        didSet { persist() }
+    }
+
+    var engine: SpeechEngineChoice {
+        didSet { persist() }
+    }
+
+    /// Run every engine on each recording and show them side by side, instead of
+    /// transcribing with one. Nothing is typed into the focused app in this mode.
+    var compareMode: Bool {
+        didSet { persist() }
+    }
+
+    /// Run the cleanup pass before injecting. Off = raw engine output.
+    var cleanupEnabled: Bool {
+        didSet { persist() }
+    }
+
+    /// Use the on-device LLM for cleanup instead of the deterministic rule pass.
+    var smartCleanup: Bool {
+        didSet { persist() }
+    }
+
+    /// Play a short tick when capture starts and stops.
+    var soundEnabled: Bool {
+        didSet { persist() }
+    }
+
+    private let defaults = UserDefaults.standard
+    private var isHydrating = false
+
+    private struct Snapshot: Codable {
+        let pushToTalkKey: String
+        let engine: SpeechEngineChoice
+        let compareMode: Bool
+        let cleanupEnabled: Bool
+        let smartCleanup: Bool
+        let soundEnabled: Bool
+    }
+
+    private enum Keys {
+        static let pushToTalkKey = "pushToTalkKey"
+        static let cleanupEnabled = "cleanupEnabled"
+        static let soundEnabled = "soundEnabled"
+        static let engine = "engine"
+        static let smartCleanup = "smartCleanup"
+        static let compareMode = "compareMode"
+    }
+
+    private init() {
+        let snapshot = Self.loadSnapshot()
+        let raw = snapshot?.pushToTalkKey
+            ?? defaults.string(forKey: Keys.pushToTalkKey)
+            ?? PushToTalkKey.rightOption.rawValue
+        pushToTalkKey = PushToTalkKey(rawValue: raw) ?? .rightOption
+        // Apple by default: no download, no dependency, live text while speaking.
+        engine = snapshot?.engine
+            ?? SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "")
+            ?? .apple
+        cleanupEnabled = snapshot?.cleanupEnabled
+            ?? (defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true)
+        smartCleanup = snapshot?.smartCleanup
+            ?? (defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false)
+        compareMode = snapshot?.compareMode
+            ?? (defaults.object(forKey: Keys.compareMode) as? Bool ?? false)
+        soundEnabled = snapshot?.soundEnabled
+            ?? (defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true)
+
+        // External settings are hydrated off the launch path. The removable volume can take
+        // an unbounded amount of time to answer its first file open, so the window starts with
+        // the last local preference snapshot and adopts the external snapshot when it arrives.
+    }
+
+    private static func loadSnapshot() -> Snapshot? {
+        let defaults = UserDefaults.standard
+        let hasAnyValue = [
+            Keys.pushToTalkKey,
+            Keys.cleanupEnabled,
+            Keys.soundEnabled,
+            Keys.engine,
+            Keys.smartCleanup,
+            Keys.compareMode
+        ].contains { defaults.object(forKey: $0) != nil }
+        guard hasAnyValue else { return nil }
+
+        return Snapshot(
+            pushToTalkKey: defaults.string(forKey: Keys.pushToTalkKey) ?? PushToTalkKey.rightOption.rawValue,
+            engine: SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple,
+            compareMode: defaults.object(forKey: Keys.compareMode) as? Bool ?? false,
+            cleanupEnabled: defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true,
+            smartCleanup: defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false,
+            soundEnabled: defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
+        )
+    }
+
+    /// Reads the authoritative external snapshot without blocking the app's launch thread.
+    /// The task may outlive a slow or sleeping drive; that is preferable to making the first
+    /// window wait on removable storage.
+    static func beginDeferredHydration() {
+        Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: MurmureDataStore.settingsURL),
+                  let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else {
+                return
+            }
+            await MainActor.run {
+                let settings = Settings.shared
+                settings.isHydrating = true
+                settings.pushToTalkKey = PushToTalkKey(rawValue: snapshot.pushToTalkKey) ?? .rightOption
+                settings.engine = snapshot.engine
+                settings.compareMode = snapshot.compareMode
+                settings.cleanupEnabled = snapshot.cleanupEnabled
+                settings.smartCleanup = snapshot.smartCleanup
+                settings.soundEnabled = snapshot.soundEnabled
+                settings.isHydrating = false
+                // Keep a local fallback for the next launch without synchronously rewriting
+                // the external file from the main actor. The authoritative snapshot is
+                // already on disk and future user edits still use `persist()`.
+                settings.defaults.set(settings.pushToTalkKey.rawValue, forKey: Keys.pushToTalkKey)
+                settings.defaults.set(settings.engine.rawValue, forKey: Keys.engine)
+                settings.defaults.set(settings.compareMode, forKey: Keys.compareMode)
+                settings.defaults.set(settings.cleanupEnabled, forKey: Keys.cleanupEnabled)
+                settings.defaults.set(settings.smartCleanup, forKey: Keys.smartCleanup)
+                settings.defaults.set(settings.soundEnabled, forKey: Keys.soundEnabled)
+            }
+        }
+    }
+
+    private func persist() {
+        guard !isHydrating else { return }
+        let snapshot = Snapshot(
+            pushToTalkKey: pushToTalkKey.rawValue,
+            engine: engine,
+            compareMode: compareMode,
+            cleanupEnabled: cleanupEnabled,
+            smartCleanup: smartCleanup,
+            soundEnabled: soundEnabled
+        )
+        guard let data = try? JSONEncoder().encode(snapshot) else { return }
+        defaults.set(snapshot.pushToTalkKey, forKey: Keys.pushToTalkKey)
+        defaults.set(snapshot.engine.rawValue, forKey: Keys.engine)
+        defaults.set(snapshot.compareMode, forKey: Keys.compareMode)
+        defaults.set(snapshot.cleanupEnabled, forKey: Keys.cleanupEnabled)
+        defaults.set(snapshot.smartCleanup, forKey: Keys.smartCleanup)
+        defaults.set(snapshot.soundEnabled, forKey: Keys.soundEnabled)
+        let url = MurmureDataStore.settingsURL
+        Task.detached(priority: .utility) {
+            try? data.write(to: url, options: .atomic)
+        }
+    }
+}
