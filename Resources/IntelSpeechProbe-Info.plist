@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>ai.pivotstudio.murmure-intel-speech-probe</string>
+    <key>CFBundleName</key>
+    <string>Murmure Intel Speech Probe</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>15.0</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Murmure uses speech recognition to measure local dictation compatibility on this Intel Mac.</string>
+</dict>
+</plist>

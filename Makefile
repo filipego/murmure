@@ -11,6 +11,7 @@ SCRATCH  := $(HOME)/Library/Caches/MurmurYouTubeBuild/scratch
 BUILD    := $(SCRATCH)/$(CONFIG)/$(EXEC)
 HELPER_BUILD := $(SCRATCH)/$(CONFIG)/MurmurUpdateHelper
 TEST_SCRATCH := $(HOME)/Library/Caches/MurmurYouTubeBuild/test-scratch
+INTEL_PROBE = $(STAGE)/MurmureIntelSpeechProbe
 
 ## The bundle is assembled and signed OUTSIDE this directory on purpose.
 ##
@@ -42,7 +43,7 @@ ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -
 endif
 
-.PHONY: all test build app run install require-stable-update-signing stage-update share release clean icon
+.PHONY: all test build app run install intel-probe require-stable-update-signing stage-update share release clean icon
 
 all: app
 
@@ -98,6 +99,26 @@ install: app
 	@cp -R "$(BUNDLE)" "/Applications/$(APPNAME)"
 	@open "/Applications/$(APPNAME)"
 	@echo "installed to /Applications/$(APPNAME)"
+
+intel-probe:
+	@mkdir -p "$(STAGE)"
+	@xcrun swiftc \
+		-parse-as-library \
+		-swift-version 6 \
+		-strict-concurrency=complete \
+		-warnings-as-errors \
+		-target x86_64-apple-macosx15.0 \
+		-framework Speech \
+		-Xlinker -sectcreate \
+		-Xlinker __TEXT \
+		-Xlinker __info_plist \
+		-Xlinker Resources/IntelSpeechProbe-Info.plist \
+		Tools/IntelSpeechProbe.swift \
+		-o "$(INTEL_PROBE)"
+	@codesign --force --sign "$(SIGN_ID)" --timestamp=none "$(INTEL_PROBE)"
+	@ARCHS=$$(lipo -archs "$(INTEL_PROBE)"); \
+		[ "$$ARCHS" = 'x86_64' ] || { echo "unexpected probe architecture: $$ARCHS" >&2; exit 1; }
+	@echo "built $(INTEL_PROBE) for x86_64 macOS 15"
 
 ## Stage the freshly built app in the local update inbox. The coordinator only accepts a
 ## bundle inside this directory, so a manifest copied from another location cannot be used
