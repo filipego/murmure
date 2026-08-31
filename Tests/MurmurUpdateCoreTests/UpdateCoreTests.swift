@@ -88,7 +88,7 @@ final class UpdateCoreTests: XCTestCase {
         }
     }
 
-    func testBundleReplacerPreservesBackupAndIsIdempotent() throws {
+    func testBundleReplacerRemovesBackupAfterSuccessAndIsIdempotent() throws {
         let root = try TemporaryDirectory()
         defer { root.remove() }
         let destination = try root.makeApp(
@@ -114,7 +114,7 @@ final class UpdateCoreTests: XCTestCase {
         )
         XCTAssertEqual(first, .installed)
         XCTAssertEqual(try marker(in: destination), "new")
-        XCTAssertEqual(try marker(in: backup), "old")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: backup.path))
 
         let second = try BundleReplacer.replace(
             stagedURL: staged,
@@ -122,7 +122,7 @@ final class UpdateCoreTests: XCTestCase {
             backupURL: backup
         )
         XCTAssertEqual(second, .alreadyInstalled)
-        XCTAssertEqual(try marker(in: backup), "old")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: backup.path))
     }
 
     func testBundleReplacerRefusesToOverwriteAnExistingBackup() throws {
@@ -230,7 +230,7 @@ final class UpdateCoreTests: XCTestCase {
         XCTAssertEqual(result, .installed)
         XCTAssertNotNil(validatedCopy)
         XCTAssertEqual(try marker(in: destination), "new")
-        XCTAssertEqual(try marker(in: backup), "old")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: backup.path))
     }
 
     func testBundleReplacerValidationFailureLeavesInstalledBundleUntouched() throws {

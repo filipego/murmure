@@ -69,13 +69,9 @@ struct MurmurUpdateHelper {
     }
 
     private static func makeBackupURL(for destination: URL) -> URL {
-        let stamp = ISO8601DateFormatter().string(from: Date())
-            .replacingOccurrences(of: ":", with: "")
-            .replacingOccurrences(of: "-", with: "")
-            .replacingOccurrences(of: ".", with: "")
         let name = destination.deletingPathExtension().lastPathComponent
         return destination.deletingLastPathComponent()
-            .appendingPathComponent("\(name).backup-\(stamp).app")
+            .appendingPathComponent(".\(name).update-backup-\(UUID().uuidString).app")
     }
 
     private static func waitForParentExit(_ pid: pid_t, timeout: TimeInterval) throws {

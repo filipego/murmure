@@ -303,6 +303,11 @@ public enum BundleReplacer {
             }
 
             try fileManager.moveItem(at: temporaryURL, to: destinationURL)
+            if movedDestination {
+                // Installation already succeeded. A cleanup failure must not prevent the new
+                // app from relaunching, but the normal path removes the rollback copy at once.
+                try? fileManager.removeItem(at: backupURL)
+            }
             return .installed
         } catch {
             // Best-effort rollback: an interrupted copy must not leave the app absent.
