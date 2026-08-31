@@ -17,14 +17,59 @@ enum SpeechEngineChoice: String, CaseIterable, Sendable, Codable {
     var showsLiveText: Bool { self == .apple }
 }
 
+struct HotkeyBindingSelection: Equatable {
+    let pushToTalk: PushToTalkKey
+    let handsFree: PushToTalkKey
+
+    init(pushToTalk: PushToTalkKey, handsFree: PushToTalkKey) {
+        self.pushToTalk = pushToTalk
+        self.handsFree = handsFree == pushToTalk
+            ? Self.fallback(excluding: pushToTalk)
+            : handsFree
+    }
+
+    func selectingPushToTalk(_ key: PushToTalkKey) -> Self {
+        Self(pushToTalk: key, handsFree: handsFree)
+    }
+
+    func selectingHandsFree(_ key: PushToTalkKey) -> Self {
+        guard key != pushToTalk else { return self }
+        return Self(pushToTalk: pushToTalk, handsFree: key)
+    }
+
+    private static func fallback(excluding key: PushToTalkKey) -> PushToTalkKey {
+        PushToTalkKey.allCases.first(where: { $0 != key }) ?? .rightCommand
+    }
+}
+
+struct SettingsSnapshot: Codable {
+    let pushToTalkKey: String
+    let engine: SpeechEngineChoice
+    let compareMode: Bool
+    let cleanupEnabled: Bool
+    let smartCleanup: Bool
+    let soundEnabled: Bool
+    let handsFreeEnabled: Bool?
+    let handsFreeKey: String?
+
+    var resolvedHandsFreeEnabled: Bool { handsFreeEnabled ?? false }
+    var resolvedHandsFreeKey: PushToTalkKey {
+        PushToTalkKey(rawValue: handsFreeKey ?? "") ?? .rightCommand
+    }
+}
+
 @MainActor
 @Observable
 final class Settings {
     static let shared = Settings()
 
-    var pushToTalkKey: PushToTalkKey {
+    private(set) var pushToTalkKey: PushToTalkKey
+
+    var handsFreeEnabled: Bool {
         didSet { persist() }
     }
+
+    private(set) var handsFreeKey: PushToTalkKey
 
     var engine: SpeechEngineChoice {
         didSet { persist() }
@@ -54,17 +99,10 @@ final class Settings {
     private let defaults = UserDefaults.standard
     private var isHydrating = false
 
-    private struct Snapshot: Codable {
-        let pushToTalkKey: String
-        let engine: SpeechEngineChoice
-        let compareMode: Bool
-        let cleanupEnabled: Bool
-        let smartCleanup: Bool
-        let soundEnabled: Bool
-    }
-
     private enum Keys {
         static let pushToTalkKey = "pushToTalkKey"
+        static let handsFreeEnabled = "handsFreeEnabled"
+        static let handsFreeKey = "handsFreeKey"
         static let cleanupEnabled = "cleanupEnabled"
         static let soundEnabled = "soundEnabled"
         static let engine = "engine"
@@ -74,10 +112,21 @@ final class Settings {
 
     private init() {
         let snapshot = Self.loadSnapshot()
-        let raw = snapshot?.pushToTalkKey
+        let pushToTalkRaw = snapshot?.pushToTalkKey
             ?? defaults.string(forKey: Keys.pushToTalkKey)
             ?? PushToTalkKey.rightOption.rawValue
-        pushToTalkKey = PushToTalkKey(rawValue: raw) ?? .rightOption
+        let requestedPushToTalk = PushToTalkKey(rawValue: pushToTalkRaw) ?? .rightOption
+        let requestedHandsFree = snapshot?.resolvedHandsFreeKey
+            ?? PushToTalkKey(rawValue: defaults.string(forKey: Keys.handsFreeKey) ?? "")
+            ?? .rightCommand
+        let selection = HotkeyBindingSelection(
+            pushToTalk: requestedPushToTalk,
+            handsFree: requestedHandsFree
+        )
+        pushToTalkKey = selection.pushToTalk
+        handsFreeKey = selection.handsFree
+        handsFreeEnabled = snapshot?.resolvedHandsFreeEnabled
+            ?? (defaults.object(forKey: Keys.handsFreeEnabled) as? Bool ?? false)
         // Apple by default: no download, no dependency, live text while speaking.
         engine = snapshot?.engine
             ?? SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "")
@@ -96,10 +145,12 @@ final class Settings {
         // the last local preference snapshot and adopts the external snapshot when it arrives.
     }
 
-    private static func loadSnapshot() -> Snapshot? {
+    private static func loadSnapshot() -> SettingsSnapshot? {
         let defaults = UserDefaults.standard
         let hasAnyValue = [
             Keys.pushToTalkKey,
+            Keys.handsFreeEnabled,
+            Keys.handsFreeKey,
             Keys.cleanupEnabled,
             Keys.soundEnabled,
             Keys.engine,
@@ -108,13 +159,15 @@ final class Settings {
         ].contains { defaults.object(forKey: $0) != nil }
         guard hasAnyValue else { return nil }
 
-        return Snapshot(
+        return SettingsSnapshot(
             pushToTalkKey: defaults.string(forKey: Keys.pushToTalkKey) ?? PushToTalkKey.rightOption.rawValue,
             engine: SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "") ?? .apple,
             compareMode: defaults.object(forKey: Keys.compareMode) as? Bool ?? false,
             cleanupEnabled: defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true,
             smartCleanup: defaults.object(forKey: Keys.smartCleanup) as? Bool ?? false,
-            soundEnabled: defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true
+            soundEnabled: defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true,
+            handsFreeEnabled: defaults.object(forKey: Keys.handsFreeEnabled) as? Bool,
+            handsFreeKey: defaults.string(forKey: Keys.handsFreeKey)
         )
     }
 
@@ -124,13 +177,19 @@ final class Settings {
     static func beginDeferredHydration() {
         Task.detached(priority: .utility) {
             guard let data = try? Data(contentsOf: MurmureDataStore.settingsURL),
-                  let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else {
+                  let snapshot = try? JSONDecoder().decode(SettingsSnapshot.self, from: data) else {
                 return
             }
             await MainActor.run {
                 let settings = Settings.shared
                 settings.isHydrating = true
-                settings.pushToTalkKey = PushToTalkKey(rawValue: snapshot.pushToTalkKey) ?? .rightOption
+                let selection = HotkeyBindingSelection(
+                    pushToTalk: PushToTalkKey(rawValue: snapshot.pushToTalkKey) ?? .rightOption,
+                    handsFree: snapshot.resolvedHandsFreeKey
+                )
+                settings.pushToTalkKey = selection.pushToTalk
+                settings.handsFreeKey = selection.handsFree
+                settings.handsFreeEnabled = snapshot.resolvedHandsFreeEnabled
                 settings.engine = snapshot.engine
                 settings.compareMode = snapshot.compareMode
                 settings.cleanupEnabled = snapshot.cleanupEnabled
@@ -141,6 +200,8 @@ final class Settings {
                 // the external file from the main actor. The authoritative snapshot is
                 // already on disk and future user edits still use `persist()`.
                 settings.defaults.set(settings.pushToTalkKey.rawValue, forKey: Keys.pushToTalkKey)
+                settings.defaults.set(settings.handsFreeEnabled, forKey: Keys.handsFreeEnabled)
+                settings.defaults.set(settings.handsFreeKey.rawValue, forKey: Keys.handsFreeKey)
                 settings.defaults.set(settings.engine.rawValue, forKey: Keys.engine)
                 settings.defaults.set(settings.compareMode, forKey: Keys.compareMode)
                 settings.defaults.set(settings.cleanupEnabled, forKey: Keys.cleanupEnabled)
@@ -150,18 +211,44 @@ final class Settings {
         }
     }
 
+    func selectPushToTalkKey(_ key: PushToTalkKey) {
+        apply(HotkeyBindingSelection(
+            pushToTalk: pushToTalkKey,
+            handsFree: handsFreeKey
+        ).selectingPushToTalk(key))
+    }
+
+    func selectHandsFreeKey(_ key: PushToTalkKey) {
+        apply(HotkeyBindingSelection(
+            pushToTalk: pushToTalkKey,
+            handsFree: handsFreeKey
+        ).selectingHandsFree(key))
+    }
+
+    private func apply(_ selection: HotkeyBindingSelection) {
+        isHydrating = true
+        pushToTalkKey = selection.pushToTalk
+        handsFreeKey = selection.handsFree
+        isHydrating = false
+        persist()
+    }
+
     private func persist() {
         guard !isHydrating else { return }
-        let snapshot = Snapshot(
+        let snapshot = SettingsSnapshot(
             pushToTalkKey: pushToTalkKey.rawValue,
             engine: engine,
             compareMode: compareMode,
             cleanupEnabled: cleanupEnabled,
             smartCleanup: smartCleanup,
-            soundEnabled: soundEnabled
+            soundEnabled: soundEnabled,
+            handsFreeEnabled: handsFreeEnabled,
+            handsFreeKey: handsFreeKey.rawValue
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(snapshot.pushToTalkKey, forKey: Keys.pushToTalkKey)
+        defaults.set(snapshot.resolvedHandsFreeEnabled, forKey: Keys.handsFreeEnabled)
+        defaults.set(snapshot.resolvedHandsFreeKey.rawValue, forKey: Keys.handsFreeKey)
         defaults.set(snapshot.engine.rawValue, forKey: Keys.engine)
         defaults.set(snapshot.compareMode, forKey: Keys.compareMode)
         defaults.set(snapshot.cleanupEnabled, forKey: Keys.cleanupEnabled)

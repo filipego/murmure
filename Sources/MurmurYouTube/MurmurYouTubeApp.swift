@@ -199,7 +199,7 @@ private struct MenuContent: View {
         Picker("Push-to-talk key", selection: Binding(
             get: { settings.pushToTalkKey },
             set: { key in
-                settings.pushToTalkKey = key
+                settings.selectPushToTalkKey(key)
                 controller.reloadHotkey()
             }
         )) {
