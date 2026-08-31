@@ -73,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MurmureDataStore.beginDeferredMigration()
         Settings.beginDeferredHydration()
         DictionaryStore.shared.beginDeferredHydration()
+        SnippetStore.shared.beginDeferredHydration()
         RunLog.beginDeferredHydration()
         RunLog.beginDeferredPendingRuleRecovery()
         Task {

@@ -213,6 +213,9 @@ struct DictationRun: Codable, Equatable, Sendable, Identifiable {
     /// Optional for backwards compatibility: runs recorded before the dictionary existed
     /// decode with this nil rather than failing the whole line.
     var corrections: [AppliedCorrection]?
+    /// Exact whole-utterance snippet that fired before dictionary correction.
+    /// Optional so history written before snippets remains readable.
+    var appliedSnippet: AppliedSnippet?
     /// The user's latest edit, while retaining the first transcript they corrected.
     /// Optional so history created before correction learning remains decodable.
     var correction: TranscriptCorrectionRecord?
@@ -230,6 +233,7 @@ struct DictationRun: Codable, Equatable, Sendable, Identifiable {
         text: String,
         group: String? = nil,
         corrections: [AppliedCorrection]? = nil,
+        appliedSnippet: AppliedSnippet? = nil,
         audioFile: String? = nil,
         correction: TranscriptCorrectionRecord? = nil
     ) {
@@ -243,6 +247,7 @@ struct DictationRun: Codable, Equatable, Sendable, Identifiable {
         self.audioFile = audioFile
         self.group = group
         self.corrections = corrections
+        self.appliedSnippet = appliedSnippet
         self.correction = correction
     }
 
@@ -261,6 +266,7 @@ struct DictationRun: Codable, Equatable, Sendable, Identifiable {
         audioFile = try container.decodeIfPresent(String.self, forKey: .audioFile)
         group = try container.decodeIfPresent(String.self, forKey: .group)
         corrections = try container.decodeIfPresent([AppliedCorrection].self, forKey: .corrections)
+        appliedSnippet = try container.decodeIfPresent(AppliedSnippet.self, forKey: .appliedSnippet)
         correction = try container.decodeIfPresent(TranscriptCorrectionRecord.self, forKey: .correction)
     }
 

@@ -31,6 +31,7 @@ struct RetranscriptionPreview: Equatable, Sendable, Identifiable {
     let candidateText: String
     let processSeconds: Double
     let corrections: [AppliedCorrection]
+    let appliedSnippet: AppliedSnippet?
     fileprivate let candidateRun: DictationRun
 }
 
@@ -51,6 +52,7 @@ enum RetranscriptionError: LocalizedError, Equatable, Sendable {
 struct RetranscriptionDependencies: Sendable {
     let transcribe: @Sendable (URL, SpeechEngineChoice) async throws -> ArchivedTranscription
     let format: @Sendable (String) async -> String
+    let expand: @Sendable (String) async -> SnippetExpansionResult
     let correct: @Sendable (String) async -> (String, [AppliedCorrection])
     let replaceHistory: @Sendable (DictationRun, DictationRun) async -> Bool
     let persistProcessed: @Sendable (UUID, String) async throws -> Void
@@ -76,6 +78,9 @@ struct RetranscriptionDependencies: Sendable {
                         : RuleBasedFormatter(profile: profile)
                 }
                 return await formatter.format(raw)
+            },
+            expand: { text in
+                await MainActor.run { SnippetStore.shared.expander.expand(text) }
             },
             correct: { text in
                 let corrector = await MainActor.run { DictionaryStore.shared.corrector }
@@ -123,7 +128,8 @@ final class RetranscriptionCoordinator {
         }
         let transcription = try await dependencies.transcribe(audioURL, engine)
         let formatted = await dependencies.format(transcription.text)
-        let (candidateText, corrections) = await dependencies.correct(formatted)
+        let expansion = await dependencies.expand(formatted)
+        let (candidateText, corrections) = await dependencies.correct(expansion.text)
         guard !candidateText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw RetranscriptionError.blankCandidate
         }
@@ -133,7 +139,8 @@ final class RetranscriptionCoordinator {
             engine: engine,
             text: candidateText,
             processSeconds: transcription.processSeconds,
-            corrections: corrections
+            corrections: corrections,
+            appliedSnippet: expansion.applied
         )
         let preview = RetranscriptionPreview(
             id: UUID(),
@@ -143,6 +150,7 @@ final class RetranscriptionCoordinator {
             candidateText: candidateText,
             processSeconds: transcription.processSeconds,
             corrections: corrections,
+            appliedSnippet: expansion.applied,
             candidateRun: candidateRun
         )
         activePreview = preview
@@ -179,7 +187,8 @@ final class RetranscriptionCoordinator {
         engine: SpeechEngineChoice,
         text: String,
         processSeconds: Double,
-        corrections: [AppliedCorrection]
+        corrections: [AppliedCorrection],
+        appliedSnippet: AppliedSnippet?
     ) -> DictationRun {
         switch source {
         case .history(let original):
@@ -202,6 +211,7 @@ final class RetranscriptionCoordinator {
                 text: text,
                 group: original.group,
                 corrections: corrections.isEmpty ? nil : corrections,
+                appliedSnippet: appliedSnippet,
                 audioFile: original.audioFile,
                 correction: correction
             )
@@ -215,7 +225,8 @@ final class RetranscriptionCoordinator {
                 audioSeconds: max(0, releasedAt.timeIntervalSince(recording.startedAt)),
                 processSeconds: processSeconds,
                 text: text,
-                corrections: corrections.isEmpty ? nil : corrections
+                corrections: corrections.isEmpty ? nil : corrections,
+                appliedSnippet: appliedSnippet
             )
         }
     }

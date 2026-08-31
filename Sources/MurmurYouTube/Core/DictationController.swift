@@ -452,11 +452,15 @@ final class DictationController {
             let cleaned = configuration.cleanupEnabled
                 ? await activeFormatter(for: configuration).format(raw)
                 : raw
+            let expansion = SnippetStore.shared.expander.expand(cleaned)
+            if expansion.applied != nil {
+                Log.speech.info("snippet · exact whole-utterance replacement applied")
+            }
 
             // The dictionary runs last, and runs regardless of the cleanup setting. Biasing
             // only raises the odds of the right word; this is the pass that guarantees it,
             // so it must not be something the user can accidentally switch off.
-            let (output, corrections) = DictionaryStore.shared.corrector.apply(to: cleaned)
+            let (output, corrections) = DictionaryStore.shared.corrector.apply(to: expansion.text)
             if !corrections.isEmpty {
                 Log.speech.info("dictionary · \(corrections.count, privacy: .public) correction(s) applied")
             }
@@ -479,7 +483,8 @@ final class DictationController {
                 audioSeconds: releasedAt.timeIntervalSince(holdStarted ?? releasedAt),
                 processSeconds: Date().timeIntervalSince(releasedAt),
                 text: output,
-                corrections: corrections.isEmpty ? nil : corrections
+                corrections: corrections.isEmpty ? nil : corrections,
+                appliedSnippet: expansion.applied
             )
             let completed = await sessionCoordinator.completeLiveSession(
                 sessionID: sessionID,

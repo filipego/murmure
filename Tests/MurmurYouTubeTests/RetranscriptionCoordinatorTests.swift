@@ -25,8 +25,9 @@ struct RetranscriptionCoordinatorTests {
 
         #expect(preview.rawText == "raw archived words")
         #expect(preview.candidateText == "Dictionary result")
+        #expect(preview.appliedSnippet?.trigger == "formatted words")
         #expect(preview.engine == .parakeet)
-        #expect(await state.events == ["transcribe:parakeet", "format", "correct"])
+        #expect(await state.events == ["transcribe:parakeet", "format", "expand", "correct"])
         #expect(await state.replacements.isEmpty)
 
         #expect(await coordinator.confirm(preview))
@@ -40,12 +41,13 @@ struct RetranscriptionCoordinatorTests {
         #expect(saved.engine == "Parakeet")
         #expect(saved.processSeconds == 0.75)
         #expect(saved.text == "Dictionary result")
+        #expect(saved.appliedSnippet?.trigger == "formatted words")
         #expect(saved.correction?.heardText == "Original heard words")
         #expect(saved.correction?.intendedText == "Dictionary result")
         #expect(saved.correction?.inputMethod == .retranscription)
         #expect(saved.correction?.rememberedRule == source.correction?.rememberedRule)
         #expect(saved.correction?.correctedAt == now)
-        #expect(await state.events == ["transcribe:parakeet", "format", "correct", "replace"])
+        #expect(await state.events == ["transcribe:parakeet", "format", "expand", "correct", "replace"])
     }
 
     @Test("failed recording confirmation persists then completes without insertion")
@@ -80,7 +82,7 @@ struct RetranscriptionCoordinatorTests {
         #expect(completed[0].engine == "Apple")
         #expect(await state.refreshCount == 1)
         #expect(await state.events == [
-            "transcribe:apple", "format", "correct", "persist", "complete", "refresh"
+            "transcribe:apple", "format", "expand", "correct", "persist", "complete", "refresh"
         ])
     }
 
@@ -129,9 +131,20 @@ struct RetranscriptionCoordinatorTests {
                 #expect(raw == "raw archived words")
                 return "Formatted words"
             },
-            correct: { formatted in
-                await state.record("correct")
+            expand: { formatted in
+                await state.record("expand")
                 #expect(formatted == "Formatted words")
+                return SnippetExpansionResult(
+                    text: "Snippet result",
+                    applied: AppliedSnippet(
+                        id: UUID(uuidString: "00000000-0000-0000-0000-000000000099")!,
+                        trigger: "formatted words"
+                    )
+                )
+            },
+            correct: { expanded in
+                await state.record("correct")
+                #expect(expanded == "Snippet result")
                 return ("Dictionary result", [])
             },
             replaceHistory: { expected, replacement in

@@ -82,6 +82,7 @@ struct TranscriptionLanguageTests {
 
         let run = try decoder.decode(DictationRun.self, from: data)
         #expect(run.language == nil)
+        #expect(run.appliedSnippet == nil)
     }
 
     @Test("history preserves its selected language")
