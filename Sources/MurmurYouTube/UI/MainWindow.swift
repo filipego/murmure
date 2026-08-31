@@ -203,8 +203,12 @@ struct PrimaryActionButton: View {
 private struct HomePanel: View {
     @Bindable var controller: DictationController
     @State private var store = RunStore.shared
+    @State private var recoverableStore = RecoverableRecordingStore.shared
+    @State private var audioPlayer = HistoryAudioPlayer()
+    @State private var retranscriptionCoordinator = RetranscriptionCoordinator()
     @State private var query = ""
     @State private var correctionRun: DictationRun?
+    @State private var retranscriptionSource: RetranscriptionSource?
 
     private var filteredRuns: [DictationRun] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -233,6 +237,10 @@ private struct HomePanel: View {
             VStack(alignment: .leading, spacing: DS.Space.wide) {
                 stats
 
+                if !recoverableStore.recordings.isEmpty {
+                    recoverableSection
+                }
+
                 HStack(alignment: .firstTextBaseline) {
                     Text("Recent dictation")
                         .font(DS.Font.title)
@@ -260,6 +268,12 @@ private struct HomePanel: View {
                                     HistoryRow(
                                         run: run,
                                         correctionDisabled: controller.state.isActive,
+                                        isPlaying: audioPlayer.state == .playing(run.id),
+                                        playbackMessage: playbackMessage(for: run.id),
+                                        onPlay: { play(run) },
+                                        onRetranscribe: {
+                                            openRetranscription(.history(run))
+                                        },
                                         onCorrect: { openCorrection(run) },
                                         onDelete: {
                                             withAnimation(DS.Motion.panel) { RunLog.delete(run) }
@@ -279,6 +293,42 @@ private struct HomePanel: View {
         }) { run in
             CorrectionEditor(run: run, dictationController: controller)
         }
+        .sheet(item: $retranscriptionSource, onDismiss: {
+            retranscriptionCoordinator.cancel()
+            controller.resumeHotkeyAfterModalInput()
+        }) { source in
+            RetranscriptionSheet(source: source, coordinator: retranscriptionCoordinator)
+        }
+        .task { await recoverableStore.refresh() }
+    }
+
+    private var recoverableSection: some View {
+        VStack(alignment: .leading, spacing: DS.Space.snug) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Recoverable recordings")
+                    .font(DS.Font.title)
+                    .foregroundStyle(DS.Color.ink)
+                Spacer()
+                Text("SAFE LOCALLY")
+                    .font(DS.Font.eyebrow)
+                    .tracking(DS.Font.silkscreenTracking)
+                    .foregroundStyle(DS.Color.inkSecondary)
+            }
+            ForEach(recoverableStore.recordings) { recording in
+                RecoverableHistoryRow(
+                    recording: recording,
+                    actionsDisabled: controller.state.isActive,
+                    isPlaying: audioPlayer.state == .playing(recording.id),
+                    playbackMessage: playbackMessage(for: recording.id),
+                    onPlay: {
+                        audioPlayer.toggle(id: recording.id, url: recording.audioURL)
+                    },
+                    onRetranscribe: {
+                        openRetranscription(.recoverable(recording))
+                    }
+                )
+            }
+        }
     }
 
     private var stats: some View {
@@ -294,6 +344,25 @@ private struct HomePanel: View {
         guard !controller.state.isActive else { return }
         controller.suspendHotkeyForModalInput()
         correctionRun = run
+    }
+
+    private func play(_ run: DictationRun) {
+        guard let audioFile = run.audioFile,
+              let audioURL = AudioHistoryStore.url(for: audioFile) else { return }
+        audioPlayer.toggle(id: run.id, url: audioURL)
+    }
+
+    private func openRetranscription(_ source: RetranscriptionSource) {
+        guard !controller.state.isActive else { return }
+        audioPlayer.stop()
+        controller.suspendHotkeyForModalInput()
+        retranscriptionSource = source
+    }
+
+    private func playbackMessage(for id: UUID) -> String? {
+        guard case let .error(failedID, message) = audioPlayer.state,
+              failedID == id else { return nil }
+        return message
     }
 }
 
@@ -326,6 +395,10 @@ private struct LocalStat: View {
 private struct HistoryRow: View {
     let run: DictationRun
     let correctionDisabled: Bool
+    let isPlaying: Bool
+    let playbackMessage: String?
+    let onPlay: () -> Void
+    let onRetranscribe: () -> Void
     let onCorrect: () -> Void
     let onDelete: () -> Void
 
@@ -366,27 +439,43 @@ private struct HistoryRow: View {
                 if let correction = run.correction {
                     HStack(spacing: DS.Space.tight) {
                         Image(systemName: "checkmark.circle")
-                        Text(correctionStatus(correction))
+                        Text(HistoryRowStatus.correction(correction))
                     }
                     .font(DS.Font.caption)
-                    .foregroundStyle(DS.Color.inkSecondary)
+                        .foregroundStyle(DS.Color.inkSecondary)
+                }
+
+                if let playbackMessage {
+                    Text(playbackMessage)
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.inkSecondary)
                 }
             }
 
             HStack(spacing: DS.Space.tight) {
                 if let audioFile = run.audioFile,
-                   let audioURL = AudioHistoryStore.url(for: audioFile) {
-                    Button {
-                        NSWorkspace.shared.activateFileViewerSelecting([audioURL])
-                    } label: {
-                        Image(systemName: "waveform")
+                   AudioHistoryStore.url(for: audioFile) != nil {
+                    Button(action: onPlay) {
+                        Image(systemName: isPlaying ? "stop.fill" : "play.fill")
                             .frame(width: DS.Space.roomy, height: DS.Space.roomy)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(DS.Color.inkSecondary)
-                    .help("Reveal audio recording")
-                    .accessibilityLabel("Reveal audio recording")
-                    .accessibilityHint("Opens the saved CAF recording in Finder")
+                    .disabled(correctionDisabled)
+                    .help(isPlaying ? "Stop audio recording" : "Play audio recording")
+                    .accessibilityLabel(isPlaying ? "Stop audio recording" : "Play audio recording")
+                    .accessibilityHint("Plays the saved recording inside Murmure")
+
+                    Button(action: onRetranscribe) {
+                        Image(systemName: "arrow.clockwise")
+                            .frame(width: DS.Space.roomy, height: DS.Space.roomy)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(DS.Color.inkSecondary)
+                    .disabled(correctionDisabled)
+                    .help(correctionDisabled ? "Finish the current dictation before retrying history" : "Retranscribe recording")
+                    .accessibilityLabel("Retranscribe recording")
+                    .accessibilityHint("Runs this saved audio through a local speech engine and shows a preview")
                 }
 
                 Button(action: onCorrect) {
@@ -436,10 +525,87 @@ private struct HistoryRow: View {
         .onHover { isHovering = $0 }
     }
 
-    private func correctionStatus(_ correction: TranscriptCorrectionRecord) -> String {
+}
+
+enum HistoryRowStatus {
+    static func correction(_ correction: TranscriptCorrectionRecord) -> String {
+        if correction.inputMethod == .retranscription { return "Retranscribed locally" }
         if correction.rememberedRule != nil { return "Correction saved and remembered" }
         if correction.pendingRule != nil { return "Correction saved; rule pending" }
         return "Correction saved"
+    }
+}
+
+private struct RecoverableHistoryRow: View {
+    let recording: RecoverableRecording
+    let actionsDisabled: Bool
+    let isPlaying: Bool
+    let playbackMessage: String?
+    let onPlay: () -> Void
+    let onRetranscribe: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DS.Space.base) {
+            VStack(alignment: .leading, spacing: DS.Space.tight) {
+                HStack(spacing: DS.Space.snug) {
+                    Text(recording.engine == .apple ? "Apple" : "Parakeet")
+                        .font(DS.Font.eyebrow)
+                        .foregroundStyle(DS.Color.inkSecondary)
+                    Text(recording.releasedAt ?? recording.startedAt, style: .time)
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.inkSecondary)
+                }
+                Text(recording.failure?.message ?? "This recording is ready to retranscribe.")
+                    .font(DS.Font.body)
+                    .foregroundStyle(DS.Color.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: DS.Space.tight) {
+                    Image(systemName: "externaldrive.fill.badge.checkmark")
+                    Text("Audio retained locally")
+                }
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.inkSecondary)
+                if let playbackMessage {
+                    Text(playbackMessage)
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.inkSecondary)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            HStack(spacing: DS.Space.tight) {
+                Button(action: onPlay) {
+                    Image(systemName: isPlaying ? "stop.fill" : "play.fill")
+                        .frame(width: DS.Space.roomy, height: DS.Space.roomy)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(DS.Color.inkSecondary)
+                .disabled(actionsDisabled)
+                .help(isPlaying ? "Stop recoverable recording" : "Play recoverable recording")
+                .accessibilityLabel(isPlaying ? "Stop recoverable recording" : "Play recoverable recording")
+
+                Button(action: onRetranscribe) {
+                    Image(systemName: "arrow.clockwise")
+                        .frame(width: DS.Space.roomy, height: DS.Space.roomy)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(DS.Color.inkSecondary)
+                .disabled(actionsDisabled)
+                .help(actionsDisabled ? "Finish the current dictation before recovery" : "Retranscribe recoverable recording")
+                .accessibilityLabel("Retranscribe recoverable recording")
+            }
+            .opacity(isHovering ? 1 : 0.55)
+        }
+        .padding(DS.Space.base)
+        .background(isHovering ? DS.Color.hover : DS.Color.panel, in: .rect(cornerRadius: DS.Radius.panel))
+        .overlay {
+            RoundedRectangle(cornerRadius: DS.Radius.panel)
+                .strokeBorder(DS.Color.seam, lineWidth: DS.Border.hairline)
+        }
+        .onHover { isHovering = $0 }
     }
 }
 

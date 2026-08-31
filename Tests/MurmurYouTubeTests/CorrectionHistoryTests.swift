@@ -317,6 +317,25 @@ struct CorrectionHistoryTests {
         #expect(state.persistCalls == 0)
     }
 
+    @Test("history status distinguishes retranscription from manual correction")
+    func retranscriptionStatusCopy() {
+        let retranscribed = sampleRun().correcting(
+            intendedText: "Retranscribed words",
+            inputMethod: .retranscription,
+            rememberedRule: nil,
+            at: Date(timeIntervalSince1970: 100)
+        )
+        let typed = sampleRun().correcting(
+            intendedText: "Typed correction",
+            inputMethod: .typed,
+            rememberedRule: nil,
+            at: Date(timeIntervalSince1970: 100)
+        )
+
+        #expect(HistoryRowStatus.correction(retranscribed.correction!) == "Retranscribed locally")
+        #expect(HistoryRowStatus.correction(typed.correction!) == "Correction saved")
+    }
+
     @Test("a pending rule survives a history JSON round trip for later reconciliation")
     func pendingRuleJournalRoundTrip() throws {
         let suggestion = CorrectionRuleSuggestion(hear: "a lie", write: "a line")
