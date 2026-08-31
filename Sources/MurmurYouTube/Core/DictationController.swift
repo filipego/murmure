@@ -140,20 +140,12 @@ final class DictationController {
     // MARK: - Button-driven recording
 
     /// Starts a recording from a Record button rather than the hotkey.
-    ///
-    /// Wispr Flow's hotkey is held down for the duration **only in compare mode**. Reaching
-    /// into another app is a comparison affordance; during ordinary dictation it would mean
-    /// every recording silently shipped your audio to a third party's servers.
     func startButtonRecording() {
         guard canStartButtonRecording else { return }
-        if Settings.shared.compareMode { WisprTrigger.press() }
         beginDictation()
     }
 
-    /// Releases Wispr's hotkey first, so its upload starts while our own engines are still
-    /// finishing — otherwise every run would wait the full round trip end to end.
     func stopButtonRecording() {
-        WisprTrigger.release()
         endDictation()
     }
 
@@ -389,33 +381,6 @@ final class DictationController {
                 \(result.seconds, format: .fixed(precision: 2))s — \
                 \(result.text, privacy: .public)
                 """)
-        }
-
-        // Wispr Flow, if its hotkey was held for this same utterance. It transcribes in the
-        // cloud, so its row lands after both local engines have already finished — the wait
-        // happens here rather than blocking the rows above from appearing.
-        if WisprReader.isInstalled {
-            transcript = "Waiting for Wispr Flow…"
-            if let wispr = await WisprReader.result(after: holdStarted, timeout: 8) {
-                RunLog.record(
-                    DictationRun(
-                        date: releasedAt,
-                        engine: wispr.engine,
-                        audioSeconds: held,
-                        processSeconds: wispr.seconds,
-                        text: wispr.text,
-                        group: group,
-                        audioFile: audioFile
-                    )
-                )
-                Log.speech.info("""
-                    compare · \(wispr.engine, privacy: .public): \
-                    \(wispr.seconds, format: .fixed(precision: 2))s — \
-                    \(wispr.text, privacy: .public)
-                    """)
-            } else {
-                Log.speech.info("compare · Wispr Flow: no result (hotkey not held, or timed out)")
-            }
         }
 
         self.holdStarted = nil

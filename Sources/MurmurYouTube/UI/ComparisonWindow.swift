@@ -97,7 +97,7 @@ struct ComparisonWindow: View {
                     }
                 } label: {
                     Label(
-                        isRecording ? "Stop" : "Record all three",
+                        isRecording ? "Stop" : "Record both",
                         systemImage: isRecording ? "stop.circle.fill" : "record.circle"
                     )
                     .font(.system(size: 15, weight: .semibold))
@@ -120,9 +120,7 @@ struct ComparisonWindow: View {
     private func statusLine(isRecording: Bool) -> String {
         if isRecording { return "Recording — click Stop when you're done talking." }
         if !controller.transcript.isEmpty { return controller.transcript }
-        return WisprReader.isInstalled
-            ? "Click Record, talk, click Stop. Apple, Parakeet and Wispr Flow all hear it."
-            : "Click Record, talk, click Stop. Wispr Flow isn't installed, so it's Apple vs Parakeet."
+        return "Click Record, talk, click Stop. Apple and Parakeet both hear the same local recording."
     }
 
     private var emptyState: some View {

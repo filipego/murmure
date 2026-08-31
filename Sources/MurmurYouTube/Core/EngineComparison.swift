@@ -25,11 +25,12 @@ enum EngineComparison {
         // Sequential, not concurrent: two engines racing for the ANE and CPU would
         // contaminate each other's timings. So this is not a live race — each engine is
         // timed in isolation and the *measured* durations are what get compared.
-        for (name, engine) in [
-            ("Apple", AppleSpeechEngine() as any TranscriptionEngine),
-            ("Parakeet", ParakeetEngine() as any TranscriptionEngine),
-        ] {
-            let result = await measure(name: name, engine: engine, chunks: chunks)
+        for participant in LocalComparisonParticipant.allCases {
+            let result = await measure(
+                name: participant.displayName,
+                engine: participant.makeEngine(),
+                chunks: chunks
+            )
             results.append(result)
             await onResult(result)
         }
