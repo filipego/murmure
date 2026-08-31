@@ -29,6 +29,11 @@ let package = Package(
             path: "Sources/MurmurAudioCore",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        .target(
+            name: "MurmurSessionCore",
+            path: "Sources/MurmurSessionCore",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         // The dictionary is its own target so it can be tested directly, and because its
         // behaviour is a cross-platform contract: the Windows app reimplements this logic in
         // C#, and both sides run the same vectors in shared/dictionary-test-vectors.json.
@@ -44,6 +49,7 @@ let package = Package(
                 "MurmurUpdateCore",
                 "MurmurPermissionCore",
                 "MurmurAudioCore",
+                "MurmurSessionCore",
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ],
             path: "Sources/MurmurYouTube",
@@ -73,6 +79,12 @@ let package = Package(
             name: "MurmurAudioCoreTests",
             dependencies: ["MurmurAudioCore"],
             path: "Tests/MurmurAudioCoreTests",
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "MurmurSessionCoreTests",
+            dependencies: ["MurmurSessionCore"],
+            path: "Tests/MurmurSessionCoreTests",
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(
