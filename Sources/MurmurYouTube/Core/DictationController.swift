@@ -79,6 +79,7 @@ final class DictationController {
     private var wantsHotkeyActive = false
     private var isHotkeySuspendedForModalInput = false
     private var handsFreePolicy = HandsFreeGesturePolicy()
+    private var primaryGesturePolicy = HotkeyGesturePolicy(gesture: .hold)
     private var activeTrigger: RecordingTrigger?
 
     var canStartButtonRecording: Bool {
@@ -138,20 +139,19 @@ final class DictationController {
     }
 
     private func armHotkey() -> Bool {
-        hotkey.key = Settings.shared.pushToTalkKey
-        hotkey.handsFreeKey = Settings.shared.handsFreeEnabled
-            ? Settings.shared.handsFreeKey
+        let primaryBinding = Settings.shared.pushToTalkBinding
+        hotkey.binding = primaryBinding
+        hotkey.handsFreeBinding = Settings.shared.handsFreeEnabled
+            ? Settings.shared.handsFreeBinding
             : nil
+        primaryGesturePolicy = HotkeyGesturePolicy(gesture: primaryBinding.gesture)
         hotkey.onPress = { [weak self] in
-            guard let self else { return }
-            self.beginDictation(
-                trigger: .holdToTalk(bindingID: Settings.shared.pushToTalkKey.rawValue)
-            )
+            self?.handlePrimaryBinding(.pressed(at: Date.timeIntervalSinceReferenceDate))
         }
-        hotkey.onRelease = { [weak self] in self?.endHoldToTalkDictation() }
-        hotkey.isHandsFreeActive = { [weak self] in
-            self?.handsFreePolicy.isActive ?? false
+        hotkey.onRelease = { [weak self] in
+            self?.handlePrimaryBinding(.released(at: Date.timeIntervalSinceReferenceDate))
         }
+        hotkey.handsFreeSessionIsActive = handsFreePolicy.isActive
         hotkey.onHandsFreeToggle = { [weak self] in
             self?.handleHandsFree(.bindingPressed)
         }
@@ -209,6 +209,19 @@ final class DictationController {
         endDictation()
     }
 
+    private func handlePrimaryBinding(_ edge: HotkeyGesturePolicy.Edge) {
+        switch primaryGesturePolicy.handle(edge) {
+        case .start:
+            beginDictation(
+                trigger: .holdToTalk(bindingID: Settings.shared.pushToTalkBinding.id)
+            )
+        case .finish:
+            endHoldToTalkDictation()
+        case .ignore:
+            break
+        }
+    }
+
     private func handleHandsFree(_ event: HandsFreeGesturePolicy.Event) {
         if event == .bindingPressed,
            !handsFreePolicy.isActive,
@@ -219,7 +232,7 @@ final class DictationController {
         switch handsFreePolicy.handle(event) {
         case .start:
             beginDictation(
-                trigger: .handsFree(bindingID: Settings.shared.handsFreeKey.rawValue)
+                trigger: .handsFree(bindingID: Settings.shared.handsFreeBinding.id)
             )
         case .finish:
             endDictation()
@@ -228,6 +241,7 @@ final class DictationController {
         case .ignore:
             break
         }
+        hotkey.handsFreeSessionIsActive = handsFreePolicy.isActive
     }
 
     // MARK: - Dictation
@@ -368,6 +382,7 @@ final class DictationController {
         if handsFreePolicy.isActive,
            case .handsFree = activeTrigger {
             _ = handsFreePolicy.handle(.enterPressed)
+            hotkey.handsFreeSessionIsActive = handsFreePolicy.isActive
         }
 
         // `.finishing` is "active", so without this a second press during processing would
@@ -600,7 +615,9 @@ final class DictationController {
     private func resetTriggerLifecycle() {
         activeTrigger = nil
         activeConfiguration = nil
+        primaryGesturePolicy.reset()
         _ = handsFreePolicy.handle(.sessionEnded)
+        hotkey.handsFreeSessionIsActive = false
     }
 
     private func fail(_ message: String) {

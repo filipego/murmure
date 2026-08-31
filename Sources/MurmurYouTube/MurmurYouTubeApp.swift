@@ -101,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         observeState()
-        Log.app.info("Murmure ready — hold \(Settings.shared.pushToTalkKey.displayName) to dictate")
+        Log.app.info("Murmure ready — use \(Settings.shared.pushToTalkBinding.label) to dictate")
     }
 
     /// `murmuryt://clear` and `murmuryt://show`, used by the legacy HTML dashboard and
@@ -192,19 +192,16 @@ private struct MenuContent: View {
     }
 
     var body: some View {
-        Text("Hold \(settings.pushToTalkKey.displayName) to dictate")
+        Text("Use \(settings.pushToTalkBinding.label) to dictate")
 
         Divider()
 
-        Picker("Push-to-talk key", selection: Binding(
-            get: { settings.pushToTalkKey },
-            set: { key in
+        Menu("Choose shortcut preset") {
+            ForEach(PushToTalkKey.allCases, id: \.self) { key in
+                Button(key.displayName) {
                 settings.selectPushToTalkKey(key)
                 controller.reloadHotkey()
-            }
-        )) {
-            ForEach(PushToTalkKey.allCases, id: \.self) { key in
-                Text(key.displayName).tag(key)
+                }
             }
         }
 

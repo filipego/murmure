@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 import Testing
 @testable import MurmurYouTube
 
@@ -81,6 +82,65 @@ struct HotkeyRegistryTests {
             for: PushToTalkKey.rightOption.binding(gesture: .hold)
         )
         #expect(issues.contains { $0.code == .internationalLayout && $0.severity == .warning })
+    }
+}
+
+@Suite("Hotkey event routing")
+struct HotkeyEventRouterTests {
+    @Test("a custom chord consumes press, repeat, and release but emits one edge each")
+    func customChord() {
+        let binding = HotkeyBinding(
+            keyCode: 49,
+            requiredFlags: HotkeyModifier.command.rawValue | HotkeyModifier.shift.rawValue,
+            side: nil,
+            gesture: .hold,
+            consumption: .suppress,
+            label: "⇧⌘Space"
+        )
+        let flags = CGEventFlags(rawValue: binding.requiredFlags)
+        let router = HotkeyEventRouter()
+        router.configure(binding: binding, handsFreeBinding: nil, handsFreeSessionIsActive: false)
+
+        let press = router.route(type: .keyDown, keyCode: 49, flags: flags)
+        let repeated = router.route(type: .keyDown, keyCode: 49, flags: flags)
+        let release = router.route(type: .keyUp, keyCode: 49, flags: flags)
+
+        #expect(press.consume && press.action == .press)
+        #expect(repeated.consume && repeated.action == nil)
+        #expect(release.consume && release.action == .release)
+    }
+
+    @Test("an observed fn binding triggers without swallowing the event")
+    func observedModifier() {
+        let binding = PushToTalkKey.fn.binding(gesture: .hold)
+        let router = HotkeyEventRouter()
+        router.configure(binding: binding, handsFreeBinding: nil, handsFreeSessionIsActive: false)
+
+        let result = router.route(
+            type: .flagsChanged,
+            keyCode: binding.keyCode,
+            flags: CGEventFlags(rawValue: binding.requiredFlags)
+        )
+
+        #expect(!result.consume)
+        #expect(result.action == .press)
+    }
+
+    @Test("Return is consumed only while hands-free is active")
+    func handsFreeControl() {
+        let router = HotkeyEventRouter()
+        router.configure(
+            binding: PushToTalkKey.fn.binding(gesture: .hold),
+            handsFreeBinding: PushToTalkKey.rightCommand.binding(gesture: .toggle),
+            handsFreeSessionIsActive: false
+        )
+
+        let inactive = router.route(type: .keyDown, keyCode: 36, flags: [])
+        router.handsFreeSessionIsActive = true
+        let active = router.route(type: .keyDown, keyCode: 36, flags: [])
+
+        #expect(!inactive.consume && inactive.action == nil)
+        #expect(active.consume && active.action == .handsFreeFinish)
     }
 }
 

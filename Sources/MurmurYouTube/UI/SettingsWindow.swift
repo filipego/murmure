@@ -14,6 +14,9 @@ struct SettingsWindow: View {
     @State private var speechLanguages = SpeechLanguageCatalog.shared
     @State private var microphoneTest = MicrophoneTestCoordinator()
     @State private var permissionRefresh = 0
+    @State private var hotkeyCaptureTarget: HotkeyCaptureTarget?
+    @State private var pendingRiskyHotkey: PendingHotkey?
+    @State private var hotkeyMessage: String?
 
     init(controller: DictationController, updates: AppUpdateCoordinator? = nil) {
         self.controller = controller
@@ -23,20 +26,26 @@ struct SettingsWindow: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Space.wide) {
-                settingsCard(title: "Push to talk", detail: "Hold this key anywhere to dictate. The Record button works regardless of what is focused.") {
-                    Picker("Push-to-talk key", selection: Binding(
-                        get: { settings.pushToTalkKey },
-                        set: { key in
-                            settings.selectPushToTalkKey(key)
+                settingsCard(title: "Push to talk", detail: "Use this shortcut anywhere to dictate. The Record button works regardless of what is focused.") {
+                    shortcutRow(
+                        title: "Dictation shortcut",
+                        binding: settings.pushToTalkBinding,
+                        target: .pushToTalk
+                    )
+
+                    Picker("Gesture", selection: Binding(
+                        get: { settings.pushToTalkBinding.gesture },
+                        set: { gesture in
+                            settings.selectPushToTalkGesture(gesture)
                             controller.reloadHotkey()
                         }
                     )) {
-                        ForEach(PushToTalkKey.allCases, id: \.self) { key in
-                            Text(key.displayName).tag(key)
+                        ForEach(HotkeyGesture.allCases, id: \.self) { gesture in
+                            Text(gesture.displayName).tag(gesture)
                         }
                     }
                     .pickerStyle(.menu)
-                    .frame(maxWidth: 260, alignment: .leading)
+                    .frame(maxWidth: 300, alignment: .leading)
 
                     Divider()
 
@@ -48,28 +57,31 @@ struct SettingsWindow: View {
                         }
                     ))
 
-                    Picker("Hands-free key", selection: Binding(
-                        get: { settings.handsFreeKey },
-                        set: { key in
-                            settings.selectHandsFreeKey(key)
-                            controller.reloadHotkey()
-                        }
-                    )) {
-                        ForEach(
-                            PushToTalkKey.allCases.filter { $0 != settings.pushToTalkKey },
-                            id: \.self
-                        ) { key in
-                            Text(key.displayName).tag(key)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: 260, alignment: .leading)
+                    shortcutRow(
+                        title: "Hands-free shortcut",
+                        binding: settings.handsFreeBinding,
+                        target: .handsFree
+                    )
                     .disabled(!settings.handsFreeEnabled)
 
                     Text("Press once to start. Press the same key or Enter to finish; Escape cancels.")
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
+
+                    if let hotkeyMessage {
+                        Text(hotkeyMessage)
+                            .font(DS.Font.caption)
+                            .foregroundStyle(DS.Color.warning)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Button("Restore shortcut defaults") {
+                        settings.restoreHotkeyDefaults()
+                        hotkeyMessage = nil
+                        controller.reloadHotkey()
+                    }
+                    .buttonStyle(.link)
                 }
 
                 settingsCard(title: "Transcription", detail: settings.engine == .apple
@@ -202,6 +214,106 @@ struct SettingsWindow: View {
             microphoneTest.stop()
             controller.resumeHotkeyAfterModalInput()
         }
+        .sheet(item: $hotkeyCaptureTarget, onDismiss: {
+            controller.resumeHotkeyAfterModalInput()
+        }) { target in
+            ShortcutRecorderSheet(
+                title: target == .pushToTalk
+                    ? "Record hold-to-talk shortcut"
+                    : "Record hands-free shortcut",
+                gesture: target == .pushToTalk
+                    ? settings.pushToTalkBinding.gesture
+                    : .toggle,
+                onCapture: { binding in
+                    hotkeyCaptureTarget = nil
+                    handleCapturedHotkey(binding, target: target)
+                },
+                onCancel: { hotkeyCaptureTarget = nil }
+            )
+        }
+        .alert("Use this shortcut?", isPresented: Binding(
+            get: { pendingRiskyHotkey != nil },
+            set: { if !$0 { pendingRiskyHotkey = nil } }
+        )) {
+            Button("Use shortcut") {
+                if let pendingRiskyHotkey {
+                    applyHotkey(pendingRiskyHotkey.binding, target: pendingRiskyHotkey.target)
+                }
+                pendingRiskyHotkey = nil
+            }
+            Button("Cancel", role: .cancel) { pendingRiskyHotkey = nil }
+        } message: {
+            Text(pendingRiskyHotkey?.message ?? "")
+        }
+    }
+
+    @ViewBuilder
+    private func shortcutRow(
+        title: String,
+        binding: HotkeyBinding,
+        target: HotkeyCaptureTarget
+    ) -> some View {
+        HStack(spacing: DS.Space.snug) {
+            Text(title)
+                .font(DS.Font.body)
+                .foregroundStyle(DS.Color.ink)
+            Spacer()
+            Button(binding.label) { beginHotkeyCapture(target) }
+                .buttonStyle(.bordered)
+            Menu("Presets") {
+                ForEach(PushToTalkKey.allCases, id: \.self) { preset in
+                    Button(preset.displayName) {
+                        let gesture = target == .pushToTalk
+                            ? settings.pushToTalkBinding.gesture
+                            : .toggle
+                        handleCapturedHotkey(
+                            preset.binding(gesture: gesture),
+                            target: target
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func beginHotkeyCapture(_ target: HotkeyCaptureTarget) {
+        hotkeyMessage = nil
+        controller.suspendHotkeyForModalInput()
+        hotkeyCaptureTarget = target
+    }
+
+    private func handleCapturedHotkey(
+        _ binding: HotkeyBinding,
+        target: HotkeyCaptureTarget
+    ) {
+        let primary = target == .pushToTalk ? binding : settings.pushToTalkBinding
+        let handsFree = target == .handsFree ? binding : settings.handsFreeBinding
+        let issues = HotkeyBindingValidator.validate(
+            primary: primary,
+            handsFree: target == .handsFree || settings.handsFreeEnabled ? handsFree : nil
+        )
+        if let error = issues.first(where: { $0.severity == .error }) {
+            hotkeyMessage = error.message
+            return
+        }
+        if let warning = issues.first(where: { $0.severity == .warning }) {
+            pendingRiskyHotkey = PendingHotkey(
+                target: target,
+                binding: binding,
+                message: warning.message
+            )
+            return
+        }
+        applyHotkey(binding, target: target)
+    }
+
+    private func applyHotkey(_ binding: HotkeyBinding, target: HotkeyCaptureTarget) {
+        let applied = switch target {
+        case .pushToTalk: settings.selectPushToTalkBinding(binding)
+        case .handsFree: settings.selectHandsFreeBinding(binding)
+        }
+        hotkeyMessage = applied ? nil : "That shortcut conflicts with another Murmure action."
+        if applied { controller.reloadHotkey() }
     }
 
     private var transcriptionLanguageStatus: String {
@@ -408,6 +520,19 @@ struct SettingsWindow: View {
             }
         }
     }
+}
+
+private enum HotkeyCaptureTarget: String, Identifiable {
+    case pushToTalk
+    case handsFree
+
+    var id: String { rawValue }
+}
+
+private struct PendingHotkey {
+    let target: HotkeyCaptureTarget
+    let binding: HotkeyBinding
+    let message: String
 }
 
 private struct StorageCard: View {

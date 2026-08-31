@@ -101,6 +101,8 @@ enum DS {
         static let correctionTextEditorHeight: CGFloat = 112
         static let correctionOriginalMaxHeight: CGFloat = 96
         static let microphoneTestMeterHeight: CGFloat = 72
+        static let shortcutRecorderWidth: CGFloat = 440
+        static let shortcutRecorderHeight: CGFloat = 180
     }
 
     enum Shadow {

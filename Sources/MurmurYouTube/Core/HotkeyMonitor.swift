@@ -66,14 +66,15 @@ enum PushToTalkKey: String, CaseIterable, Sendable {
 final class HotkeyMonitor {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
-    private var isPressed = false
-    private var isHandsFreePressed = false
+    private lazy var callbackContext = HotkeyCallbackContext(monitor: self)
 
-    var key: PushToTalkKey = .rightOption
-    var handsFreeKey: PushToTalkKey?
+    var binding = PushToTalkKey.rightOption.binding(gesture: .hold)
+    var handsFreeBinding: HotkeyBinding?
+    var handsFreeSessionIsActive = false {
+        didSet { callbackContext.router.handsFreeSessionIsActive = handsFreeSessionIsActive }
+    }
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
-    var isHandsFreeActive: (() -> Bool)?
     var onHandsFreeToggle: (() -> Void)?
     var onHandsFreeFinish: (() -> Void)?
     var onHandsFreeCancel: (() -> Void)?
@@ -85,7 +86,13 @@ final class HotkeyMonitor {
 
         let mask = (1 << CGEventType.flagsChanged.rawValue)
             | (1 << CGEventType.keyDown.rawValue)
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
+            | (1 << CGEventType.keyUp.rawValue)
+        callbackContext.router.configure(
+            binding: binding,
+            handsFreeBinding: handsFreeBinding,
+            handsFreeSessionIsActive: handsFreeSessionIsActive
+        )
+        let refcon = Unmanaged.passUnretained(callbackContext).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -94,16 +101,14 @@ final class HotkeyMonitor {
             eventsOfInterest: CGEventMask(mask),
             callback: { _, type, event, refcon in
                 guard let refcon else { return Unmanaged.passUnretained(event) }
-                let monitor = Unmanaged<HotkeyMonitor>.fromOpaque(refcon).takeUnretainedValue()
-
-                // CGEvent isn't Sendable, so pull out the plain values before crossing into
-                // actor-isolated code. The tap was added to the main run loop, so this
-                // callback genuinely does run on the main thread.
-                let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
-                let flags = event.flags
-                let consume = MainActor.assumeIsolated {
-                    monitor.handle(type: type, keyCode: keyCode, flags: flags)
-                }
+                let context = Unmanaged<HotkeyCallbackContext>
+                    .fromOpaque(refcon)
+                    .takeUnretainedValue()
+                let consume = context.handle(
+                    type: type,
+                    keyCode: event.getIntegerValueField(.keyboardEventKeycode),
+                    flags: event.flags
+                )
                 return consume ? nil : Unmanaged.passUnretained(event)
             },
             userInfo: refcon
@@ -118,7 +123,7 @@ final class HotkeyMonitor {
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
 
-        Log.hotkey.info("listening for \(self.key.displayName)")
+        Log.hotkey.info("listening for \(self.binding.label)")
         return true
     }
 
@@ -131,56 +136,161 @@ final class HotkeyMonitor {
         }
         tap = nil
         runLoopSource = nil
+        callbackContext.router.reset()
+    }
+
+    fileprivate func perform(_ action: HotkeyTapAction) {
+        switch action {
+        case .press: onPress?()
+        case .release: onRelease?()
+        case .handsFreeToggle: onHandsFreeToggle?()
+        case .handsFreeFinish: onHandsFreeFinish?()
+        case .handsFreeCancel: onHandsFreeCancel?()
+        case .reenable:
+            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+        }
+    }
+}
+
+enum HotkeyTapAction: Sendable, Equatable {
+    case press
+    case release
+    case handsFreeToggle
+    case handsFreeFinish
+    case handsFreeCancel
+    case reenable
+}
+
+/// The event tap needs a synchronous consume/pass-through answer, while app actions belong
+/// on the main actor. This context owns only plain event state, computes that answer, and
+/// then schedules the resulting action onto the actor without asserting executor identity.
+private final class HotkeyCallbackContext: @unchecked Sendable {
+    weak var monitor: HotkeyMonitor?
+    let router = HotkeyEventRouter()
+
+    init(monitor: HotkeyMonitor) {
+        self.monitor = monitor
+    }
+
+    func handle(type: CGEventType, keyCode: Int64, flags: CGEventFlags) -> Bool {
+        let result = router.route(type: type, keyCode: keyCode, flags: flags)
+        if let action = result.action, let monitor {
+            Task { @MainActor [weak monitor] in monitor?.perform(action) }
+        }
+        return result.consume
+    }
+}
+
+final class HotkeyEventRouter: @unchecked Sendable {
+    private var binding = PushToTalkKey.rightOption.binding(gesture: .hold)
+    private var handsFreeBinding: HotkeyBinding?
+    private var isPressed = false
+    private var isHandsFreePressed = false
+    var handsFreeSessionIsActive = false
+
+    func configure(
+        binding: HotkeyBinding,
+        handsFreeBinding: HotkeyBinding?,
+        handsFreeSessionIsActive: Bool
+    ) {
+        self.binding = binding
+        self.handsFreeBinding = handsFreeBinding
+        self.handsFreeSessionIsActive = handsFreeSessionIsActive
         isPressed = false
         isHandsFreePressed = false
     }
 
-    // MARK: - Tap callback
+    func reset() {
+        isPressed = false
+        isHandsFreePressed = false
+        handsFreeSessionIsActive = false
+    }
 
-    /// - Returns: `true` if the event should be swallowed rather than passed along.
-    private func handle(type: CGEventType, keyCode: Int64, flags: CGEventFlags) -> Bool {
-        // The system disables a tap that runs too slowly or is interrupted; re-arm it.
+    func route(
+        type: CGEventType,
+        keyCode: Int64,
+        flags: CGEventFlags
+    ) -> (consume: Bool, action: HotkeyTapAction?) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            return false
+            return (false, .reenable)
         }
 
         if type == .keyDown,
-           let action = HandsFreeControlKey.action(
+           let control = HandsFreeControlKey.action(
                keyCode: keyCode,
-               isHandsFreeActive: isHandsFreeActive?() ?? false
+               isHandsFreeActive: handsFreeSessionIsActive
            ) {
-            switch action {
-            case .finish:
-                onHandsFreeFinish?()
-            case .cancel:
-                onHandsFreeCancel?()
+            return (true, control == .finish ? .handsFreeFinish : .handsFreeCancel)
+        }
+
+        if let handsFreeBinding,
+           let event = physicalEvent(
+               for: handsFreeBinding,
+               type: type,
+               keyCode: keyCode,
+               flags: flags,
+               wasPressed: isHandsFreePressed
+           ) {
+            if event == .press { isHandsFreePressed = true }
+            if event == .release { isHandsFreePressed = false }
+            return (
+                handsFreeBinding.consumption == .suppress,
+                event == .press ? .handsFreeToggle : nil
+            )
+        }
+
+        guard let event = physicalEvent(
+            for: binding,
+            type: type,
+            keyCode: keyCode,
+            flags: flags,
+            wasPressed: isPressed
+        ) else { return (false, nil) }
+        if event == .press { isPressed = true }
+        if event == .release { isPressed = false }
+        let action: HotkeyTapAction? = switch event {
+        case .press: .press
+        case .release: .release
+        case .repeatPress: nil
+        }
+        return (
+            binding.consumption == .suppress,
+            action
+        )
+    }
+
+    private enum PhysicalEvent {
+        case press
+        case release
+        case repeatPress
+    }
+
+    private func physicalEvent(
+        for binding: HotkeyBinding,
+        type: CGEventType,
+        keyCode: Int64,
+        flags: CGEventFlags,
+        wasPressed: Bool
+    ) -> PhysicalEvent? {
+        guard keyCode == binding.keyCode else { return nil }
+
+        if binding.isModifierOnly {
+            guard type == .flagsChanged else { return nil }
+            let nowPressed = flags.rawValue & binding.requiredFlags == binding.requiredFlags
+            if nowPressed { return wasPressed ? .repeatPress : .press }
+            return wasPressed ? .release : nil
+        } else {
+            switch type {
+            case .keyDown:
+                guard flags.rawValue & binding.requiredFlags == binding.requiredFlags else {
+                    return nil
+                }
+                return wasPressed ? .repeatPress : .press
+            case .keyUp:
+                return wasPressed ? .release : nil
+            default:
+                return nil
             }
-            // Return must not also add a newline, and Escape must not dismiss a target-app
-            // surface, when that key has just controlled Murmure's active recording.
-            return true
         }
-
-        guard type == .flagsChanged else { return false }
-
-        if let handsFreeKey, keyCode == handsFreeKey.keyCode {
-            let nowPressed = flags.contains(handsFreeKey.flag)
-            guard nowPressed != isHandsFreePressed else { return false }
-            isHandsFreePressed = nowPressed
-
-            // Toggle on the down edge only. Modifier release is deliberately not a finish.
-            if nowPressed { onHandsFreeToggle?() }
-            return handsFreeKey.shouldConsumeEvent
-        }
-
-        guard keyCode == key.keyCode else { return false }
-
-        let nowPressed = flags.contains(key.flag)
-        guard nowPressed != isPressed else { return false }
-        isPressed = nowPressed
-
-        if nowPressed { onPress?() } else { onRelease?() }
-
-        return key.shouldConsumeEvent
     }
 }

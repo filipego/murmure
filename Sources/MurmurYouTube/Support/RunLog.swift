@@ -515,7 +515,7 @@ enum RunLog {
     static func regenerate() {
         let runs = load()
         let compareMode = Settings.shared.compareMode
-        let key = Settings.shared.pushToTalkKey.displayName
+        let key = Settings.shared.pushToTalkBinding.label
         let url = dashboardURL
         _ = dashboardWriter.enqueue {
             let dashboard = DashboardHTML.render(runs: runs, compareMode: compareMode, key: key)

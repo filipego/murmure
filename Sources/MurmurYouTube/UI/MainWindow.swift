@@ -336,7 +336,7 @@ private struct HomePanel: View {
             LocalStat(label: "Sessions", value: "\(store.runs.count)")
             LocalStat(label: "Words", value: "\(words)")
             LocalStat(label: "Corrections", value: "\(corrections)")
-            LocalStat(label: "Push to talk", value: Settings.shared.pushToTalkKey.displayName)
+            LocalStat(label: "Push to talk", value: Settings.shared.pushToTalkBinding.label)
         }
     }
 
