@@ -12,8 +12,7 @@ private func loadSnippetsFromDisk() async -> SnippetHydrationResult {
         do {
             let data = try Data(contentsOf: MurmureDataStore.snippetsURL)
             return .loaded(try JSONDecoder().decode([SnippetEntry].self, from: data))
-        } catch let error as NSError
-            where error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError {
+        } catch where isMissingLocalFile(error) {
             return .missing
         } catch {
             Log.app.error("snippet load failed: \(error.localizedDescription)")
@@ -93,6 +92,12 @@ final class SnippetStore {
     }
 
     func upsert(_ entry: SnippetEntry) async -> SnippetValidationIssue? {
+        if entry.trigger.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .emptyTrigger
+        }
+        if entry.replacement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .emptyReplacement
+        }
         guard await ensureHydrated() else { return .persistenceFailed }
         if let issue = SnippetValidator.validate(
             trigger: entry.trigger,

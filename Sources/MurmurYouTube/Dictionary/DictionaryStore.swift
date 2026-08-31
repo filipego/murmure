@@ -13,8 +13,7 @@ private func loadDictionaryFromDisk() async -> DictionaryHydrationResult {
     return await Task.detached(priority: .utility) {
         do {
             return .loaded(try String(contentsOf: url, encoding: .utf8))
-        } catch let error as NSError
-            where error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError {
+        } catch where isMissingLocalFile(error) {
             return .missing
         } catch {
             return .failed
@@ -210,8 +209,7 @@ final class DictionaryStore {
         do {
             let text = try String(contentsOf: Self.fileURL, encoding: .utf8)
             adopt(text)
-        } catch let error as NSError
-            where error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError {
+        } catch where isMissingLocalFile(error) {
             entries = []
             revision += 1
             mutationGeneration += 1

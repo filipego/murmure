@@ -4,6 +4,12 @@ import Testing
 
 @Suite("Snippet persistence")
 struct SnippetStoreTests {
+    @Test("Foundation's missing-file read error is recognized")
+    func missingFileError() {
+        let error = CocoaError(.fileReadNoSuchFile)
+        #expect(isMissingLocalFile(error))
+    }
+
     @Test("hydration completes before a mutation is persisted")
     @MainActor
     func hydrationBeforeMutation() async {
@@ -37,6 +43,19 @@ struct SnippetStoreTests {
 
         #expect(issue == .persistenceFailed)
         #expect(store.entries == [old])
+    }
+
+    @Test("empty input is rejected even when storage hydration is unavailable")
+    @MainActor
+    func validationPrecedesHydration() async {
+        let store = SnippetStore(
+            loadEntries: { .failed },
+            persistEntries: { _ in true }
+        )
+
+        let issue = await store.upsert(SnippetEntry(trigger: "", replacement: ""))
+
+        #expect(issue == .emptyTrigger)
     }
 
     @Test("editing preserves identity and duplicate triggers are rejected")
