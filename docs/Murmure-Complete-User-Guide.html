@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Murmure Complete User Guide</title>
+  <style>
+    :root {
+      --ink: #131516;
+      --panel: #222526;
+      --paper: #f2efe7;
+      --silver: #d8d4ca;
+      --well: #e5e1d7;
+      --muted: #686c68;
+      --line: #bbb7ad;
+      --record: #d23b32;
+      --amber: #d89a2b;
+      --green: #739d77;
+      --white: #fffdf7;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #777; color: var(--ink); }
+    body { font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif; }
+    .download-control {
+      position: fixed;
+      z-index: 50;
+      top: 18px;
+      right: 18px;
+      padding: 12px 16px;
+      color: var(--white);
+      background: var(--ink);
+      border: 1px solid #4b4f4c;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+    .download-control:hover { background: #2a2d2e; }
+    .page {
+      width: 794px;
+      height: 1123px;
+      margin: 0 auto 24px;
+      padding: 58px 62px 62px;
+      position: relative;
+      overflow: hidden;
+      background: var(--paper);
+      page-break-after: always;
+    }
+    .dark { color: var(--paper); background: var(--ink); }
+    .kicker {
+      margin: 0 0 16px;
+      color: var(--record);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3, p, ul, ol { margin-top: 0; }
+    h1 { margin-bottom: 26px; font-size: 61px; line-height: .98; letter-spacing: -.048em; }
+    h2 { margin-bottom: 20px; font-size: 39px; line-height: 1.04; letter-spacing: -.035em; }
+    h3 { margin-bottom: 9px; font-size: 19px; line-height: 1.18; }
+    p, li { font-size: 15px; line-height: 1.48; }
+    p { color: #3e423f; }
+    .dark p { color: #c3c5c0; }
+    strong { color: inherit; }
+    .lead { max-width: 580px; font-size: 20px; line-height: 1.42; color: #555954; }
+    .dark .lead { color: #c6c8c2; }
+    .small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .dark .small { color: #999c97; }
+    .rule { height: 1px; margin: 25px 0; background: var(--line); }
+    .dark .rule { background: #3c403e; }
+    .footer {
+      position: absolute;
+      left: 62px;
+      right: 62px;
+      bottom: 30px;
+      display: flex;
+      justify-content: space-between;
+      color: #777a76;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+    .brand { letter-spacing: .22em; }
+    .record-dot { display: inline-block; width: 11px; height: 11px; margin-right: 8px; border-radius: 50%; background: var(--record); }
+    .tag { display: inline-block; padding: 7px 10px; border: 1px solid #a9a69d; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+    .tag.dark-tag { color: white; background: var(--ink); border-color: var(--ink); }
+    .status { display: flex; align-items: center; gap: 10px; }
+    .lamp { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(115,157,119,.14); }
+    .lamp.amber { background: var(--amber); box-shadow: 0 0 0 4px rgba(216,154,43,.14); }
+    .lamp.red { background: var(--record); box-shadow: none; }
+    .keycap { display: inline-flex; min-width: 43px; height: 38px; padding: 0 11px; align-items: center; justify-content: center; border: 1px solid #a7a49b; border-bottom-width: 4px; border-radius: 7px; background: #fbf8f0; font-size: 15px; font-weight: 800; }
+    .dark .keycap { color: white; border-color: #666a67; background: #2a2d2e; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+    .card { padding: 22px; background: var(--well); border-top: 4px solid var(--ink); }
+    .dark .card { color: white; background: var(--panel); border-color: #474b48; }
+    .card p, .card li { margin-bottom: 0; font-size: 13px; }
+    .card ul { margin-bottom: 0; padding-left: 19px; }
+    .callout { padding: 18px 20px; border-left: 5px solid var(--record); background: var(--well); }
+    .callout p:last-child { margin-bottom: 0; }
+    .dark .callout { color: var(--ink); }
+    .dark .callout p { color: #3e423f; }
+    .note { padding: 14px 16px; border: 1px solid #aaa79e; background: rgba(255,255,255,.45); }
+    .dark .note { border-color: #4b4f4c; background: #202324; }
+    .step-list { list-style: none; padding: 0; counter-reset: item; }
+    .step-list li { counter-increment: item; position: relative; min-height: 50px; padding: 0 0 18px 54px; }
+    .step-list li::before { content: counter(item, decimal-leading-zero); position: absolute; left: 0; top: 0; color: var(--record); font-weight: 800; letter-spacing: .08em; }
+    .step-list li::after { content: ""; position: absolute; left: 15px; top: 22px; bottom: 4px; width: 1px; background: #bbb7ad; }
+    .step-list li:last-child::after { display: none; }
+    .toc { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; margin-top: 36px; }
+    .toc-row { display: flex; align-items: baseline; gap: 12px; padding: 14px 0; border-bottom: 1px solid #c8c4ba; }
+    .toc-row b { color: var(--record); font-size: 12px; }
+    .toc-row span { font-size: 14px; font-weight: 700; }
+    .cover-deck { position: absolute; right: -80px; bottom: 165px; width: 590px; height: 320px; padding: 28px; background: var(--silver); transform: rotate(-4deg); box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+    .cover-face { height: 100%; padding: 26px; color: white; background: var(--panel); }
+    .meter { display: flex; gap: 8px; align-items: end; height: 105px; margin: 27px 0; }
+    .meter i { width: 16px; background: var(--green); }
+    .meter i:nth-last-child(-n+3) { background: var(--amber); }
+    .meter i:last-child { background: var(--record); }
+    .knobs { display: flex; gap: 19px; }
+    .knob { width: 56px; height: 56px; border: 10px solid #bdb9b0; border-radius: 50%; background: #2c2f30; }
+    .app-map { display: grid; grid-template-columns: 160px 1fr; gap: 18px; margin-top: 30px; }
+    .nav { padding: 18px; color: white; background: var(--ink); }
+    .nav div { margin-bottom: 10px; padding: 12px; border: 1px solid #3f4340; font-size: 13px; font-weight: 700; }
+    .nav div.active { color: var(--ink); background: var(--paper); }
+    .surface { padding: 24px; border: 1px solid #b7b3aa; background: white; }
+    .history-row { margin: 11px 0; padding: 14px; border: 1px solid #ccc8bf; background: #f5f3ed; }
+    .icons { display: flex; gap: 8px; margin-top: 10px; }
+    .icon { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid #aaa79e; font-size: 12px; font-weight: 800; }
+    .gesture { min-height: 180px; padding: 20px; background: var(--panel); border: 1px solid #404441; }
+    .gesture h3 { color: white; }
+    .gesture p { color: #b7bab5; font-size: 13px; }
+    .flow { display: flex; align-items: center; gap: 9px; margin: 18px 0; }
+    .flow-box { flex: 1; padding: 13px; text-align: center; border: 1px solid #aaa79e; background: white; font-size: 12px; font-weight: 800; }
+    .dark .flow-box { color: var(--ink); }
+    .flow-arrow { color: var(--record); font-size: 22px; }
+    .engine { min-height: 350px; padding: 25px; border-top: 5px solid var(--ink); background: var(--well); }
+    .engine ul { padding-left: 18px; }
+    .engine li { margin-bottom: 9px; font-size: 13px; }
+    .language-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .language-grid span { padding: 9px 10px; border: 1px solid #c1bdb4; font-size: 11px; font-weight: 700; }
+    .pipeline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 28px 0; }
+    .pipe { padding: 13px 15px; color: white; background: var(--ink); font-size: 12px; font-weight: 800; }
+    .pipe-arrow { color: var(--record); font-size: 20px; }
+    .window { padding: 24px; border: 1px solid #aaa79e; background: white; }
+    .window-bar { display: flex; justify-content: space-between; padding-bottom: 11px; border-bottom: 1px solid #c8c4ba; font-size: 12px; font-weight: 800; }
+    .review-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+    .review-pane { min-height: 190px; padding: 15px; background: var(--well); }
+    .button-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .button { padding: 9px 13px; border: 1px solid #aaa79e; font-size: 11px; font-weight: 800; }
+    .button.primary { color: white; background: var(--ink); border-color: var(--ink); }
+    .form-row { margin-bottom: 16px; }
+    .form-row label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .field { min-height: 41px; padding: 11px 12px; border: 1px solid #aaa79e; background: white; font-size: 13px; }
+    .field.tall { min-height: 105px; }
+    .term-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; padding: 14px; background: white; border: 1px solid #c4c0b7; }
+    .term-row b { flex: 1; }
+    .term-kind { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+    .privacy-loop { width: 460px; height: 330px; margin: 30px auto; display: grid; place-items: center; position: relative; border: 2px solid #555a56; border-radius: 50%; }
+    .computer { width: 240px; height: 150px; padding: 12px; background: var(--silver); border-radius: 8px; }
+    .screen { height: 110px; display: grid; place-items: center; color: white; background: var(--panel); font-weight: 800; }
+    .outbound { position: absolute; right: -66px; padding: 6px 8px; color: white; background: var(--ink); font-size: 11px; font-weight: 800; }
+    .outbound.one { top: 104px; }
+    .outbound.two { top: 208px; }
+    .trouble { display: grid; grid-template-columns: 180px 1fr; gap: 0; border-top: 1px solid #aaa79e; }
+    .trouble > div { padding: 14px 12px; border-bottom: 1px solid #aaa79e; }
+    .trouble .problem { font-weight: 800; background: var(--well); }
+    .check-row { display: flex; gap: 13px; align-items: flex-start; padding: 12px 0; border-bottom: 1px solid #c6c2b8; }
+    .check-row p { margin: 0; }
+    @media print {
+      body { background: white; }
+      .download-control { display: none; }
+      .page { margin: 0; }
+      @page { size: A4 portrait; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <a class="download-control" href="../output/pdf/Murmure-Complete-User-Guide.pdf" download>Download PDF</a>
+  <section class="page dark" data-document-role="page" data-label="Cover">
+    <p class="kicker"><span class="record-dot"></span>Complete user guide</p>
+    <h1>Murmure.<br>Your local<br>voice desk.</h1>
+    <p class="lead">Everything you need to install, configure, dictate, edit, personalize, recover, and troubleshoot Murmure 0.1.14.</p>
+    <div class="cover-deck"><div class="cover-face"><small>MURMURE / INPUT LEVEL</small><div class="meter"><i style="height:25%"></i><i style="height:39%"></i><i style="height:62%"></i><i style="height:83%"></i><i style="height:57%"></i><i style="height:73%"></i><i style="height:91%"></i><i style="height:69%"></i><i style="height:48%"></i><i style="height:80%"></i><i style="height:92%"></i><i style="height:100%"></i></div><div class="knobs"><span class="knob"></span><span class="knob"></span><span class="knob"></span><span class="record-dot" style="width:56px;height:56px;margin-left:auto"></span></div></div></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>Apple Silicon / macOS 26+</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Contents">
+    <p class="kicker">How to use this guide</p>
+    <h2>Quick when you need it.<br>Complete when you want it.</h2>
+    <p class="lead">Read pages 3 through 6 to start dictating. Keep the rest as a reference for every feature and recovery path.</p>
+    <div class="toc">
+      <div>
+        <div class="toc-row"><b>01</b><span>Requirements and installation</span></div>
+        <div class="toc-row"><b>02</b><span>First launch and setup</span></div>
+        <div class="toc-row"><b>03</b><span>The app at a glance</span></div>
+        <div class="toc-row"><b>04</b><span>Everyday dictation</span></div>
+        <div class="toc-row"><b>05</b><span>Gestures and hands-free</span></div>
+        <div class="toc-row"><b>06</b><span>Speech engines</span></div>
+        <div class="toc-row"><b>07</b><span>Languages</span></div>
+        <div class="toc-row"><b>08</b><span>Microphone and sound</span></div>
+      </div>
+      <div>
+        <div class="toc-row"><b>09</b><span>Cleanup and processing</span></div>
+        <div class="toc-row"><b>10</b><span>Command Mode</span></div>
+        <div class="toc-row"><b>11</b><span>Snippets</span></div>
+        <div class="toc-row"><b>12</b><span>Dictionary</span></div>
+        <div class="toc-row"><b>13</b><span>Corrections</span></div>
+        <div class="toc-row"><b>14</b><span>History and recovery</span></div>
+        <div class="toc-row"><b>15</b><span>Storage, privacy, updates</span></div>
+        <div class="toc-row"><b>16</b><span>Troubleshooting and reference</span></div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:38px"><p><strong>Two companion formats.</strong> The eight-slide Canva deck is the fast introduction. This manual contains the complete operating instructions.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>02 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Requirements and Installation">
+    <p class="kicker">01 / Requirements</p>
+    <h2>Start with the right Mac and the right file.</h2>
+    <div class="grid-2" style="margin-top:28px">
+      <div class="card"><div class="status"><span class="lamp"></span><h3>Apple Silicon</h3></div><p>M1 or newer. The current shared app does not run on Intel Macs.</p></div>
+      <div class="card"><div class="status"><span class="lamp"></span><h3>macOS 26 or later</h3></div><p>The modern speech and on-device model APIs require macOS 26+.</p></div>
+    </div>
+    <h3 style="margin-top:36px">Install the shared archive</h3>
+    <ol class="step-list">
+      <li>Download <strong>Murmure.app.zip</strong> from the GitHub release link your friend shares with you.</li>
+      <li>Double-click the ZIP, then drag <strong>Murmure.app</strong> into the Applications folder.</li>
+      <li>Open Applications. Control-click Murmure, choose <strong>Open</strong>, then confirm.</li>
+      <li>If macOS still blocks it, open <strong>System Settings &gt; Privacy &amp; Security</strong> and choose <strong>Open Anyway</strong>.</li>
+      <li>Keep only one installed copy in Applications. Do not run the app from Downloads or an external build folder.</li>
+    </ol>
+    <div class="callout"><p><strong>Why the warning?</strong> Friend builds may be locally signed but not notarized through Apple's paid distribution service. The warning does not mean Murmure sends your audio anywhere.</p></div>
+    <p class="small" style="margin-top:18px">Intel compatibility is still a separate hardware investigation. Do not bypass the requirements shown above.</p>
+    <div class="footer"><span class="brand">MURMURE</span><span>03 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="First Launch Setup">
+    <p class="kicker">02 / First launch</p>
+    <h2>Complete all seven setup steps.</h2>
+    <p class="lead">The Continue button stays unavailable until the required proof for that step is complete.</p>
+    <ol class="step-list" style="margin-top:26px">
+      <li><strong>Private by design.</strong> Review where data lives and the two network exceptions.</li>
+      <li><strong>Microphone.</strong> Request access so Murmure can hear recordings.</li>
+      <li><strong>Accessibility.</strong> Open macOS settings and grant access so the global shortcut and text insertion work.</li>
+      <li><strong>Shortcut.</strong> Choose a physical key and one of the three gestures.</li>
+      <li><strong>Microphone test.</strong> Choose an input, start the meter, speak, and stop the test.</li>
+      <li><strong>Language behavior.</strong> Choose Automatic or an explicit language and confirm the engine.</li>
+      <li><strong>Test dictation.</strong> Record a short sentence, finish it, then acknowledge the completed test.</li>
+    </ol>
+    <div class="grid-2" style="margin-top:20px">
+      <div class="note"><h3>Microphone access</h3><p>Lets Murmure capture audio. macOS owns this permission.</p></div>
+      <div class="note"><h3>Accessibility access</h3><p>Lets the global shortcut work and inserts finished text into the app you were using.</p></div>
+    </div>
+    <div class="callout" style="margin-top:22px"><p><strong>Changed a permission?</strong> Quit and reopen Murmure after macOS shows the grant. You can rerun the whole setup later from Settings.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>04 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="App Map">
+    <p class="kicker">03 / App map</p>
+    <h2>Three destinations. One local workflow.</h2>
+    <div class="app-map">
+      <div class="nav"><div class="active">Home</div><div>Dictionary</div><div>Settings</div></div>
+      <div class="surface">
+        <h3>Home</h3><p>Shows readiness, session totals, recoverable recordings, and searchable local history.</p>
+        <div class="history-row"><b>Recent dictation</b><p class="small">Apple (streaming) / time / processing duration</p><div class="icons"><span class="icon">Play</span><span class="icon">Retry</span><span class="icon">Edit</span><span class="icon">Copy</span><span class="icon">Trash</span></div></div>
+        <div class="grid-2"><div class="note"><h3>Dictionary</h3><p>Manage terms and hear-to-write corrections.</p></div><div class="note"><h3>Settings</h3><p>Control shortcuts, engines, language, microphone, cleanup, snippets, storage, and updates.</p></div></div>
+      </div>
+    </div>
+    <h3 style="margin-top:30px">The large Record control</h3>
+    <p>The Home record button works regardless of which app currently has focus. It is useful during setup or when testing Murmure itself. For daily work, the global shortcut is faster.</p>
+    <div class="callout"><p><strong>Ready status.</strong> The top status line tells you whether Murmure is ready and whether audio and history are using local or external storage.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>05 / 20</span></div>
+  </section>
+
+  <section class="page dark" data-document-role="page" data-label="Everyday Dictation">
+    <p class="kicker">04 / Everyday dictation</p>
+    <h2>Cursor. Shortcut. Voice. Text.</h2>
+    <div class="grid-3" style="margin-top:34px">
+      <div class="gesture"><span class="tag">01</span><h3 style="margin-top:54px">Place the cursor</h3><p>Click the exact editable field in Mail, Notes, Messages, a browser, or another Mac app.</p></div>
+      <div class="gesture"><span class="tag">02</span><h3 style="margin-top:54px">Start recording</h3><p>Use your selected key and gesture. Speak normally, including pauses.</p></div>
+      <div class="gesture"><span class="tag">03</span><h3 style="margin-top:54px">Finish</h3><p>Murmure transcribes, cleans, applies snippets and dictionary rules, saves history, and inserts the result.</p></div>
+    </div>
+    <h3 style="margin-top:38px">What happens after you finish</h3>
+    <div class="pipeline"><span class="pipe">Audio</span><span class="pipe-arrow">&gt;</span><span class="pipe">Speech engine</span><span class="pipe-arrow">&gt;</span><span class="pipe">Cleanup</span><span class="pipe-arrow">&gt;</span><span class="pipe">Snippet</span><span class="pipe-arrow">&gt;</span><span class="pipe">Dictionary</span><span class="pipe-arrow">&gt;</span><span class="pipe">History + insertion</span></div>
+    <div class="note"><p><strong>Focus matters.</strong> Leave the destination field focused while Murmure finishes. Compare Mode is the exception: it shows engine results instead of typing anything.</p></div>
+    <div class="note" style="margin-top:14px"><p><strong>Start and finish sounds.</strong> Enable them in Settings if you want audible confirmation without watching the screen.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>06 / 20</span></div>
+  </section>
+
+  <section class="page dark" data-document-role="page" data-label="Gestures and Hands-Free">
+    <p class="kicker">05 / Gestures</p>
+    <h2>Choose the physical behavior that fits your desk.</h2>
+    <div class="grid-3" style="margin-top:26px">
+      <div class="gesture"><h3>Hold</h3><p>Press and hold to record. Release to finish. Best for short dictation and the default <span class="keycap">fn</span> workflow.</p></div>
+      <div class="gesture"><h3>Double-tap and hold</h3><p>Tap once, then press and hold within the short timing window. Release to finish.</p></div>
+      <div class="gesture"><h3>Press to start/stop</h3><p>Press once to begin and press again to finish. Useful when holding a key is uncomfortable.</p></div>
+    </div>
+    <h3 style="margin-top:34px">Hands-free dictation</h3>
+    <p>Enable hands-free in Settings and choose a shortcut that is different from push-to-talk and Command Mode.</p>
+    <div class="flow"><span class="flow-box">Press hands-free key</span><span class="flow-arrow">&gt;</span><span class="flow-box">Speak without holding</span><span class="flow-arrow">&gt;</span><span class="flow-box">Same key or Enter finishes</span></div>
+    <div class="grid-2">
+      <div class="note"><h3>Finish</h3><p>Press the same hands-free key or press Enter.</p></div>
+      <div class="note"><h3>Cancel</h3><p>Press Escape while the hands-free session is active.</p></div>
+    </div>
+    <div class="callout" style="margin-top:22px"><p><strong>Shortcut safety.</strong> Murmure rejects duplicate shortcuts, bare ordinary keys, and common macOS-reserved combinations. Right Option may act as AltGr on international keyboard layouts.</p></div>
+    <p class="small" style="margin-top:18px">Use Restore shortcut defaults if custom bindings become confusing.</p>
+    <div class="footer"><span class="brand">MURMURE</span><span>07 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Speech Engines">
+    <p class="kicker">06 / Engines</p>
+    <h2>Two local engines with different strengths.</h2>
+    <div class="grid-2" style="margin-top:30px">
+      <div class="engine"><span class="tag dark-tag">Apple streaming</span><h3 style="margin-top:22px">Text while you speak</h3><ul><li>Runs through Apple's Speech framework.</li><li>Shows streaming transcript updates.</li><li>Uses an explicit language hint.</li><li>The operating system manages language assets.</li><li>Best when you want immediate feedback.</li></ul></div>
+      <div class="engine"><span class="tag dark-tag">Parakeet batch</span><h3 style="margin-top:22px">Text after release</h3><ul><li>Runs locally through FluidAudio and Core ML.</li><li>Transcribes after the recording finishes.</li><li>Provides Automatic recognition for 25 languages.</li><li>May download about 470 MB on first use.</li><li>Best for multilingual automatic recognition.</li></ul></div>
+    </div>
+    <h3 style="margin-top:32px">Compare both local engines</h3>
+    <p>Compare Mode runs both engines on one recording and opens a side-by-side result window. It deliberately does <strong>not</strong> type either result into the focused app.</p>
+    <div class="callout"><p><strong>Timing caution.</strong> Treat the comparison as a quality review, not a universal speed ranking. Engine timing begins after different preparation stages.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>08 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Languages">
+    <p class="kicker">07 / Languages</p>
+    <h2>Automatic for switching. Explicit for control.</h2>
+    <div class="grid-2">
+      <div class="card"><h3>Automatic</h3><p>Selecting Automatic selects Parakeet. Speak any supported European language without changing the picker first.</p></div>
+      <div class="card"><h3>Explicit language</h3><p>Choose one language when you want a decoder hint. Apple can use the matching installed system speech asset.</p></div>
+    </div>
+    <h3 style="margin-top:30px">Automatic supports these 25 languages</h3>
+    <div class="language-grid">
+      <span>Bulgarian</span><span>Croatian</span><span>Czech</span><span>Danish</span><span>Dutch</span><span>English</span><span>Estonian</span><span>Finnish</span><span>French</span><span>German</span><span>Greek</span><span>Hungarian</span><span>Italian</span><span>Latvian</span><span>Lithuanian</span><span>Maltese</span><span>Polish</span><span>Portuguese</span><span>Romanian</span><span>Russian</span><span>Slovak</span><span>Slovenian</span><span>Spanish</span><span>Swedish</span><span>Ukrainian</span>
+    </div>
+    <h3 style="margin-top:28px">Cleanup behavior</h3>
+    <p>English, Spanish, and French have language-specific deterministic cleanup. Other explicit languages use neutral cleanup. Automatic also uses neutral cleanup so English assumptions are never applied to a language Murmure detected automatically.</p>
+    <div class="callout"><p><strong>Smart cleanup limitation.</strong> Apple's on-device AI cleanup is unavailable while Language is Automatic. Choose explicit English, Spanish, or French if you want that optional feature.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>09 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Microphone and Sound">
+    <p class="kicker">08 / Audio input</p>
+    <h2>Choose the microphone you actually want Murmure to follow.</h2>
+    <div class="window" style="margin-top:28px">
+      <div class="window-bar"><span>MICROPHONE</span><span class="status"><span class="lamp"></span>Ready</span></div>
+      <div class="form-row" style="margin-top:20px"><label>Input</label><div class="field">System default</div></div>
+      <div class="meter" style="height:70px;margin:18px 0"><i style="height:20%"></i><i style="height:37%"></i><i style="height:61%"></i><i style="height:44%"></i><i style="height:76%"></i><i style="height:90%"></i><i style="height:58%"></i><i style="height:81%"></i><i style="height:68%"></i><i style="height:95%"></i></div>
+      <div class="button-row"><span class="button primary">Test microphone</span></div>
+    </div>
+    <h3 style="margin-top:30px">System default</h3>
+    <p>Follows the current macOS input without changing macOS. This is the safest choice if you regularly switch between built-in, USB, Bluetooth, or display microphones.</p>
+    <h3>Specific device</h3>
+    <p>Keeps the chosen device selected. If it disconnects during capture, Murmure stops safely instead of silently switching the recording to a different microphone.</p>
+    <div class="grid-2">
+      <div class="note"><h3>Bluetooth</h3><p>Connection quality and microphone mode can affect clarity and latency.</p></div>
+      <div class="note"><h3>Test first</h3><p>Watch the meter while speaking. Stop the test before starting normal dictation.</p></div>
+    </div>
+    <p class="small" style="margin-top:18px">Play start and finish sounds is independent of the selected microphone.</p>
+    <div class="footer"><span class="brand">MURMURE</span><span>10 / 20</span></div>
+  </section>
+
+  <section class="page dark" data-document-role="page" data-label="Cleanup Pipeline">
+    <p class="kicker">09 / Cleanup</p>
+    <h2>Speech becomes usable text in a deliberate order.</h2>
+    <div class="pipeline" style="margin-top:34px"><span class="pipe">Raw transcript</span><span class="pipe-arrow">&gt;</span><span class="pipe">Deterministic cleanup</span><span class="pipe-arrow">&gt;</span><span class="pipe">Optional smart cleanup</span><span class="pipe-arrow">&gt;</span><span class="pipe">Snippet</span><span class="pipe-arrow">&gt;</span><span class="pipe">Dictionary correction</span></div>
+    <div class="grid-2" style="margin-top:34px">
+      <div class="card"><h3>Clean up transcripts</h3><p>Removes common fillers, handles spoken punctuation, normalizes text, and improves sentence structure using local deterministic rules.</p></div>
+      <div class="card"><h3>Smart cleanup</h3><p>Uses Apple's on-device model for optional AI cleanup. It has no network fallback and is available only when the device, OS, model, and explicit language are supported.</p></div>
+    </div>
+    <h3 style="margin-top:34px">What cleanup does not do</h3>
+    <ul>
+      <li>It does not upload audio or transcripts.</li>
+      <li>It does not replace the explicit correction and dictionary workflow.</li>
+      <li>It does not use English-specific assumptions in Automatic mode.</li>
+      <li>It does not change snippet matching: a snippet still requires a complete matching utterance.</li>
+    </ul>
+    <div class="callout" style="margin-top:26px"><p><strong>Turn it off when exact raw wording matters.</strong> Disable Clean up transcripts before legal quoting, code-like strings, or other situations where every recognized token should remain untouched.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>11 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Command Mode">
+    <p class="kicker">10 / Command Mode</p>
+    <h2>Edit selected text without sending it to a server.</h2>
+    <ol class="step-list">
+      <li>Select editable text in another app. The selection cannot be empty.</li>
+      <li>Hold <span class="keycap">⌃</span> <span class="keycap">⌥</span> <span class="keycap">⌘</span> <span class="keycap">D</span>.</li>
+      <li>Speak an instruction such as "make this shorter" or "translate this into French."</li>
+      <li>Release the shortcut. Murmure creates a proposal with Apple's on-device model.</li>
+      <li>Review and edit the proposal. Choose Replace selected text, Copy proposal, or Cancel.</li>
+    </ol>
+    <div class="window">
+      <div class="window-bar"><span>COMMAND MODE</span><span>Local transformation</span></div>
+      <div class="review-cols"><div class="review-pane"><h3>Original</h3><p>The exact selected text remains visible here.</p></div><div class="review-pane"><h3>Proposal</h3><p>The proposed replacement stays editable until you choose what to do.</p></div></div>
+      <div class="button-row"><span class="button">Cancel</span><span class="button">Copy proposal</span><span class="button primary">Replace selected text</span></div>
+    </div>
+    <div class="callout" style="margin-top:22px"><p><strong>Safety rule.</strong> Murmure replaces text only if the current selection still exactly matches the original captured selection. If it changed or the target is no longer writable, replacement is refused and Copy proposal remains available.</p></div>
+    <p class="small" style="margin-top:16px">Command Mode requires Apple's on-device Foundation Model. Settings explains when the model is unavailable. Selected text and spoken instructions are not added to Murmure history.</p>
+    <div class="footer"><span class="brand">MURMURE</span><span>12 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Snippets">
+    <p class="kicker">11 / Snippets</p>
+    <h2>Turn one complete spoken phrase into reusable text.</h2>
+    <div class="grid-2" style="margin-top:28px">
+      <div class="window"><div class="window-bar"><span>ADD SNIPPET</span><span>Local</span></div><div class="form-row" style="margin-top:18px"><label>When I say</label><div class="field">email signature</div></div><div class="form-row"><label>Write</label><div class="field tall">Best,<br>Filipe<br>Studio in the Box</div></div><div class="status"><span class="lamp"></span><b>Enabled</b></div></div>
+      <div><h3>Exact whole utterance</h3><p>Say only the trigger phrase. Murmure never replaces the same words when they appear inside ordinary prose.</p><h3>Multiline replacements</h3><p>Line breaks are preserved in the inserted text.</p><h3>Before dictionary rules</h3><p>Snippet expansion happens before dictionary correction.</p></div>
+    </div>
+    <h3 style="margin-top:30px">Manage snippets in Settings</h3>
+    <ul>
+      <li><strong>Add</strong> creates a trigger, replacement, and enabled state.</li>
+      <li><strong>Toggle</strong> temporarily disables a snippet without deleting it.</li>
+      <li><strong>Edit</strong> changes the trigger or replacement.</li>
+      <li><strong>Delete</strong> removes the snippet after confirmation.</li>
+    </ul>
+    <div class="callout"><p><strong>Validation.</strong> Triggers and replacements cannot be empty. Duplicate normalized triggers are rejected so two snippets never compete for the same phrase.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>13 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Dictionary">
+    <p class="kicker">12 / Dictionary</p>
+    <h2>Teach the terms and corrections that matter to you.</h2>
+    <div class="grid-2">
+      <div class="card"><h3>Term</h3><p>Add a name, product, place, or phrase that exists in your vocabulary. Terms can help bias speech recognition and preserve preferred spelling.</p></div>
+      <div class="card"><h3>Correction</h3><p>Define what Murmure commonly hears and what it should write instead. Example: cloud code &gt; Claude Code.</p></div>
+    </div>
+    <div style="margin-top:28px">
+      <div class="term-row"><span class="lamp"></span><b>Anthropic</b><span class="term-kind">Term</span><span class="icon">Edit</span><span class="icon">Pause</span><span class="icon">Trash</span></div>
+      <div class="term-row"><span class="lamp"></span><b>cloud code &gt; Claude Code</b><span class="term-kind">Correction</span><span class="icon">Edit</span><span class="icon">Pause</span><span class="icon">Trash</span></div>
+    </div>
+    <h3 style="margin-top:28px">Dictionary controls</h3>
+    <ul>
+      <li>Search terms and corrections from the top of the Dictionary page.</li>
+      <li>Add a new entry with Command-N or Add entry.</li>
+      <li>Edit, disable, enable, or delete any row.</li>
+      <li>Reveal the plain-text dictionary file from the footer when advanced manual inspection is needed.</li>
+    </ul>
+    <div class="callout"><p><strong>Prefer specific corrections.</strong> Murmure warns when a trigger looks like an ordinary common word because broad replacements can change text you did not intend to change.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>14 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Corrections">
+    <p class="kicker">13 / Correct dictation</p>
+    <h2>Fix history first. Teach Murmure only when the rule is safe.</h2>
+    <div class="window">
+      <div class="window-bar"><span>CORRECT DICTATION</span><span>Nothing saves until confirmation</span></div>
+      <div class="form-row" style="margin-top:18px"><label>Murmure heard</label><div class="field">Send it to cloud code tomorrow.</div></div>
+      <div class="form-row"><label>I meant</label><div class="field tall">Send it to Claude Code tomorrow.</div></div>
+      <div class="note"><p><strong>Remember for future dictations</strong></p><p>Rule to remember: "cloud code" &gt; "Claude Code"</p></div>
+      <div class="button-row"><span class="button">Cancel</span><span class="button primary">Save correction</span></div>
+    </div>
+    <h3 style="margin-top:25px">Complete correction workflow</h3>
+    <ol class="step-list">
+      <li>On a Home history row, choose the pencil Correct action.</li>
+      <li>Optionally play the original recording.</li>
+      <li>Edit I meant, or choose Dictate to fill the draft with a fresh voice recording.</li>
+      <li>Review the suggested rule. Leave Remember on only when the rule is safe.</li>
+      <li>Choose Save correction. This is the only action that changes history or the dictionary.</li>
+    </ol>
+    <p class="small">Punctuation-only changes, insertions, deletions, or ambiguous edits may be saved to history without creating a dictionary rule. If the data drive is unavailable, a safe rule can remain pending and retry later.</p>
+    <div class="footer"><span class="brand">MURMURE</span><span>15 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="History">
+    <p class="kicker">14 / History</p>
+    <h2>Every saved recording remains useful.</h2>
+    <div class="surface" style="margin-top:24px">
+      <div class="window-bar"><span>LOCAL HISTORY</span><span>Search your local history</span></div>
+      <div class="history-row"><b>Apple (streaming) / 0.42s</b><p>Your saved transcript appears here with its engine, time, and processing duration.</p><div class="icons"><span class="icon">Play</span><span class="icon">Retry</span><span class="icon">Edit</span><span class="icon">Copy</span><span class="icon">Trash</span></div></div>
+    </div>
+    <div class="grid-2" style="margin-top:24px">
+      <div class="card"><h3>Play</h3><p>Starts or stops the local saved audio. Starting another row stops the first.</p></div>
+      <div class="card"><h3>Retranscribe</h3><p>Runs the saved audio through a selected local engine and shows a preview before replacing history.</p></div>
+      <div class="card"><h3>Correct</h3><p>Opens the correction editor and can optionally create a safe dictionary rule.</p></div>
+      <div class="card"><h3>Copy or delete</h3><p>Copy sends the transcript to the clipboard. Trash removes the history item.</p></div>
+    </div>
+    <h3 style="margin-top:27px">History status labels</h3>
+    <p>Rows may show Retranscribed locally, Correction saved, Correction saved and remembered, or Correction saved; rule pending.</p>
+    <div class="callout"><p><strong>Search is local.</strong> Use the Home search field to filter your saved transcripts without sending the query or results to a service.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>16 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Recovery and Retranscription">
+    <p class="kicker">14 / Recovery</p>
+    <h2>A failed transcript does not have to mean lost audio.</h2>
+    <p class="lead">When recognition or saving fails after recording, Murmure can retain the local audio as a recoverable recording on Home.</p>
+    <div class="flow"><span class="flow-box">Recoverable recording</span><span class="flow-arrow">&gt;</span><span class="flow-box">Choose local engine</span><span class="flow-arrow">&gt;</span><span class="flow-box">Review new transcript</span><span class="flow-arrow">&gt;</span><span class="flow-box">Save to history</span></div>
+    <div class="window" style="margin-top:24px">
+      <div class="window-bar"><span>RETRANSCRIBE RECORDING</span><span>Local engine</span></div>
+      <div class="form-row" style="margin-top:18px"><label>Recovery status</label><div class="field">The speech engine returned no text.</div></div>
+      <div class="form-row"><label>Speech engine</label><div class="field">Apple (streaming) or Parakeet (batch)</div></div>
+      <div class="form-row"><label>New local transcript</label><div class="field tall">Nothing is saved until you review and confirm this candidate.</div></div>
+      <div class="button-row"><span class="button">Cancel</span><span class="button primary">Save to history</span></div>
+    </div>
+    <ul style="margin-top:24px">
+      <li>History retranscription replaces the current history text only after confirmation.</li>
+      <li>Recovery retranscription adds the recovered recording to history only after confirmation.</li>
+      <li>Parakeet may download its free local model before the first retry.</li>
+      <li>If saving fails, the original recording and history remain unchanged.</li>
+    </ul>
+    <div class="footer"><span class="brand">MURMURE</span><span>17 / 20</span></div>
+  </section>
+
+  <section class="page dark" data-document-role="page" data-label="Storage and Privacy">
+    <p class="kicker">15 / Storage and privacy</p>
+    <h2>Your working data stays in the local loop.</h2>
+    <div class="privacy-loop"><div class="computer"><div class="screen">LOCAL DATA</div></div><span class="outbound one">Model download</span><span class="outbound two">Update check</span></div>
+    <div class="grid-2">
+      <div class="card"><h3>Stored locally</h3><p>Settings, snippets, dictionary entries, transcript history, captured audio, and Command Mode processing remain on the Mac or configured data drive.</p></div>
+      <div class="card"><h3>Network exceptions</h3><p>Only one-time local model downloads and optional update checks use the network. There is no cloud transcription or Command Mode fallback.</p></div>
+    </div>
+    <h3 style="margin-top:26px">Data storage card</h3>
+    <p>Settings shows the exact active storage location and whether it is ready. Most Macs use Application Support automatically. A specially configured operator Mac may use its named external drive. Use Reveal Murmure data folder to inspect the active location.</p>
+    <div class="note"><p><strong>Diagnostics are sanitized.</strong> Preview, copy, or export configuration and permission facts. Reports exclude dictated text, history, audio, snippets, dictionary data, and local paths.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>18 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Updates and Troubleshooting">
+    <p class="kicker">15 / Updates and support</p>
+    <h2>Update safely. Diagnose without exposing your words.</h2>
+    <h3>Check for updates</h3>
+    <ol class="step-list">
+      <li>Open Settings and find Updates near the bottom.</li>
+      <li>Choose Check for updates. Murmure checks GitHub Releases and stages a verified archive locally.</li>
+      <li>When a newer version is ready and no recording is active, choose Install and relaunch.</li>
+      <li>After relaunch, confirm the version number shown in Settings.</li>
+    </ol>
+    <h3 style="margin-top:24px">Common problems</h3>
+    <div class="trouble">
+      <div class="problem">Shortcut does nothing</div><div>Confirm Accessibility is Granted. Quit and reopen Murmure after changing the macOS permission.</div>
+      <div class="problem">No audio level</div><div>Confirm Microphone is Granted, select System default, then run Test microphone.</div>
+      <div class="problem">No text inserted</div><div>Keep an editable field focused. Turn off Compare Mode, which intentionally does not insert text.</div>
+      <div class="problem">Automatic unavailable</div><div>Select Parakeet and allow its one-time local model download to finish.</div>
+      <div class="problem">Smart cleanup disabled</div><div>Turn on cleanup and choose explicit English, Spanish, or French. Automatic is not supported.</div>
+      <div class="problem">Command Mode unavailable</div><div>Check the availability message in Settings. Apple's on-device model is required.</div>
+      <div class="problem">Storage not ready</div><div>Reconnect the configured drive if one is used. Do not delete or move the active data folder by hand.</div>
+    </div>
+    <div class="footer"><span class="brand">MURMURE</span><span>19 / 20</span></div>
+  </section>
+
+  <section class="page" data-document-role="page" data-label="Quick Reference">
+    <p class="kicker">16 / Quick reference</p>
+    <h2>The complete desk-side checklist.</h2>
+    <div class="grid-2">
+      <div>
+        <h3>Before dictating</h3>
+        <div class="check-row"><span class="lamp"></span><p>Microphone Granted</p></div>
+        <div class="check-row"><span class="lamp"></span><p>Accessibility Granted</p></div>
+        <div class="check-row"><span class="lamp"></span><p>Storage Ready</p></div>
+        <div class="check-row"><span class="lamp"></span><p>Correct engine and language</p></div>
+        <h3 style="margin-top:27px">Default controls</h3>
+        <div class="check-row"><span class="keycap">fn</span><p>Hold to dictate</p></div>
+        <div class="check-row"><span class="keycap">⌃⌥⌘D</span><p>Hold for Command Mode</p></div>
+        <div class="check-row"><span class="keycap">Enter</span><p>Finish hands-free</p></div>
+        <div class="check-row"><span class="keycap">Esc</span><p>Cancel hands-free</p></div>
+      </div>
+      <div>
+        <h3>Where to find it</h3>
+        <div class="check-row"><span class="tag">Home</span><p>History, recovery, replay, retry, correct, copy, delete</p></div>
+        <div class="check-row"><span class="tag">Dictionary</span><p>Terms and hear-to-write corrections</p></div>
+        <div class="check-row"><span class="tag">Settings</span><p>Shortcuts, engines, language, microphone, cleanup, snippets, permissions, storage, diagnostics, updates</p></div>
+        <h3 style="margin-top:27px">Remember</h3>
+        <div class="note"><p>Automatic uses Parakeet.</p></div>
+        <div class="note" style="margin-top:9px"><p>Compare Mode does not type.</p></div>
+        <div class="note" style="margin-top:9px"><p>Snippets match a whole utterance.</p></div>
+        <div class="note" style="margin-top:9px"><p>Corrections save only after confirmation.</p></div>
+        <div class="note" style="margin-top:9px"><p>Command Mode always asks you to review.</p></div>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:30px"><p><strong>Speak. Review. Keep moving.</strong> Murmure is designed to reduce friction without taking control away from you.</p></div>
+    <div class="footer"><span class="brand">MURMURE</span><span>20 / 20</span></div>
+  </section>
+</body>
+</html>
