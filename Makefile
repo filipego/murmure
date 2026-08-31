@@ -69,6 +69,7 @@ app: build
 	@cp $(BUILD) "$(CONTENTS)/MacOS/$(EXEC)"
 	@cp "$(HELPER_BUILD)" "$(HELPERS)/MurmurUpdateHelper"
 	@cp Resources/Info.plist "$(CONTENTS)/Info.plist"
+	@cp Sources/MurmurYouTube/Localization/catalog.tsv "$(CONTENTS)/Resources/catalog.tsv"
 	@if [ -f Resources/AppIcon.icns ]; then cp Resources/AppIcon.icns "$(CONTENTS)/Resources/"; fi
 	@printf 'APPL????' > "$(CONTENTS)/PkgInfo"
 	@# Belt and braces: the staging dir isn't synced, but the copied binary can still carry

@@ -31,6 +31,7 @@ struct OnboardingWindow: View {
 
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var onboarding = OnboardingState.shared
+    @State private var appLanguage = AppLanguageStore.shared
     @State private var settings = Settings.shared
     @State private var audioInputs = AudioInputStore.shared
     @State private var microphoneTest = MicrophoneTestCoordinator()
@@ -43,10 +44,10 @@ struct OnboardingWindow: View {
         VStack(alignment: .leading, spacing: DS.Space.wide) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: DS.Space.tight) {
-                    Text("Set up Murmure")
+                    Text(L10n.text("Set up Murmure"))
                         .font(DS.Font.display)
                         .foregroundStyle(DS.Color.ink)
-                    Text("Local voice dictation, ready for this Mac.")
+                    Text(L10n.text("Local voice dictation, ready for this Mac."))
                         .font(DS.Font.label)
                         .foregroundStyle(DS.Color.inkSecondary)
                 }
@@ -68,12 +69,12 @@ struct OnboardingWindow: View {
             }
 
             HStack(spacing: DS.Space.snug) {
-                if onboarding.step != .privacy && onboarding.step != .complete {
-                    Button("Back") { onboarding.back() }
+                if onboarding.step != .appLanguage && onboarding.step != .complete {
+                    Button(L10n.text("Back")) { onboarding.back() }
                 }
                 Spacer()
                 if onboarding.step == .complete {
-                    Button("Finish setup") {
+                    Button(L10n.text("Finish setup")) {
                         onboarding.complete()
                         dismissWindow(id: "onboarding")
                     }
@@ -81,7 +82,7 @@ struct OnboardingWindow: View {
                     .tint(DS.Color.ink)
                     .keyboardShortcut(.defaultAction)
                 } else {
-                    Button("Continue") { onboarding.advance(readiness: readiness) }
+                    Button(L10n.text("Continue")) { onboarding.advance(readiness: readiness) }
                         .buttonStyle(.borderedProminent)
                         .tint(DS.Color.ink)
                         .keyboardShortcut(.defaultAction)
@@ -116,6 +117,13 @@ struct OnboardingWindow: View {
                 .foregroundStyle(DS.Color.ink)
 
             switch onboarding.step {
+            case .appLanguage:
+                explanation("Choose the language Murmure uses for buttons, options, and instructions. You can change it later in Settings.")
+                Picker(L10n.text("App language"), selection: $appLanguage.language) {
+                    ForEach(AppLanguage.allCases, id: \.self) { language in
+                        Text(language.nativeName).tag(language)
+                    }
+                }
             case .privacy:
                 explanation(
                     "Everything you dictate is processed on this Mac. Audio, history, snippets, and your dictionary stay in Murmure's local data folder. Only model downloads and update checks use the network."
@@ -123,7 +131,7 @@ struct OnboardingWindow: View {
             case .microphonePermission:
                 explanation("Microphone access lets Murmure hear a recording. macOS controls this permission.")
                 readinessRow("Microphone", ready: Permissions.hasMicrophone)
-                Button(Permissions.hasMicrophone ? "Microphone access granted" : "Request microphone access") {
+                Button(L10n.text(Permissions.hasMicrophone ? "Microphone access granted" : "Request microphone access")) {
                     Task {
                         if !(await Permissions.requestMicrophone()) {
                             Permissions.openMicrophoneSettings()
@@ -135,29 +143,29 @@ struct OnboardingWindow: View {
             case .accessibilityPermission:
                 explanation("Accessibility lets the global shortcut work and inserts finished text into the app you were using.")
                 readinessRow("Accessibility", ready: Permissions.hasAccessibility)
-                Button(Permissions.hasAccessibility ? "Accessibility granted" : "Open Accessibility Settings") {
+                Button(L10n.text(Permissions.hasAccessibility ? "Accessibility granted" : "Open Accessibility Settings")) {
                     Permissions.promptForAccessibility()
                     Permissions.openAccessibilitySettings()
                 }
                 .disabled(Permissions.hasAccessibility)
             case .shortcut:
                 explanation("Choose a comfortable shortcut. You can record any modified key combination later in Settings.")
-                Picker("Shortcut", selection: Binding(
+                Picker(L10n.text("Shortcut"), selection: Binding(
                     get: { settings.pushToTalkKey },
                     set: { settings.selectPushToTalkKey($0); controller.reloadHotkey() }
                 )) {
-                    ForEach(PushToTalkKey.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                    ForEach(PushToTalkKey.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
-                Picker("Gesture", selection: Binding(
+                Picker(L10n.text("Gesture"), selection: Binding(
                     get: { settings.pushToTalkBinding.gesture },
                     set: { settings.selectPushToTalkGesture($0); controller.reloadHotkey() }
                 )) {
-                    ForEach(HotkeyGesture.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                    ForEach(HotkeyGesture.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
             case .microphoneTest:
                 explanation("Pick an input, start the meter, speak briefly, then stop the test.")
-                Picker("Input", selection: $settings.microphoneSelection) {
-                    Text("System default").tag(MicrophoneSelection.systemDefault)
+                Picker(L10n.text("Input"), selection: $settings.microphoneSelection) {
+                    Text(L10n.text("System default")).tag(MicrophoneSelection.systemDefault)
                     ForEach(audioInputs.devices) { device in
                         Text(device.displayName).tag(MicrophoneSelection.device(
                             uniqueID: device.id,
@@ -167,17 +175,17 @@ struct OnboardingWindow: View {
                 }
                 VUMeter(level: microphoneTest.level, isActive: microphoneTest.state.isBusy)
                     .frame(height: DS.Size.microphoneTestMeterHeight)
-                Button(microphoneTest.state.isBusy ? "Stop microphone test" : "Start microphone test") {
+                Button(L10n.text(microphoneTest.state.isBusy ? "Stop microphone test" : "Start microphone test")) {
                     toggleMicrophoneTest()
                 }
                 readinessRow("Microphone test", ready: microphoneTested)
             case .language:
                 explanation("Automatic recognizes any of Parakeet's 25 supported European languages. Choose one language when you want an explicit decoder hint.")
-                Picker("Engine", selection: onboardingEngineBinding) {
-                    ForEach(SpeechEngineChoice.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                Picker(L10n.text("Engine"), selection: onboardingEngineBinding) {
+                    ForEach(SpeechEngineChoice.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
-                Picker("Language", selection: onboardingLanguageBinding) {
-                    ForEach(TranscriptionLanguageOption.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                Picker(L10n.text("Language"), selection: onboardingLanguageBinding) {
+                    ForEach(TranscriptionLanguageOption.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
             case .testDictation:
                 explanation("Record one short sentence. It will be saved to local history; this setup window does not contain a text field to paste into.")
@@ -191,7 +199,7 @@ struct OnboardingWindow: View {
                 .buttonStyle(.borderedProminent)
                 .tint(DS.Color.ink)
                 .disabled(controller.state == .finishing)
-                Toggle("I completed the test dictation", isOn: $testDictationAcknowledged)
+                Toggle(L10n.text("I completed the test dictation"), isOn: $testDictationAcknowledged)
             case .complete:
                 explanation("Murmure is ready. Hold your shortcut in any app, speak, then finish the selected gesture. You can rerun setup from Settings at any time.")
                 readinessRow("Microphone", ready: Permissions.hasMicrophone)
@@ -236,11 +244,11 @@ struct OnboardingWindow: View {
     private var testDictationButtonTitle: String {
         switch controller.state {
         case .starting, .listening:
-            "Finish test dictation"
+            L10n.text("Finish test dictation")
         case .finishing:
-            "Finishing test dictation…"
+            L10n.text("Finishing test dictation…")
         case .idle, .error:
-            "Start test dictation"
+            L10n.text("Start test dictation")
         }
     }
 
@@ -251,26 +259,33 @@ struct OnboardingWindow: View {
 
     private var stepTitle: String {
         switch onboarding.step {
-        case .privacy: "Private by design"
-        case .microphonePermission: "Allow microphone access"
-        case .accessibilityPermission: "Allow the global shortcut"
-        case .shortcut: "Choose your shortcut"
-        case .microphoneTest: "Test your microphone"
-        case .language: "Choose language behavior"
-        case .testDictation: "Try one local dictation"
-        case .complete: "Setup complete"
+        case .appLanguage: L10n.text("Choose app language")
+        case .privacy: L10n.text("Private by design")
+        case .microphonePermission: L10n.text("Allow microphone access")
+        case .accessibilityPermission: L10n.text("Allow the global shortcut")
+        case .shortcut: L10n.text("Choose your shortcut")
+        case .microphoneTest: L10n.text("Test your microphone")
+        case .language: L10n.text("Choose language behavior")
+        case .testDictation: L10n.text("Try one local dictation")
+        case .complete: L10n.text("Setup complete")
         }
     }
 
     private func explanation(_ text: String) -> some View {
-        Text(text)
+        Text(L10n.text(text))
             .font(DS.Font.body)
             .foregroundStyle(DS.Color.inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
     private func readinessRow(_ title: String, ready: Bool) -> some View {
-        Label(ready ? "\(title) ready" : "\(title) needs attention", systemImage: ready ? "checkmark.circle.fill" : "exclamationmark.circle")
+        Label(
+            L10n.format(
+                ready ? "%@ ready" : "%@ needs attention",
+                arguments: [L10n.text(title)]
+            ),
+            systemImage: ready ? "checkmark.circle.fill" : "exclamationmark.circle"
+        )
             .font(DS.Font.bodyEmphasis)
             .foregroundStyle(ready ? DS.Color.success : DS.Color.warning)
     }

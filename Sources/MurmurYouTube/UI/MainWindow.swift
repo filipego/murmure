@@ -32,10 +32,10 @@ struct MainWindow: View {
     private var navigationRail: some View {
         VStack(alignment: .leading, spacing: DS.Space.wide) {
             VStack(alignment: .leading, spacing: DS.Space.tight) {
-                Text("Murmure")
+                Text(L10n.text("Murmure"))
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.railInk)
-                Text("LOCAL VOICE DESK")
+                Text(L10n.text("LOCAL VOICE DESK"))
                     .font(DS.Font.eyebrow)
                     .tracking(DS.Font.silkscreenTracking)
                     .foregroundStyle(DS.Color.railInkSecondary)
@@ -168,7 +168,7 @@ struct MainWindow: View {
         case .starting: "Preparing microphone"
         case .listening: "Listening"
         case .finishing: "Transcribing locally"
-        case .error(let message): "Needs attention: \(message)"
+        case .error(let message): L10n.format("Needs attention: %@", arguments: [message])
         }
     }
 }
@@ -188,7 +188,7 @@ struct PrimaryActionButton: View {
                 Image(systemName: systemImage)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(isActive ? .white : DS.Color.canvas)
-                Text(title)
+                Text(L10n.text(title))
                     .font(DS.Font.bodyEmphasis)
                     .foregroundStyle(isActive ? .white : DS.Color.canvas)
             }
@@ -242,11 +242,11 @@ private struct HomePanel: View {
                 }
 
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Recent dictation")
+                    Text(L10n.text("Recent dictation"))
                         .font(DS.Font.title)
                         .foregroundStyle(DS.Color.ink)
                     Spacer()
-                    Text("LOCAL HISTORY")
+                    Text(L10n.text("LOCAL HISTORY"))
                         .font(DS.Font.eyebrow)
                         .tracking(DS.Font.silkscreenTracking)
                         .foregroundStyle(DS.Color.inkSecondary)
@@ -305,11 +305,11 @@ private struct HomePanel: View {
     private var recoverableSection: some View {
         VStack(alignment: .leading, spacing: DS.Space.snug) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Recoverable recordings")
+                Text(L10n.text("Recoverable recordings"))
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.ink)
                 Spacer()
-                Text("SAFE LOCALLY")
+                Text(L10n.text("SAFE LOCALLY"))
                     .font(DS.Font.eyebrow)
                     .tracking(DS.Font.silkscreenTracking)
                     .foregroundStyle(DS.Color.inkSecondary)
@@ -420,7 +420,7 @@ private struct HistoryRow: View {
                         .font(DS.Font.counter)
                         .foregroundStyle(DS.Color.inkSecondary)
                 }
-                Text(run.text.isEmpty ? "(Nothing recognized)" : run.text)
+                Text(run.text.isEmpty ? L10n.text("(Nothing recognized)") : run.text)
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.ink)
                     .textSelection(.enabled)
@@ -430,7 +430,11 @@ private struct HistoryRow: View {
                 if let corrections = run.corrections, !corrections.isEmpty {
                     HStack(spacing: DS.Space.tight) {
                         Image(systemName: "wand.and.stars")
-                        Text("\(corrections.reduce(0) { $0 + $1.count }) dictionary correction\(corrections.count == 1 ? "" : "s")")
+                        let correctionCount = corrections.reduce(0) { $0 + $1.count }
+                        Text(L10n.format(
+                            correctionCount == 1 ? "%d dictionary correction" : "%d dictionary corrections",
+                            arguments: [correctionCount]
+                        ))
                     }
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.warning)
@@ -439,7 +443,7 @@ private struct HistoryRow: View {
                 if let snippet = run.appliedSnippet {
                     HStack(spacing: DS.Space.tight) {
                         Image(systemName: "text.badge.checkmark")
-                        Text("Snippet · \(snippet.trigger)")
+                        Text(L10n.format("Snippet · %@", arguments: [snippet.trigger]))
                     }
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.inkSecondary)
@@ -473,7 +477,7 @@ private struct HistoryRow: View {
                     .disabled(correctionDisabled)
                     .help(isPlaying ? "Stop audio recording" : "Play audio recording")
                     .accessibilityLabel(isPlaying ? "Stop audio recording" : "Play audio recording")
-                    .accessibilityHint("Plays the saved recording inside Murmure")
+                    .accessibilityHint(L10n.text("Plays the saved recording inside Murmure"))
 
                     Button(action: onRetranscribe) {
                         Image(systemName: "arrow.clockwise")
@@ -483,8 +487,8 @@ private struct HistoryRow: View {
                     .foregroundStyle(DS.Color.inkSecondary)
                     .disabled(correctionDisabled)
                     .help(correctionDisabled ? "Finish the current dictation before retrying history" : "Retranscribe recording")
-                    .accessibilityLabel("Retranscribe recording")
-                    .accessibilityHint("Runs this saved audio through a local speech engine and shows a preview")
+                    .accessibilityLabel(L10n.text("Retranscribe recording"))
+                    .accessibilityHint(L10n.text("Runs this saved audio through a local speech engine and shows a preview"))
                 }
 
                 Button(action: onCorrect) {
@@ -495,8 +499,8 @@ private struct HistoryRow: View {
                 .foregroundStyle(DS.Color.inkSecondary)
                 .disabled(correctionDisabled)
                 .help(correctionDisabled ? "Finish the current dictation before correcting history" : "Correct dictation")
-                .accessibilityLabel("Correct dictation")
-                .accessibilityHint("Opens an editor for this saved dictation")
+                .accessibilityLabel(L10n.text("Correct dictation"))
+                .accessibilityHint(L10n.text("Opens an editor for this saved dictation"))
 
                 Button {
                     NSPasteboard.general.clearContents()
@@ -511,7 +515,7 @@ private struct HistoryRow: View {
                 .foregroundStyle(DS.Color.inkSecondary)
                 .help(didCopy ? "Copied" : "Copy transcription")
                 .accessibilityLabel(didCopy ? "Copied transcription" : "Copy transcription")
-                .accessibilityHint("Copies this dictation to the clipboard")
+                .accessibilityHint(L10n.text("Copies this dictation to the clipboard"))
 
                 Button(action: onDelete) {
                     Image(systemName: "trash")
@@ -519,9 +523,9 @@ private struct HistoryRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(DS.Color.inkSecondary)
-                .help("Delete transcription")
-                .accessibilityLabel("Delete transcription")
-                .accessibilityHint("Removes this dictation from local history")
+                .help(L10n.text("Delete transcription"))
+                .accessibilityLabel(L10n.text("Delete transcription"))
+                .accessibilityHint(L10n.text("Removes this dictation from local history"))
             }
             .opacity(isHovering ? 1 : 0.55)
         }
@@ -572,7 +576,7 @@ private struct RecoverableHistoryRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: DS.Space.tight) {
                     Image(systemName: "externaldrive.fill.badge.checkmark")
-                    Text("Audio retained locally")
+                    Text(L10n.text("Audio retained locally"))
                 }
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.inkSecondary)
@@ -604,7 +608,7 @@ private struct RecoverableHistoryRow: View {
                 .foregroundStyle(DS.Color.inkSecondary)
                 .disabled(actionsDisabled)
                 .help(actionsDisabled ? "Finish the current dictation before recovery" : "Retranscribe recoverable recording")
-                .accessibilityLabel("Retranscribe recoverable recording")
+                .accessibilityLabel(L10n.text("Retranscribe recoverable recording"))
             }
             .opacity(isHovering ? 1 : 0.55)
         }
@@ -626,10 +630,10 @@ private struct EmptyHomeState: View {
             Image(systemName: hasHistory ? "magnifyingglass" : "mic")
                 .font(.system(size: 22, weight: .medium))
                 .foregroundStyle(DS.Color.inkSecondary)
-            Text(hasHistory ? "No matching dictation" : "Your local history starts here")
+            Text(L10n.text(hasHistory ? "No matching dictation" : "Your local history starts here"))
                 .font(DS.Font.bodyEmphasis)
                 .foregroundStyle(DS.Color.ink)
-            Text(hasHistory ? "Try another search term." : "Press Record or hold your push-to-talk key, then speak naturally.")
+            Text(L10n.text(hasHistory ? "Try another search term." : "Press Record or hold your push-to-talk key, then speak naturally."))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
         }
@@ -661,7 +665,7 @@ struct SearchField: View {
                         .foregroundStyle(DS.Color.inkSecondary)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
+                .accessibilityLabel(L10n.text("Clear search"))
             }
         }
         .padding(.horizontal, DS.Space.base)
@@ -680,10 +684,10 @@ struct EmptyPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.snug) {
-            Text(label)
+            Text(L10n.text(label))
                 .font(DS.Font.bodyEmphasis)
                 .foregroundStyle(DS.Color.ink)
-            Text(detail)
+            Text(L10n.text(detail))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
         }

@@ -8,45 +8,49 @@ struct MurmurYouTubeApp: App {
     var body: some Scene {
         // The main window. A `Window` rather than a `WindowGroup`: this app has one front
         // panel, and letting ⌘N spawn a second copy of a tape deck makes no sense.
-        Window("Murmure", id: "main") {
-            MainSceneRoot(controller: delegate.controller, updates: delegate.updateCoordinator)
+        Window(L10n.text("Murmure"), id: "main") {
+            AppLanguageRoot {
+                MainSceneRoot(controller: delegate.controller, updates: delegate.updateCoordinator)
+            }
         }
         .defaultSize(width: 860, height: 620)
         .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .appInfo) {
-                Button("Reveal Dictionary File") {
+                Button(L10n.text("Reveal Dictionary File")) {
                     NSWorkspace.shared.activateFileViewerSelecting([DictionaryStore.fileURL])
                 }
             }
         }
 
-        Window("Set up Murmure", id: "onboarding") {
-            OnboardingWindow(controller: delegate.controller)
+        Window(L10n.text("Set up Murmure"), id: "onboarding") {
+            AppLanguageRoot { OnboardingWindow(controller: delegate.controller) }
         }
         .windowResizability(.contentSize)
 
-        Window("Command Mode", id: "command-mode") {
-            CommandModeWindow(controller: delegate.controller.commandMode)
+        Window(L10n.text("Command Mode"), id: "command-mode") {
+            AppLanguageRoot { CommandModeWindow(controller: delegate.controller.commandMode) }
         }
         .windowResizability(.contentSize)
 
         // Fully qualified: this app has its own `Settings` type, which otherwise shadows
         // SwiftUI's settings scene.
         SwiftUI.Settings {
-            SettingsWindow(controller: delegate.controller, updates: delegate.updateCoordinator)
+            AppLanguageRoot {
+                SettingsWindow(controller: delegate.controller, updates: delegate.updateCoordinator)
+            }
         }
 
         // Secondary now: status and the hotkey while you're working in another app.
         MenuBarExtra {
-            MenuContent(controller: delegate.controller)
+            AppLanguageRoot { MenuContent(controller: delegate.controller) }
         } label: {
             Image(systemName: delegate.controller.state.isActive ? "waveform.circle.fill" : "waveform")
         }
 
-        Window("Engine comparison", id: "comparison") {
-            ComparisonWindow(controller: delegate.controller)
+        Window(L10n.text("Engine comparison"), id: "comparison") {
+            AppLanguageRoot { ComparisonWindow(controller: delegate.controller) }
         }
         .defaultSize(width: 640, height: 560)
         .windowResizability(.contentMinSize)
@@ -67,9 +71,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.setActivationPolicy(.regular)
             let alert = NSAlert()
             alert.alertStyle = .critical
-            alert.messageText = "This Murmure build is not compatible with this Mac"
-            alert.informativeText = issue.message
-            alert.addButton(withTitle: "Quit Murmure")
+            alert.messageText = L10n.text("This Murmure build is not compatible with this Mac")
+            alert.informativeText = L10n.text(issue.message)
+            alert.addButton(withTitle: L10n.text("Quit Murmure"))
             NSApp.activate(ignoringOtherApps: true)
             alert.runModal()
             NSApp.terminate(nil)
@@ -212,44 +216,44 @@ private struct MenuContent: View {
     }
 
     var body: some View {
-        Text("Use \(settings.pushToTalkBinding.label) to dictate")
+        Text(L10n.format("Use %@ to dictate", arguments: [settings.pushToTalkBinding.label]))
 
         Divider()
 
-        Menu("Choose shortcut preset") {
+        Menu(L10n.text("Choose shortcut preset")) {
             ForEach(PushToTalkKey.allCases, id: \.self) { key in
-                Button(key.displayName) {
+                Button(L10n.text(key.displayName)) {
                 settings.selectPushToTalkKey(key)
                 controller.reloadHotkey()
                 }
             }
         }
 
-        Toggle("Compare mode (both engines)", isOn: $settings.compareMode)
+        Toggle(L10n.text("Compare mode (both engines)"), isOn: $settings.compareMode)
 
         if !settings.compareMode {
-            Picker("Engine", selection: $settings.engine) {
+            Picker(L10n.text("Engine"), selection: $settings.engine) {
                 ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
-                    Text(choice.displayName).tag(choice)
+                    Text(L10n.text(choice.displayName)).tag(choice)
                 }
             }
         }
 
-        Toggle("Clean up text", isOn: $settings.cleanupEnabled)
+        Toggle(L10n.text("Clean up text"), isOn: $settings.cleanupEnabled)
 
         if settings.cleanupEnabled {
-            Toggle("Smart cleanup (on-device AI)", isOn: $settings.smartCleanup)
+            Toggle(L10n.text("Smart cleanup (on-device AI)"), isOn: $settings.smartCleanup)
                 .disabled(!FoundationModelFormatter.isAvailable)
             if let reason = FoundationModelFormatter.unavailableReason {
-                Text(reason).font(.caption)
+                Text(L10n.text(reason)).font(.caption)
             }
         }
 
-        Toggle("Sound", isOn: $settings.soundEnabled)
+        Toggle(L10n.text("Sound"), isOn: $settings.soundEnabled)
 
         Divider()
 
-        Button("Show comparison window") {
+        Button(L10n.text("Show comparison window")) {
             RunStore.shared.reload()
             openWindow(id: "comparison")
             NSApp.activate(ignoringOtherApps: true)
@@ -259,18 +263,18 @@ private struct MenuContent: View {
         // Downloading ~470 MB on the first hold would look like a hang, so offer to do it
         // deliberately instead.
         if settings.engine == .parakeet {
-            Button(parakeetStatus) { preloadParakeet() }
+            Button(L10n.text(parakeetStatus)) { preloadParakeet() }
                 .disabled(isPreloadingParakeet || parakeetOnDisk)
         }
 
         if !Permissions.hasAccessibility {
-            Button("Grant Accessibility…") { Permissions.openAccessibilitySettings() }
+            Button(L10n.text("Grant Accessibility…")) { Permissions.openAccessibilitySettings() }
         }
         if !Permissions.hasMicrophone {
-            Button("Grant Microphone…") { Permissions.openMicrophoneSettings() }
+            Button(L10n.text("Grant Microphone…")) { Permissions.openMicrophoneSettings() }
         }
 
-        Button("Quit Murmure") { NSApp.terminate(nil) }
+        Button(L10n.text("Quit Murmure")) { NSApp.terminate(nil) }
             .keyboardShortcut("q")
     }
 }

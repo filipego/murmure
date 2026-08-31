@@ -7,6 +7,8 @@ struct OnboardingPolicyTests {
     @Test("permission and proof steps gate forward progress")
     func readinessGates() {
         let empty = OnboardingReadiness()
+        #expect(OnboardingStep.allCases.first == .appLanguage)
+        #expect(OnboardingPolicy.canAdvance(from: .appLanguage, readiness: empty))
         #expect(OnboardingPolicy.canAdvance(from: .privacy, readiness: empty))
         #expect(!OnboardingPolicy.canAdvance(from: .microphonePermission, readiness: empty))
         #expect(!OnboardingPolicy.canAdvance(from: .accessibilityPermission, readiness: empty))
@@ -40,7 +42,7 @@ struct OnboardingPolicyTests {
         state.reset()
         state.reset()
         #expect(!state.isCompleted)
-        #expect(state.step == .privacy)
+        #expect(state.step == .appLanguage)
         #expect(defaults.string(forKey: "unrelated") == "keep")
         defaults.removePersistentDomain(forName: suite)
     }
@@ -59,11 +61,11 @@ struct OnboardingPolicyTests {
         )
 
         state.back()
-        #expect(state.step == .privacy)
+        #expect(state.step == .appLanguage)
         state.advance(readiness: ready)
-        #expect(state.step == .microphonePermission)
-        state.back()
         #expect(state.step == .privacy)
+        state.back()
+        #expect(state.step == .appLanguage)
         defaults.removePersistentDomain(forName: suite)
     }
 }

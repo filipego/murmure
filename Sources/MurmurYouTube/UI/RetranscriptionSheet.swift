@@ -25,7 +25,7 @@ struct RetranscriptionSheet: View {
                 engineSection
                 if let preview { candidateSection(preview) }
                 if let message {
-                    Text(message)
+                    Text(L10n.text(message))
                         .font(DS.Font.label)
                         .foregroundStyle(DS.Color.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -49,10 +49,10 @@ struct RetranscriptionSheet: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: DS.Space.tight) {
-            Text("Retranscribe recording")
+            Text(L10n.text("Retranscribe recording"))
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.ink)
-            Text("Murmure runs the saved audio locally. Nothing is typed or saved until you review and confirm the result.")
+            Text(L10n.text("Murmure runs the saved audio locally. Nothing is typed or saved until you review and confirm the result."))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -81,20 +81,20 @@ struct RetranscriptionSheet: View {
 
     private var engineSection: some View {
         VStack(alignment: .leading, spacing: DS.Space.snug) {
-            Text("LOCAL ENGINE")
+            Text(L10n.text("LOCAL ENGINE"))
                 .font(DS.Font.eyebrow)
                 .tracking(DS.Font.silkscreenTracking)
                 .foregroundStyle(DS.Color.inkSecondary)
-            Picker("Speech engine", selection: $engine) {
+            Picker(L10n.text("Speech engine"), selection: $engine) {
                 ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
-                    Text(choice.displayName).tag(choice)
+                    Text(L10n.text(choice.displayName)).tag(choice)
                 }
             }
             .labelsHidden()
             .disabled(isBusy)
-            Text(engine == .parakeet && !ParakeetModels.isDownloaded
+            Text(L10n.text(engine == .parakeet && !ParakeetModels.isDownloaded
                 ? "Parakeet may download its free local model before the first retry."
-                : "The recording and transcript stay on this Mac.")
+                : "The recording and transcript stay on this Mac."))
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.inkSecondary)
         }
@@ -109,7 +109,7 @@ struct RetranscriptionSheet: View {
     private func candidateSection(_ preview: RetranscriptionPreview) -> some View {
         VStack(alignment: .leading, spacing: DS.Space.snug) {
             HStack(alignment: .firstTextBaseline) {
-                Text("NEW LOCAL TRANSCRIPT")
+                Text(L10n.text("NEW LOCAL TRANSCRIPT"))
                     .font(DS.Font.eyebrow)
                     .tracking(DS.Font.silkscreenTracking)
                     .foregroundStyle(DS.Color.inkSecondary)
@@ -130,7 +130,7 @@ struct RetranscriptionSheet: View {
                         .strokeBorder(DS.Color.seam, lineWidth: DS.Border.hairline)
                 }
             if let snippet = preview.appliedSnippet {
-                Text("Snippet applied: \(snippet.trigger)")
+                Text(L10n.format("Snippet applied: %@", arguments: [snippet.trigger]))
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.inkSecondary)
             }
@@ -140,7 +140,7 @@ struct RetranscriptionSheet: View {
     private var actions: some View {
         HStack(spacing: DS.Space.snug) {
             Spacer()
-            Button("Cancel", role: .cancel) {
+            Button(L10n.text("Cancel"), role: .cancel) {
                 coordinator.cancel()
                 dismiss()
             }

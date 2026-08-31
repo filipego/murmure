@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 enum OnboardingStep: String, CaseIterable, Codable, Sendable {
+    case appLanguage
     case privacy
     case microphonePermission
     case accessibilityPermission
@@ -25,7 +26,7 @@ enum OnboardingPolicy {
         readiness: OnboardingReadiness
     ) -> Bool {
         switch step {
-        case .privacy, .shortcut, .language:
+        case .appLanguage, .privacy, .shortcut, .language:
             true
         case .microphonePermission:
             readiness.microphoneGranted
@@ -58,7 +59,7 @@ final class OnboardingState {
         stepKey = "\(keyPrefix).step"
         completedKey = "\(keyPrefix).completed"
         isCompleted = defaults.bool(forKey: completedKey)
-        step = OnboardingStep(rawValue: defaults.string(forKey: stepKey) ?? "") ?? .privacy
+        step = OnboardingStep(rawValue: defaults.string(forKey: stepKey) ?? "") ?? .appLanguage
         if isCompleted { step = .complete }
     }
 
@@ -89,7 +90,7 @@ final class OnboardingState {
     }
 
     func reset() {
-        step = .privacy
+        step = .appLanguage
         isCompleted = false
         defaults.removeObject(forKey: stepKey)
         defaults.removeObject(forKey: completedKey)

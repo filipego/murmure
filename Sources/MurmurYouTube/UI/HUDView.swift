@@ -20,12 +20,12 @@ struct HUDView: View {
                 .frame(width: 64, height: 24)
 
             VStack(alignment: .leading, spacing: DS.Space.hair) {
-                Text(statusTitle)
+                Text(L10n.text(statusTitle))
                     .font(DS.Font.bodyEmphasis)
                     .foregroundStyle(DS.Color.railInk)
                     .lineLimit(1)
                 if !detail.isEmpty {
-                    Text(detail)
+                    Text(controller.transcript.isEmpty ? L10n.text(detail) : detail)
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.railInkSecondary)
                         .lineLimit(1)
@@ -48,8 +48,8 @@ struct HUDView: View {
             y: DS.Shadow.window.y
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(statusTitle)
-        .accessibilityValue(detail)
+        .accessibilityLabel(L10n.text(statusTitle))
+        .accessibilityValue(controller.transcript.isEmpty ? L10n.text(detail) : detail)
     }
 
     private var statusIcon: String {

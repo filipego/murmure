@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MurmurYouTube",
+    defaultLocalization: "en",
     platforms: [.macOS(.v26)],
     dependencies: [
         // Parakeet TDT as CoreML on the Neural Engine. Optional at runtime — Apple's
@@ -53,6 +54,7 @@ let package = Package(
                 .product(name: "FluidAudio", package: "FluidAudio"),
             ],
             path: "Sources/MurmurYouTube",
+            resources: [.process("Localization")],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

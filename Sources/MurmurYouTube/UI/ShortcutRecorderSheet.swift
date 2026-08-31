@@ -9,10 +9,10 @@ struct ShortcutRecorderSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.wide) {
-            Text(title)
+            Text(L10n.text(title))
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.ink)
-            Text("Press a modifier by itself, or hold modifiers and press another key. Escape cancels.")
+            Text(L10n.text("Press a modifier by itself, or hold modifiers and press another key. Escape cancels."))
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)

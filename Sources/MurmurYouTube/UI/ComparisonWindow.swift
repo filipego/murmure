@@ -65,16 +65,19 @@ struct ComparisonWindow: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("Engine comparison")
+                Text(L10n.text("Engine comparison"))
                     .font(.system(size: 22, weight: .bold, design: .rounded))
                     .foregroundStyle(DS.Color.ink)
-                Text("\(store.runs.count) recording\(store.runs.count == 1 ? "" : "s")")
+                Text(L10n.format(
+                    store.runs.count == 1 ? "%d recording" : "%d recordings",
+                    arguments: [store.runs.count]
+                ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
             if !store.runs.isEmpty {
-                Button("Clear") {
+                Button(L10n.text("Clear")) {
                     RunLog.clear()
                     store.reload()
                 }
@@ -97,7 +100,7 @@ struct ComparisonWindow: View {
                     }
                 } label: {
                     Label(
-                        isRecording ? "Stop" : "Record both",
+                        L10n.text(isRecording ? "Stop" : "Record both"),
                         systemImage: isRecording ? "stop.circle.fill" : "record.circle"
                     )
                     .font(.system(size: 15, weight: .semibold))
@@ -110,7 +113,9 @@ struct ComparisonWindow: View {
                 .disabled(!isRecording && !controller.canStartButtonRecording)
             }
 
-            Text(statusLine(isRecording: isRecording))
+            Text(controller.transcript.isEmpty
+                ? L10n.text(statusLine(isRecording: isRecording))
+                : statusLine(isRecording: isRecording))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -128,11 +133,14 @@ struct ComparisonWindow: View {
             Image(systemName: "waveform")
                 .font(.system(size: 30))
                 .foregroundStyle(DS.Color.inkSecondary)
-            Text("Use \(settings.pushToTalkBinding.label), say a sentence, then finish the configured gesture.")
+            Text(L10n.format(
+                "Use %@, say a sentence, then finish the configured gesture.",
+                arguments: [settings.pushToTalkBinding.label]
+            ))
                 .font(.system(size: 15, weight: .semibold))
-            Text(settings.compareMode
+            Text(L10n.text(settings.compareMode
                  ? "Both engines run on that one recording and appear here."
-                 : "Turn on Compare mode in the menu bar to see both engines at once.")
+                 : "Turn on Compare mode in the menu bar to see both engines at once."))
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -162,7 +170,10 @@ private struct ComparisonCard: View {
         let ratio = worst.processSeconds / best.processSeconds
         let delta = worst.processSeconds - best.processSeconds
         guard delta > 0.005 else { return "tied" }
-        return String(format: "%@ %.1f× faster · %.2fs ahead", best.engine, ratio, delta)
+        return L10n.format(
+            "%@ %.1f× faster · %.2fs ahead",
+            arguments: [best.engine, ratio, delta]
+        )
     }
 
     /// Case and punctuation are normalized away: Apple auto-punctuates and Parakeet
@@ -178,11 +189,19 @@ private struct ComparisonCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(runs.first.map { "\($0.date.formatted(date: .omitted, time: .standard)) · held \($0.audioSeconds, format: .number.precision(.fractionLength(1)))s" } ?? "")
+                Text(runs.first.map {
+                    L10n.format(
+                        "%@ · held %@s",
+                        arguments: [
+                            $0.date.formatted(date: .omitted, time: .standard),
+                            $0.audioSeconds.formatted(.number.precision(.fractionLength(1)))
+                        ]
+                    )
+                } ?? "")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(verdict.0)
+                Text(L10n.text(verdict.0))
                     .font(.caption2.weight(.semibold))
                     .padding(.horizontal, 9).padding(.vertical, 3)
                     .background(verdict.1.opacity(0.16), in: Capsule())
@@ -199,20 +218,20 @@ private struct ComparisonCard: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .help("Delete this comparison")
+                    .help(L10n.text("Delete this comparison"))
                 }
             }
             if let margin {
                 HStack(spacing: 5) {
                     Image(systemName: margin == "tied" ? "equal.circle.fill" : "bolt.fill")
-                    Text(margin)
+                    Text(L10n.text(margin))
                 }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(DS.Color.success)
             } else if runs.count == 1 {
                 HStack(spacing: 5) {
                     ProgressView().controlSize(.small)
-                    Text("running second engine…")
+                    Text(L10n.text("running second engine…"))
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -238,7 +257,7 @@ private struct EngineRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text(run.engine + (isWinner ? " · fastest" : ""))
+                Text(run.engine + (isWinner ? L10n.text(" · fastest") : ""))
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 8).padding(.vertical, 2)
                     .background((isWinner ? DS.Color.success : DS.Color.inkSecondary).opacity(0.16), in: Capsule())
@@ -249,10 +268,13 @@ private struct EngineRow: View {
                     .monospacedDigit()
                     .foregroundStyle(isWinner ? DS.Color.success : DS.Color.ink)
             }
-            Text("\(run.realtimeFactor, format: .number.precision(.fractionLength(0)))× realtime · \(run.characters) chars")
+            Text(L10n.format(
+                "%@× realtime · %d chars",
+                arguments: [run.realtimeFactor.formatted(.number.precision(.fractionLength(0))), run.characters]
+            ))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            Text(run.text.isEmpty ? "(nothing recognized)" : run.text)
+            Text(run.text.isEmpty ? L10n.text("(nothing recognized)") : run.text)
                 .font(.callout)
                 .foregroundStyle(run.text.isEmpty ? .secondary : .primary)
                 .textSelection(.enabled)

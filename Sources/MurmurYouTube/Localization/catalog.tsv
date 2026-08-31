@@ -1,0 +1,334 @@
+key	fr	es
+Murmure	Murmure	Murmure
+Home	Accueil	Inicio
+Dictionary	Dictionnaire	Diccionario
+Settings	Réglages	Ajustes
+App language	Langue de l’app	Idioma de la app
+English	Anglais	Inglés
+French	Français	Francés
+Spanish	Espagnol	Español
+Back	Retour	Atrás
+Continue	Continuer	Continuar
+Cancel	Annuler	Cancelar
+Done	Terminé	Listo
+Save	Enregistrer	Guardar
+Delete	Supprimer	Eliminar
+Edit	Modifier	Editar
+Enable	Activer	Activar
+Disable	Désactiver	Desactivar
+Enabled	Activé	Activado
+Clear	Effacer	Borrar
+Copy	Copier	Copiar
+Record	Enregistrer	Grabar
+Stop	Arrêter	Detener
+Ready	Prêt	Listo
+Unknown	Inconnu	Desconocido
+Granted	Autorisé	Concedido
+Request access	Demander l’accès	Solicitar acceso
+Needs access	Accès requis	Requiere acceso
+Needs attention	Vérification requise	Requiere atención
+Set up Murmure	Configurer Murmure	Configurar Murmure
+Local voice dictation, ready for this Mac.	Dictée vocale locale, prête pour ce Mac.	Dictado de voz local, listo para este Mac.
+Choose app language	Choisir la langue de l’app	Elegir el idioma de la app
+Choose the language Murmure uses for buttons, options, and instructions. You can change it later in Settings.	Choisissez la langue utilisée par Murmure pour les boutons, les options et les instructions. Vous pourrez la modifier plus tard dans Réglages.	Elige el idioma que Murmure usará para los botones, las opciones y las instrucciones. Podrás cambiarlo más tarde en Ajustes.
+Private by design	Confidentiel par conception	Privado por diseño
+Everything you dictate is processed on this Mac. Audio, history, snippets, and your dictionary stay in Murmure's local data folder. Only model downloads and update checks use the network.	Tout ce que vous dictez est traité sur ce Mac. L’audio, l’historique, les extraits et votre dictionnaire restent dans le dossier local de Murmure. Seuls les téléchargements de modèles et la recherche de mises à jour utilisent le réseau.	Todo lo que dictas se procesa en este Mac. El audio, el historial, los fragmentos y tu diccionario permanecen en la carpeta local de Murmure. Solo las descargas de modelos y la búsqueda de actualizaciones usan la red.
+Allow microphone access	Autoriser l’accès au microphone	Permitir acceso al micrófono
+Microphone access lets Murmure hear a recording. macOS controls this permission.	L’accès au microphone permet à Murmure d’entendre un enregistrement. macOS contrôle cette autorisation.	El acceso al micrófono permite que Murmure escuche una grabación. macOS controla este permiso.
+Microphone	Microphone	Micrófono
+Microphone access granted	Accès au microphone autorisé	Acceso al micrófono concedido
+Request microphone access	Demander l’accès au microphone	Solicitar acceso al micrófono
+Allow the global shortcut	Autoriser le raccourci global	Permitir el atajo global
+Accessibility lets the global shortcut work and inserts finished text into the app you were using.	L’accessibilité permet au raccourci global de fonctionner et d’insérer le texte final dans l’app que vous utilisiez.	Accesibilidad permite que el atajo global funcione e inserta el texto final en la app que estabas usando.
+Accessibility	Accessibilité	Accesibilidad
+Accessibility granted	Accessibilité autorisée	Accesibilidad concedida
+Open Accessibility Settings	Ouvrir les réglages d’accessibilité	Abrir los ajustes de Accesibilidad
+Choose your shortcut	Choisir votre raccourci	Elegir tu atajo
+Choose a comfortable shortcut. You can record any modified key combination later in Settings.	Choisissez un raccourci confortable. Vous pourrez enregistrer toute combinaison de touches avec modificateurs dans Réglages.	Elige un atajo cómodo. Más tarde podrás grabar cualquier combinación con modificadores en Ajustes.
+Shortcut	Raccourci	Atajo
+Gesture	Geste	Gesto
+Hold	Maintenir	Mantener pulsado
+Double-tap and hold	Double appui puis maintien	Doble toque y mantener
+Press to start/stop	Appuyer pour démarrer/arrêter	Pulsar para iniciar/detener
+Test your microphone	Tester votre microphone	Probar tu micrófono
+Pick an input, start the meter, speak briefly, then stop the test.	Choisissez une entrée, démarrez le vu-mètre, parlez brièvement, puis arrêtez le test.	Elige una entrada, inicia el medidor, habla brevemente y detén la prueba.
+Input	Entrée	Entrada
+System default	Réglage système	Predeterminado del sistema
+Start microphone test	Démarrer le test du microphone	Iniciar prueba del micrófono
+Stop microphone test	Arrêter le test du microphone	Detener prueba del micrófono
+Microphone test	Test du microphone	Prueba del micrófono
+Choose language behavior	Choisir le comportement linguistique	Elegir el comportamiento del idioma
+Automatic recognizes any of Parakeet's 25 supported European languages. Choose one language when you want an explicit decoder hint.	Le mode Automatique reconnaît les 25 langues européennes prises en charge par Parakeet. Choisissez une langue pour fournir une indication explicite au décodeur.	Automático reconoce cualquiera de los 25 idiomas europeos compatibles con Parakeet. Elige un idioma cuando quieras dar una indicación explícita al decodificador.
+Engine	Moteur	Motor
+Language	Langue	Idioma
+Automatic	Automatique	Automático
+Apple (streaming)	Apple (en continu)	Apple (en directo)
+Parakeet (batch)	Parakeet (par lot)	Parakeet (por lotes)
+Try one local dictation	Essayer une dictée locale	Probar un dictado local
+Record one short sentence. It will be saved to local history; this setup window does not contain a text field to paste into.	Enregistrez une courte phrase. Elle sera conservée dans l’historique local ; cette fenêtre de configuration ne contient pas de champ de texte.	Graba una frase corta. Se guardará en el historial local; esta ventana de configuración no contiene un campo de texto.
+Start test dictation	Démarrer la dictée de test	Iniciar dictado de prueba
+Finish test dictation	Terminer la dictée de test	Finalizar dictado de prueba
+Finishing test dictation…	Finalisation de la dictée de test…	Finalizando el dictado de prueba…
+I completed the test dictation	J’ai terminé la dictée de test	He completado el dictado de prueba
+Setup complete	Configuration terminée	Configuración completada
+Murmure is ready. Hold your shortcut in any app, speak, then finish the selected gesture. You can rerun setup from Settings at any time.	Murmure est prêt. Maintenez votre raccourci dans n’importe quelle app, parlez, puis terminez le geste choisi. Vous pouvez relancer la configuration depuis Réglages à tout moment.	Murmure está listo. Mantén pulsado tu atajo en cualquier app, habla y termina el gesto elegido. Puedes repetir la configuración desde Ajustes en cualquier momento.
+Finish setup	Terminer la configuration	Finalizar configuración
+A clear place for the words you just spoke.	Un espace clair pour les mots que vous venez de prononcer.	Un espacio claro para las palabras que acabas de pronunciar.
+LOCAL VOICE DESK	POSTE VOCAL LOCAL	ESCRITORIO DE VOZ LOCAL
+Sessions	Sessions	Sesiones
+Words	Mots	Palabras
+Corrections	Corrections	Correcciones
+Push to talk	Appuyer pour parler	Pulsar para hablar
+Recoverable recordings	Enregistrements récupérables	Grabaciones recuperables
+SAFE LOCALLY	EN SÉCURITÉ LOCALEMENT	SEGURO EN LOCAL
+Audio retained locally	Audio conservé localement	Audio conservado localmente
+Recent dictation	Dictées récentes	Dictados recientes
+LOCAL HISTORY	HISTORIQUE LOCAL	HISTORIAL LOCAL
+Search your local history	Rechercher dans l’historique local	Buscar en tu historial local
+Clear search	Effacer la recherche	Borrar búsqueda
+Your local history starts here	Votre historique local commence ici	Tu historial local comienza aquí
+Press Record or hold your push-to-talk key, then speak naturally.	Appuyez sur Enregistrer ou maintenez votre touche de dictée, puis parlez naturellement.	Pulsa Grabar o mantén pulsada tu tecla de dictado y habla con naturalidad.
+No matching dictation	Aucune dictée correspondante	No hay dictados coincidentes
+Try a different search.	Essayez une autre recherche.	Prueba otra búsqueda.
+Start recording	Démarrer l’enregistrement	Iniciar grabación
+Stop recording	Arrêter l’enregistrement	Detener grabación
+Play audio recording	Lire l’enregistrement audio	Reproducir grabación de audio
+Plays the saved recording inside Murmure	Lit l’enregistrement sauvegardé dans Murmure	Reproduce la grabación guardada dentro de Murmure
+Retranscribe recording	Retranscrire l’enregistrement	Volver a transcribir la grabación
+Runs this saved audio through a local speech engine and shows a preview	Traite cet audio avec un moteur local et affiche un aperçu	Procesa este audio guardado con un motor local y muestra una vista previa
+Correct dictation	Corriger la dictée	Corregir dictado
+Opens an editor for this saved dictation	Ouvre un éditeur pour cette dictée sauvegardée	Abre un editor para este dictado guardado
+Copy transcription	Copier la transcription	Copiar transcripción
+Copies this dictation to the clipboard	Copie cette dictée dans le presse-papiers	Copia este dictado al portapapeles
+Delete transcription	Supprimer la transcription	Eliminar transcripción
+Removes this dictation from local history	Supprime cette dictée de l’historique local	Elimina este dictado del historial local
+Copied transcription	Transcription copiée	Transcripción copiada
+Retranscribed locally	Retranscrit localement	Transcrito de nuevo en local
+Correction saved	Correction enregistrée	Corrección guardada
+Correction saved and remembered	Correction enregistrée et mémorisée	Corrección guardada y recordada
+Correction saved; rule pending	Correction enregistrée ; règle en attente	Corrección guardada; regla pendiente
+Play recoverable recording	Lire l’enregistrement récupérable	Reproducir grabación recuperable
+Stop recoverable recording	Arrêter l’enregistrement récupérable	Detener grabación recuperable
+Retranscribe recoverable recording	Retranscrire l’enregistrement récupérable	Volver a transcribir grabación recuperable
+This local recording is ready to retry.	Cet enregistrement local est prêt pour une nouvelle tentative.	Esta grabación local está lista para volver a intentarlo.
+Teach Murmure the words that matter to you.	Apprenez à Murmure les mots qui comptent pour vous.	Enseña a Murmure las palabras que te importan.
+Search terms and corrections	Rechercher des termes et corrections	Buscar términos y correcciones
+Add dictionary entry	Ajouter une entrée au dictionnaire	Añadir entrada al diccionario
+Your dictionary is empty	Votre dictionnaire est vide	Tu diccionario está vacío
+Add names, product terms, or a phrase Murmure often mishears.	Ajoutez des noms, des produits ou une expression que Murmure comprend souvent mal.	Añade nombres, productos o una frase que Murmure suela entender mal.
+No matching entries	Aucune entrée correspondante	No hay entradas coincidentes
+Try another search term.	Essayez un autre terme de recherche.	Prueba otro término de búsqueda.
+Term	Terme	Término
+Correction	Correction	Corrección
+Entry type	Type d’entrée	Tipo de entrada
+Word or phrase	Mot ou expression	Palabra o frase
+When you hear	Lorsque vous entendez	Cuando oigas
+Write	Écrire	Escribir
+Add entry	Ajouter l’entrée	Añadir entrada
+Edit dictionary entry	Modifier l’entrée du dictionnaire	Editar entrada del diccionario
+Reveal dictionary file	Afficher le fichier du dictionnaire	Mostrar archivo del diccionario
+Keep the local workflow tuned to your desk.	Adaptez le flux local à votre façon de travailler.	Adapta el flujo local a tu forma de trabajar.
+Dictation shortcut	Raccourci de dictée	Atajo de dictado
+Use this shortcut anywhere to dictate. The Record button works regardless of what is focused.	Utilisez ce raccourci partout pour dicter. Le bouton Enregistrer fonctionne quel que soit l’élément actif.	Usa este atajo en cualquier lugar para dictar. El botón Grabar funciona sin importar qué elemento tenga el foco.
+Presets	Préréglages	Preajustes
+Record dictation shortcut	Enregistrer le raccourci de dictée	Grabar atajo de dictado
+Enable hands-free dictation	Activer la dictée mains libres	Activar dictado manos libres
+Hands-free shortcut	Raccourci mains libres	Atajo de manos libres
+Record hands-free shortcut	Enregistrer le raccourci mains libres	Grabar atajo de manos libres
+Press once to start. Press the same key or Enter to finish; Escape cancels.	Appuyez une fois pour démarrer. Appuyez sur la même touche ou sur Entrée pour terminer ; Échap annule.	Pulsa una vez para iniciar. Pulsa la misma tecla o Intro para terminar; Escape cancela.
+Hold-to-talk and hands-free cannot use the same shortcut.	La dictée maintenue et le mode mains libres ne peuvent pas utiliser le même raccourci.	Mantener para hablar y manos libres no pueden usar el mismo atajo.
+Enable local Command Mode	Activer le mode Commande local	Activar Modo Comando local
+Command Mode shortcut	Raccourci du mode Commande	Atajo de Modo Comando
+Record Command Mode shortcut	Enregistrer le raccourci du mode Commande	Grabar atajo de Modo Comando
+Command Mode must use a different shortcut from dictation.	Le mode Commande doit utiliser un raccourci différent de la dictée.	Modo Comando debe usar un atajo diferente al dictado.
+Select text in another app, hold the shortcut, speak an editing instruction, then review the local proposal before anything is replaced.	Sélectionnez du texte dans une autre app, maintenez le raccourci, énoncez une instruction de modification, puis vérifiez la proposition locale avant tout remplacement.	Selecciona texto en otra app, mantén pulsado el atajo, di una instrucción de edición y revisa la propuesta local antes de reemplazar nada.
+Speech engine	Moteur vocal	Motor de voz
+Apple transcribes on-device and streams text while you speak.	Apple transcrit sur l’appareil et affiche le texte pendant que vous parlez.	Apple transcribe en el dispositivo y muestra el texto mientras hablas.
+Parakeet transcribes on-device when you release the key.	Parakeet transcrit sur l’appareil lorsque vous relâchez la touche.	Parakeet transcribe en el dispositivo cuando sueltas la tecla.
+Compare both local engines	Comparer les deux moteurs locaux	Comparar ambos motores locales
+Both engines run on that one recording and appear here.	Les deux moteurs traitent le même enregistrement et apparaissent ici.	Ambos motores procesan la misma grabación y aparecen aquí.
+Clean up transcripts	Nettoyer les transcriptions	Limpiar transcripciones
+Cleanup removes fillers and fixes punctuation before dictionary corrections run.	Le nettoyage supprime les hésitations et corrige la ponctuation avant les corrections du dictionnaire.	La limpieza elimina muletillas y corrige la puntuación antes de aplicar las correcciones del diccionario.
+Smart cleanup (on-device AI)	Nettoyage intelligent (IA locale)	Limpieza inteligente (IA en el dispositivo)
+Play start and finish sounds	Jouer les sons de début et de fin	Reproducir sonidos de inicio y fin
+Sound	Son	Sonido
+Choose a local input for dictation. System default follows macOS without changing it.	Choisissez une entrée locale pour la dictée. Le réglage système suit macOS sans le modifier.	Elige una entrada local para el dictado. El valor predeterminado sigue a macOS sin cambiarlo.
+Test microphone	Tester le microphone	Probar micrófono
+Opening the selected microphone…	Ouverture du microphone sélectionné…	Abriendo el micrófono seleccionado…
+Starting microphone	Démarrage du microphone	Iniciando micrófono
+Preparing microphone	Préparation du microphone	Preparando micrófono
+Snippets	Extraits	Fragmentos
+Say a complete phrase and replace it with reusable local text. Snippets run before dictionary corrections.	Prononcez une phrase complète pour la remplacer par un texte local réutilisable. Les extraits s’appliquent avant les corrections du dictionnaire.	Di una frase completa y reemplázala por texto local reutilizable. Los fragmentos se aplican antes que las correcciones del diccionario.
+Add snippet	Ajouter un extrait	Añadir fragmento
+No snippets yet. Try “my address,” “email signature,” or any phrase you would say by itself.	Aucun extrait pour l’instant. Essayez « mon adresse », « signature e-mail » ou toute phrase prononcée seule.	Aún no hay fragmentos. Prueba «mi dirección», «firma de correo» o cualquier frase que dirías por sí sola.
+Murmure replaces only a complete matching utterance. It never changes a phrase inside ordinary prose.	Murmure remplace uniquement une expression complète correspondante. Il ne modifie jamais une phrase au milieu d’un texte ordinaire.	Murmure solo reemplaza una expresión completa coincidente. Nunca cambia una frase dentro de un texto normal.
+Line breaks are kept in the inserted text.	Les sauts de ligne sont conservés dans le texte inséré.	Los saltos de línea se conservan en el texto insertado.
+Permissions	Autorisations	Permisos
+Grant Microphone…	Autoriser le microphone…	Conceder micrófono…
+Grant Accessibility…	Autoriser l’accessibilité…	Conceder accesibilidad…
+Open System Settings	Ouvrir Réglages Système	Abrir Ajustes del Sistema
+Data storage	Stockage des données	Almacenamiento de datos
+Reveal Murmure data folder	Afficher le dossier de données de Murmure	Mostrar carpeta de datos de Murmure
+Reveal data folder	Afficher le dossier de données	Mostrar carpeta de datos
+Setup and diagnostics	Configuration et diagnostic	Configuración y diagnóstico
+Rerun the guided setup or create a private diagnostic report. Reports include configuration and permission states, never dictated text, history, snippets, dictionary entries, or file paths.	Relancez la configuration guidée ou créez un rapport de diagnostic privé. Les rapports contiennent la configuration et les autorisations, jamais le texte dicté, l’historique, les extraits, le dictionnaire ou les chemins de fichiers.	Repite la configuración guiada o crea un informe de diagnóstico privado. Los informes incluyen la configuración y los permisos, nunca el texto dictado, el historial, los fragmentos, el diccionario ni las rutas de archivos.
+Run setup again	Relancer la configuration	Repetir configuración
+Preview diagnostics	Aperçu du diagnostic	Vista previa del diagnóstico
+Copy diagnostics	Copier le diagnostic	Copiar diagnóstico
+Export diagnostics…	Exporter le diagnostic…	Exportar diagnóstico…
+Sanitized diagnostics	Diagnostic expurgé	Diagnóstico depurado
+Review the exact JSON before sharing it.	Vérifiez le JSON exact avant de le partager.	Revisa el JSON exacto antes de compartirlo.
+Sanitized diagnostics copied.	Diagnostic expurgé copié.	Diagnóstico depurado copiado.
+Sanitized diagnostics exported.	Diagnostic expurgé exporté.	Diagnóstico depurado exportado.
+The diagnostic report could not be prepared.	Le rapport de diagnostic n’a pas pu être préparé.	No se pudo preparar el informe de diagnóstico.
+The diagnostic report could not be copied.	Le rapport de diagnostic n’a pas pu être copié.	No se pudo copiar el informe de diagnóstico.
+The diagnostic report could not be exported.	Le rapport de diagnostic n’a pas pu être exporté.	No se pudo exportar el informe de diagnóstico.
+Updates	Mises à jour	Actualizaciones
+Check GitHub Releases for updates	Rechercher des mises à jour sur GitHub Releases	Buscar actualizaciones en GitHub Releases
+Check for updates	Rechercher des mises à jour	Buscar actualizaciones
+Install and relaunch	Installer et relancer	Instalar y reiniciar
+Murmure is up to date.	Murmure est à jour.	Murmure está actualizado.
+Checking GitHub Releases and preparing any update…	Recherche sur GitHub Releases et préparation de la mise à jour…	Buscando en GitHub Releases y preparando la actualización…
+Installing and relaunching Murmure…	Installation et relance de Murmure…	Instalando y reiniciando Murmure…
+Updates are staged locally under Application Support.	Les mises à jour sont préparées localement dans Application Support.	Las actualizaciones se preparan localmente en Application Support.
+Restore shortcut defaults	Rétablir les raccourcis par défaut	Restaurar atajos predeterminados
+Command Mode	Mode Commande	Modo Comando
+Select text in another app, then hold the configured Command Mode shortcut.	Sélectionnez du texte dans une autre app, puis maintenez le raccourci du mode Commande.	Selecciona texto en otra app y mantén pulsado el atajo configurado de Modo Comando.
+Recording instruction…	Enregistrement de l’instruction…	Grabando instrucción…
+Speak the change you want, then release the shortcut.	Énoncez la modification souhaitée, puis relâchez le raccourci.	Di el cambio que quieres y suelta el atajo.
+Creating a local proposal…	Création d’une proposition locale…	Creando una propuesta local…
+Murmure is using Apple's on-device model. Nothing has been replaced.	Murmure utilise le modèle Apple sur l’appareil. Rien n’a été remplacé.	Murmure está usando el modelo de Apple en el dispositivo. No se ha reemplazado nada.
+Original	Original	Original
+Proposal	Proposition	Propuesta
+Proposed replacement	Remplacement proposé	Reemplazo propuesto
+Copy proposal	Copier la proposition	Copiar propuesta
+Replace selected text	Remplacer le texte sélectionné	Reemplazar texto seleccionado
+Selected text and your instruction stay on this Mac.	Le texte sélectionné et votre instruction restent sur ce Mac.	El texto seleccionado y tu instrucción permanecen en este Mac.
+Engine comparison	Comparaison des moteurs	Comparación de motores
+Click Record, talk, click Stop. Apple and Parakeet both hear the same local recording.	Cliquez sur Enregistrer, parlez, puis cliquez sur Arrêter. Apple et Parakeet utilisent le même enregistrement local.	Haz clic en Grabar, habla y haz clic en Detener. Apple y Parakeet usan la misma grabación local.
+Record both	Enregistrer pour les deux	Grabar para ambos
+Both engines will run on that one recording and appear here side by side.	Les deux moteurs traiteront le même enregistrement et apparaîtront ici côte à côte.	Ambos motores procesarán la misma grabación y aparecerán aquí uno junto al otro.
+Compare mode is off — turn it on in the menu bar to see both engines at once.	Le mode Comparaison est désactivé. Activez-le dans la barre des menus pour voir les deux moteurs.	El modo Comparación está desactivado. Actívalo en la barra de menús para ver ambos motores.
+Turn on Compare mode in the menu bar to see both engines at once.	Activez le mode Comparaison dans la barre des menus pour voir les deux moteurs.	Activa el modo Comparación en la barra de menús para ver ambos motores.
+MURMURE HEARD	MURMURE A ENTENDU	MURMURE OYÓ
+I MEANT	JE VOULAIS DIRE	QUERÍA DECIR
+I meant	Je voulais dire	Quería decir
+Play original	Lire l’original	Reproducir original
+Dictate	Dicter	Dictar
+Remember for future dictations	Mémoriser pour les prochaines dictées	Recordar para futuros dictados
+Save correction	Enregistrer la correction	Guardar corrección
+Edit the text Murmure should have written	Modifier le texte que Murmure aurait dû écrire	Edita el texto que Murmure debería haber escrito
+No words were recognized. Your edited text is unchanged.	Aucun mot n’a été reconnu. Votre texte modifié reste inchangé.	No se reconoció ninguna palabra. Tu texto editado no ha cambiado.
+The original audio is not available.	L’audio original n’est pas disponible.	El audio original no está disponible.
+The original audio could not be played.	L’audio original n’a pas pu être lu.	No se pudo reproducir el audio original.
+Retranscribe	Retranscrire	Volver a transcribir
+Murmure runs the saved audio locally. Nothing is typed or saved until you review and confirm the result.	Murmure traite localement l’audio sauvegardé. Rien n’est saisi ni enregistré avant votre vérification et confirmation.	Murmure procesa el audio guardado localmente. No se escribe ni guarda nada hasta que revises y confirmes el resultado.
+LOCAL ENGINE	MOTEUR LOCAL	MOTOR LOCAL
+RECOVERY STATUS	ÉTAT DE RÉCUPÉRATION	ESTADO DE RECUPERACIÓN
+NEW LOCAL TRANSCRIPT	NOUVELLE TRANSCRIPTION LOCALE	NUEVA TRANSCRIPCIÓN LOCAL
+Transcribing locally	Transcription locale	Transcribiendo localmente
+Save to history	Enregistrer dans l’historique	Guardar en el historial
+This recording is ready to retranscribe.	Cet enregistrement est prêt à être retranscrit.	Esta grabación está lista para volver a transcribirse.
+Parakeet may download its free local model before the first retry.	Parakeet peut télécharger son modèle local gratuit avant la première tentative.	Parakeet puede descargar su modelo local gratuito antes del primer intento.
+Record again	Réenregistrer	Grabar de nuevo
+Replace history	Remplacer l’historique	Reemplazar historial
+Edit snippet	Modifier l’extrait	Editar fragmento
+WHEN I SAY	QUAND JE DIS	CUANDO DIGA
+WRITE	ÉCRIRE	ESCRIBIR
+Save snippet	Enregistrer l’extrait	Guardar fragmento
+Delete snippet	Supprimer l’extrait	Eliminar fragmento
+Delete this snippet?	Supprimer cet extrait ?	¿Eliminar este fragmento?
+The snippet could not be updated. Check that your data drive is available.	L’extrait n’a pas pu être mis à jour. Vérifiez que votre disque de données est disponible.	No se pudo actualizar el fragmento. Comprueba que tu unidad de datos esté disponible.
+The snippet could not be deleted. Check that your data drive is available.	L’extrait n’a pas pu être supprimé. Vérifiez que votre disque de données est disponible.	No se pudo eliminar el fragmento. Comprueba que tu unidad de datos esté disponible.
+Use this shortcut?	Utiliser ce raccourci ?	¿Usar este atajo?
+Use shortcut	Utiliser le raccourci	Usar atajo
+Press a modifier by itself, or hold modifiers and press another key. Escape cancels.	Appuyez sur un modificateur seul, ou maintenez des modificateurs et appuyez sur une autre touche. Échap annule.	Pulsa un modificador solo, o mantén modificadores y pulsa otra tecla. Escape cancela.
+That shortcut conflicts with another Murmure action.	Ce raccourci entre en conflit avec une autre action de Murmure.	Este atajo entra en conflicto con otra acción de Murmure.
+That shortcut is reserved by macOS.	Ce raccourci est réservé par macOS.	Este atajo está reservado por macOS.
+Use at least one modifier with an ordinary key.	Utilisez au moins un modificateur avec une touche ordinaire.	Usa al menos un modificador con una tecla normal.
+Right Option is AltGr on many international keyboard layouts.	La touche Option droite agit comme AltGr sur de nombreux claviers internationaux.	Opción derecha funciona como AltGr en muchos teclados internacionales.
+Reveal Dictionary File	Afficher le fichier du dictionnaire	Mostrar archivo del diccionario
+Choose shortcut preset	Choisir un préréglage de raccourci	Elegir preajuste de atajo
+Show comparison window	Afficher la fenêtre de comparaison	Mostrar ventana de comparación
+Download Parakeet models…	Télécharger les modèles Parakeet…	Descargar modelos de Parakeet…
+Loading Parakeet models…	Chargement des modèles Parakeet…	Cargando modelos de Parakeet…
+Parakeet models installed ✓	Modèles Parakeet installés ✓	Modelos de Parakeet instalados ✓
+Compare mode (both engines)	Mode Comparaison (deux moteurs)	Modo Comparación (ambos motores)
+Quit Murmure	Quitter Murmure	Salir de Murmure
+This Murmure build is not compatible with this Mac	Cette version de Murmure n’est pas compatible avec ce Mac	Esta versión de Murmure no es compatible con este Mac
+Bulgarian	Bulgare	Búlgaro
+Croatian	Croate	Croata
+Czech	Tchèque	Checo
+Danish	Danois	Danés
+Dutch	Néerlandais	Neerlandés
+Estonian	Estonien	Estonio
+Finnish	Finnois	Finés
+German	Allemand	Alemán
+Greek	Grec	Griego
+Hungarian	Hongrois	Húngaro
+Italian	Italien	Italiano
+Latvian	Letton	Letón
+Lithuanian	Lituanien	Lituano
+Maltese	Maltais	Maltés
+Polish	Polonais	Polaco
+Portuguese	Portugais	Portugués
+Romanian	Roumain	Rumano
+Russian	Russe	Ruso
+Slovak	Slovaque	Eslovaco
+Slovenian	Slovène	Esloveno
+Swedish	Suédois	Sueco
+Ukrainian	Ukrainien	Ucraniano
+Listening	Écoute	Escuchando
+Transcribing	Transcription	Transcribiendo
+Dictation needs attention	La dictée nécessite votre attention	El dictado necesita atención
+Speak naturally	Parlez naturellement	Habla con naturalidad
+Finishing locally…	Finalisation locale…	Finalizando localmente…
+Saving…	Enregistrement…	Guardando…
+my address	mon adresse	mi dirección
+Clean up text	Nettoyer le texte	Limpiar texto
+Delete this comparison	Supprimer cette comparaison	Eliminar esta comparación
+running second engine…	exécution du second moteur…	ejecutando el segundo motor…
+Edit the text first. Dictate can fill the field, but nothing is saved until you choose Save correction.	Modifiez d’abord le texte. La dictée peut remplir le champ, mais rien n’est enregistré avant de choisir Enregistrer la correction.	Edita primero el texto. El dictado puede rellenar el campo, pero no se guarda nada hasta que elijas Guardar corrección.
+The corrected history will be saved without adding this rule to the dictionary.	L’historique corrigé sera enregistré sans ajouter cette règle au dictionnaire.	El historial corregido se guardará sin añadir esta regla al diccionario.
+Downloads and prepares a verified Murmure release when one is available	Télécharge et prépare une version vérifiée de Murmure lorsqu’elle est disponible	Descarga y prepara una versión verificada de Murmure cuando está disponible
+Replaces the installed bundle with the verified GitHub release	Remplace l’application installée par la version GitHub vérifiée	Sustituye la aplicación instalada por la versión verificada de GitHub
+Use %@ to dictate	Utilisez %@ pour dicter	Usa %@ para dictar
+Use %@, say a sentence, then finish the configured gesture.	Utilisez %@, prononcez une phrase, puis terminez le geste configuré.	Usa %@, di una frase y completa el gesto configurado.
+Local transformation for selected text in %@.	Transformation locale du texte sélectionné dans %@.	Transformación local del texto seleccionado en %@.
+Migration: %@	Migration : %@	Migración: %@
+%@ ready	%@ prêt	%@ listo
+%@ needs attention	%@ nécessite votre attention	%@ necesita atención
+%d enabled · %d total	%d activés · %d au total	%d activados · %d en total
+%d recording	%d enregistrement	%d grabación
+%d recordings	%d enregistrements	%d grabaciones
+ · fastest	 · le plus rapide	 · el más rápido
+(nothing recognized)	(rien de reconnu)	(no se reconoció nada)
+%d entry	%d entrée	%d entrada
+%d entries	%d entrées	%d entradas
+%@ (unavailable)	%@ (indisponible)	%@ (no disponible)
+Snippet applied: %@	Extrait appliqué : %@	Fragmento aplicado: %@
+%d dictionary correction	%d correction du dictionnaire	%d corrección del diccionario
+%d dictionary corrections	%d corrections du dictionnaire	%d correcciones del diccionario
+Snippet · %@	Extrait · %@	Fragmento · %@
+%@× realtime · %d chars	%@× temps réel · %d caractères	%@× tiempo real · %d caracteres
+Local transformation unavailable: %@ There is no network fallback.	Transformation locale indisponible : %@ Il n’existe aucun recours au réseau.	Transformación local no disponible: %@ No hay alternativa en red.
+Parakeet uses %@ as an on-device decoder hint.	Parakeet utilise %@ comme indication de décodage sur l’appareil.	Parakeet usa %@ como pista de decodificación en el dispositivo.
+Apple Speech · %@ · On-device model installed.	Reconnaissance Apple · %@ · Modèle sur l’appareil installé.	Reconocimiento de Apple · %@ · Modelo en el dispositivo instalado.
+Apple Speech · %@ · The system downloads its on-device model once when first used.	Reconnaissance Apple · %@ · Le système télécharge une fois son modèle sur l’appareil lors de la première utilisation.	Reconocimiento de Apple · %@ · El sistema descarga una vez su modelo en el dispositivo al usarlo por primera vez.
+Smart cleanup does not support %@; deterministic local cleanup will be used.	Le nettoyage intelligent ne prend pas en charge %@ ; le nettoyage local déterministe sera utilisé.	La limpieza inteligente no admite %@; se usará la limpieza local determinista.
+Listening to %@. Test audio is not saved.	Écoute de %@. L’audio de test n’est pas enregistré.	Escuchando %@. El audio de prueba no se guarda.
+Version %@ (%@) is ready to install.	La version %@ (%@) est prête à être installée.	La versión %@ (%@) está lista para instalarse.
+Update unavailable: %@	Mise à jour indisponible : %@	Actualización no disponible: %@
+%@ %.1f× faster · %.2fs ahead	%@ est %.1f× plus rapide · %.2fs d’avance	%@ es %.1f× más rápido · %.2fs de ventaja
+%@ · held %@s	%@ · maintenu %@s	%@ · mantenido %@s
+identical	identiques	idénticos
+same words	mêmes mots	mismas palabras
+words differ	mots différents	palabras diferentes
+tied	égalité	empate
+Needs attention: %@	Nécessite votre attention : %@	Necesita atención: %@
+(Nothing recognized)	(Rien de reconnu)	(No se reconoció nada)
+Checking Apple's on-device model availability…	Vérification de la disponibilité du modèle Apple sur l’appareil…	Comprobando la disponibilidad del modelo de Apple en el dispositivo…
+Apple's on-device model is ready. Selected text and instructions are never stored or sent to a server.	Le modèle Apple sur l’appareil est prêt. Le texte sélectionné et les instructions ne sont jamais stockés ni envoyés à un serveur.	El modelo de Apple en el dispositivo está listo. El texto seleccionado y las instrucciones nunca se guardan ni se envían a un servidor.
+Parakeet automatically recognizes 25 European languages on-device.	Parakeet reconnaît automatiquement 25 langues européennes sur l’appareil.	Parakeet reconoce automáticamente 25 idiomas europeos en el dispositivo.
+Checking Apple's on-device language assets…	Vérification des ressources linguistiques Apple sur l’appareil…	Comprobando los recursos de idioma de Apple en el dispositivo…
+Apple Speech does not support this language on this Mac. Nothing will fall back to English.	La reconnaissance Apple ne prend pas en charge cette langue sur ce Mac. Aucun retour à l’anglais ne sera effectué.	El reconocimiento de Apple no admite este idioma en este Mac. No se usará el inglés como alternativa.

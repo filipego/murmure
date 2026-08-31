@@ -11,6 +11,7 @@ struct SettingsWindow: View {
     @Bindable var controller: DictationController
     var updates: AppUpdateCoordinator?
     @State private var settings = Settings.shared
+    @State private var appLanguage = AppLanguageStore.shared
     @State private var audioInputs = AudioInputStore.shared
     @State private var speechLanguages = SpeechLanguageCatalog.shared
     @State private var snippets = SnippetStore.shared
@@ -36,6 +37,18 @@ struct SettingsWindow: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Space.wide) {
+                settingsCard(
+                    title: "App language",
+                    detail: "Choose the language Murmure uses for buttons, options, and instructions. You can change it later in Settings."
+                ) {
+                    Picker(L10n.text("App language"), selection: $appLanguage.language) {
+                        ForEach(AppLanguage.allCases, id: \.self) { language in
+                            Text(language.nativeName).tag(language)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 settingsCard(title: "Push to talk", detail: "Use this shortcut anywhere to dictate. The Record button works regardless of what is focused.") {
                     shortcutRow(
                         title: "Dictation shortcut",
@@ -43,7 +56,7 @@ struct SettingsWindow: View {
                         target: .pushToTalk
                     )
 
-                    Picker("Gesture", selection: Binding(
+                    Picker(L10n.text("Gesture"), selection: Binding(
                         get: { settings.pushToTalkBinding.gesture },
                         set: { gesture in
                             settings.selectPushToTalkGesture(gesture)
@@ -51,7 +64,7 @@ struct SettingsWindow: View {
                         }
                     )) {
                         ForEach(HotkeyGesture.allCases, id: \.self) { gesture in
-                            Text(gesture.displayName).tag(gesture)
+                            Text(L10n.text(gesture.displayName)).tag(gesture)
                         }
                     }
                     .pickerStyle(.menu)
@@ -59,7 +72,7 @@ struct SettingsWindow: View {
 
                     Divider()
 
-                    Toggle("Enable hands-free dictation", isOn: Binding(
+                    Toggle(L10n.text("Enable hands-free dictation"), isOn: Binding(
                         get: { settings.handsFreeEnabled },
                         set: { enabled in
                             settings.handsFreeEnabled = enabled
@@ -74,19 +87,19 @@ struct SettingsWindow: View {
                     )
                     .disabled(!settings.handsFreeEnabled)
 
-                    Text("Press once to start. Press the same key or Enter to finish; Escape cancels.")
+                    Text(L10n.text("Press once to start. Press the same key or Enter to finish; Escape cancels."))
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if let hotkeyMessage {
-                        Text(hotkeyMessage)
+                        Text(L10n.text(hotkeyMessage))
                             .font(DS.Font.caption)
                             .foregroundStyle(DS.Color.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    Button("Restore shortcut defaults") {
+                    Button(L10n.text("Restore shortcut defaults")) {
                         settings.restoreHotkeyDefaults()
                         hotkeyMessage = nil
                         controller.reloadHotkey()
@@ -98,7 +111,7 @@ struct SettingsWindow: View {
                     title: "Command Mode",
                     detail: "Select text in another app, hold the shortcut, speak an editing instruction, then review the local proposal before anything is replaced."
                 ) {
-                    Toggle("Enable local Command Mode", isOn: Binding(
+                    Toggle(L10n.text("Enable local Command Mode"), isOn: Binding(
                         get: { settings.commandModeEnabled },
                         set: { enabled in
                             settings.commandModeEnabled = enabled
@@ -107,7 +120,7 @@ struct SettingsWindow: View {
                     ))
 
                     HStack(spacing: DS.Space.snug) {
-                        Text("Command Mode shortcut")
+                        Text(L10n.text("Command Mode shortcut"))
                             .font(DS.Font.body)
                             .foregroundStyle(DS.Color.ink)
                         Spacer()
@@ -118,7 +131,7 @@ struct SettingsWindow: View {
                     }
                     .disabled(!settings.commandModeEnabled)
 
-                    Text(commandModeAvailabilityText)
+                    Text(L10n.text(commandModeAvailabilityText))
                         .font(DS.Font.caption)
                         .foregroundStyle(commandModeIsAvailable
                             ? DS.Color.inkSecondary
@@ -129,37 +142,37 @@ struct SettingsWindow: View {
                 settingsCard(title: "Transcription", detail: settings.engine == .apple
                     ? "Apple transcribes on-device and streams text while you speak."
                     : "Parakeet transcribes on-device when you release the key.") {
-                    Picker("Engine", selection: engineBinding) {
+                    Picker(L10n.text("Engine"), selection: engineBinding) {
                         ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
-                            Text(choice.displayName).tag(choice)
+                            Text(L10n.text(choice.displayName)).tag(choice)
                         }
                     }
                     .pickerStyle(.segmented)
 
-                    Picker("Language", selection: languageBinding) {
+                    Picker(L10n.text("Language"), selection: languageBinding) {
                         ForEach(TranscriptionLanguageOption.allCases, id: \.self) { option in
-                            Text(option.displayName).tag(option)
+                            Text(L10n.text(option.displayName)).tag(option)
                         }
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: 260, alignment: .leading)
 
-                    Text(transcriptionLanguageStatus)
+                    Text(L10n.text(transcriptionLanguageStatus))
                         .font(DS.Font.caption)
                         .foregroundStyle(transcriptionLanguageIsError
                             ? DS.Color.warning
                             : DS.Color.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Toggle("Compare both local engines", isOn: $settings.compareMode)
-                    Toggle("Play start and finish sounds", isOn: $settings.soundEnabled)
+                    Toggle(L10n.text("Compare both local engines"), isOn: $settings.compareMode)
+                    Toggle(L10n.text("Play start and finish sounds"), isOn: $settings.soundEnabled)
                 }
 
                 settingsCard(
                     title: "Microphone",
                     detail: "Choose a local input for dictation. System default follows macOS without changing it."
                 ) {
-                    Picker("Input", selection: Binding(
+                    Picker(L10n.text("Input"), selection: Binding(
                         get: { settings.microphoneSelection },
                         set: { selection in
                             microphoneTest.stop()
@@ -168,7 +181,7 @@ struct SettingsWindow: View {
                             audioInputs.refresh()
                         }
                     )) {
-                        Text("System default").tag(MicrophoneSelection.systemDefault)
+                        Text(L10n.text("System default")).tag(MicrophoneSelection.systemDefault)
                         ForEach(audioInputs.devices) { device in
                             Text(microphoneLabel(device)).tag(MicrophoneSelection.device(
                                 uniqueID: device.id,
@@ -176,7 +189,10 @@ struct SettingsWindow: View {
                             ))
                         }
                         if selectedMicrophoneIsUnavailable {
-                            Text("\(settings.microphoneSelection.displayName) (unavailable)")
+                            Text(L10n.format(
+                                "%@ (unavailable)",
+                                arguments: [settings.microphoneSelection.displayName]
+                            ))
                                 .tag(settings.microphoneSelection)
                         }
                     }
@@ -191,13 +207,13 @@ struct SettingsWindow: View {
                     .frame(height: DS.Size.microphoneTestMeterHeight)
 
                     HStack(spacing: DS.Space.snug) {
-                        Button(microphoneTest.state.isBusy ? "Stop test" : "Test microphone") {
+                        Button(L10n.text(microphoneTest.state.isBusy ? "Stop test" : "Test microphone")) {
                             toggleMicrophoneTest()
                         }
                         .buttonStyle(.bordered)
                         .disabled(controller.state.isActive)
 
-                        Text(microphoneStatusText)
+                        Text(L10n.text(microphoneStatusText))
                             .font(DS.Font.caption)
                             .foregroundStyle(microphoneStatusIsError
                                 ? DS.Color.warning
@@ -207,11 +223,11 @@ struct SettingsWindow: View {
                 }
 
                 settingsCard(title: "Cleanup", detail: "Cleanup removes fillers and fixes punctuation before dictionary corrections run.") {
-                    Toggle("Clean up transcripts", isOn: $settings.cleanupEnabled)
-                    Toggle("Smart cleanup (on-device AI)", isOn: smartCleanupBinding)
+                    Toggle(L10n.text("Clean up transcripts"), isOn: $settings.cleanupEnabled)
+                    Toggle(L10n.text("Smart cleanup (on-device AI)"), isOn: smartCleanupBinding)
                         .disabled(!settings.cleanupEnabled || !smartCleanupSupported)
                     if let reason = smartCleanupUnavailableReason {
-                        Text(reason)
+                        Text(L10n.text(reason))
                             .font(DS.Font.caption)
                             .foregroundStyle(DS.Color.inkSecondary)
                     }
@@ -222,11 +238,14 @@ struct SettingsWindow: View {
                     detail: "Say a complete phrase and replace it with reusable local text. Snippets run before dictionary corrections."
                 ) {
                     HStack(spacing: DS.Space.snug) {
-                        Text("\(snippets.entries.filter(\.isEnabled).count) enabled · \(snippets.entries.count) total")
+                        Text(L10n.format(
+                            "%d enabled · %d total",
+                            arguments: [snippets.entries.filter(\.isEnabled).count, snippets.entries.count]
+                        ))
                             .font(DS.Font.label)
                             .foregroundStyle(DS.Color.inkSecondary)
                         Spacer()
-                        Button("Add snippet") {
+                        Button(L10n.text("Add snippet")) {
                             snippetMessage = nil
                             snippetDraft = SnippetEntry(trigger: "", replacement: "")
                         }
@@ -234,7 +253,7 @@ struct SettingsWindow: View {
                     }
 
                     if snippets.entries.isEmpty {
-                        Text("No snippets yet. Try “my address,” “email signature,” or any phrase you would say by itself.")
+                        Text(L10n.text("No snippets yet. Try “my address,” “email signature,” or any phrase you would say by itself."))
                             .font(DS.Font.body)
                             .foregroundStyle(DS.Color.inkSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -245,7 +264,7 @@ struct SettingsWindow: View {
                     }
 
                     if let snippetMessage {
-                        Text(snippetMessage)
+                        Text(L10n.text(snippetMessage))
                             .font(DS.Font.caption)
                             .foregroundStyle(DS.Color.warning)
                             .fixedSize(horizontal: false, vertical: true)
@@ -276,22 +295,22 @@ struct SettingsWindow: View {
                     detail: "Rerun the guided setup or create a private diagnostic report. Reports include configuration and permission states, never dictated text, history, snippets, dictionary entries, or file paths."
                 ) {
                     HStack(spacing: DS.Space.snug) {
-                        Button("Run setup again") {
+                        Button(L10n.text("Run setup again")) {
                             OnboardingState.shared.reset()
                             openWindow(id: "onboarding")
                         }
                         .buttonStyle(.bordered)
 
-                        Button("Preview diagnostics") { previewDiagnostics() }
+                        Button(L10n.text("Preview diagnostics")) { previewDiagnostics() }
                             .buttonStyle(.bordered)
-                        Button("Copy diagnostics") { copyDiagnostics() }
+                        Button(L10n.text("Copy diagnostics")) { copyDiagnostics() }
                             .buttonStyle(.bordered)
-                        Button("Export diagnostics…") { exportDiagnostics() }
+                        Button(L10n.text("Export diagnostics…")) { exportDiagnostics() }
                             .buttonStyle(.bordered)
                     }
 
                     if let diagnosticsMessage {
-                        Text(diagnosticsMessage)
+                        Text(L10n.text(diagnosticsMessage))
                             .font(DS.Font.caption)
                             .foregroundStyle(DS.Color.inkSecondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -338,25 +357,25 @@ struct SettingsWindow: View {
         .sheet(item: $diagnosticsPreview) { preview in
             DiagnosticsPreviewSheet(json: preview.json)
         }
-        .alert("Use this shortcut?", isPresented: Binding(
+        .alert(L10n.text("Use this shortcut?"), isPresented: Binding(
             get: { pendingRiskyHotkey != nil },
             set: { if !$0 { pendingRiskyHotkey = nil } }
         )) {
-            Button("Use shortcut") {
+            Button(L10n.text("Use shortcut")) {
                 if let pendingRiskyHotkey {
                     applyHotkey(pendingRiskyHotkey.binding, target: pendingRiskyHotkey.target)
                 }
                 pendingRiskyHotkey = nil
             }
-            Button("Cancel", role: .cancel) { pendingRiskyHotkey = nil }
+            Button(L10n.text("Cancel"), role: .cancel) { pendingRiskyHotkey = nil }
         } message: {
             Text(pendingRiskyHotkey?.message ?? "")
         }
-        .alert("Delete this snippet?", isPresented: Binding(
+        .alert(L10n.text("Delete this snippet?"), isPresented: Binding(
             get: { pendingSnippetDeletion != nil },
             set: { if !$0 { pendingSnippetDeletion = nil } }
         )) {
-            Button("Delete", role: .destructive) {
+            Button(L10n.text("Delete"), role: .destructive) {
                 guard let entry = pendingSnippetDeletion else { return }
                 pendingSnippetDeletion = nil
                 Task {
@@ -365,7 +384,7 @@ struct SettingsWindow: View {
                     }
                 }
             }
-            Button("Cancel", role: .cancel) { pendingSnippetDeletion = nil }
+            Button(L10n.text("Cancel"), role: .cancel) { pendingSnippetDeletion = nil }
         } message: {
             Text(pendingSnippetDeletion?.trigger ?? "")
         }
@@ -404,7 +423,7 @@ struct SettingsWindow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(DS.Color.inkSecondary)
-            .help("Edit snippet")
+            .help(L10n.text("Edit snippet"))
             .accessibilityLabel("Edit \(entry.trigger)")
 
             Button {
@@ -414,7 +433,7 @@ struct SettingsWindow: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(DS.Color.inkSecondary)
-            .help("Delete snippet")
+            .help(L10n.text("Delete snippet"))
             .accessibilityLabel("Delete \(entry.trigger)")
         }
         .padding(DS.Space.base)
@@ -428,15 +447,15 @@ struct SettingsWindow: View {
         target: HotkeyCaptureTarget
     ) -> some View {
         HStack(spacing: DS.Space.snug) {
-            Text(title)
+            Text(L10n.text(title))
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.ink)
             Spacer()
             Button(binding.label) { beginHotkeyCapture(target) }
                 .buttonStyle(.bordered)
-            Menu("Presets") {
+            Menu(L10n.text("Presets")) {
                 ForEach(PushToTalkKey.allCases, id: \.self) { preset in
-                    Button(preset.displayName) {
+                    Button(L10n.text(preset.displayName)) {
                         let gesture = target == .pushToTalk
                             ? settings.pushToTalkBinding.gesture
                             : .toggle
@@ -516,31 +535,40 @@ struct SettingsWindow: View {
     private var commandModeAvailabilityText: String {
         switch foundationModelAvailability.state {
         case .checking:
-            return "Checking Apple's on-device model availability…"
+            return L10n.text("Checking Apple's on-device model availability…")
         case .available:
-            return "Apple's on-device model is ready. Selected text and instructions are never stored or sent to a server."
+            return L10n.text("Apple's on-device model is ready. Selected text and instructions are never stored or sent to a server.")
         case let .unavailable(reason):
-            return "Local transformation unavailable: \(reason) There is no network fallback."
+            return L10n.format(
+                "Local transformation unavailable: %@ There is no network fallback.",
+                arguments: [reason]
+            )
         }
     }
 
     private var transcriptionLanguageStatus: String {
         if settings.engine == .parakeet {
             return settings.transcriptionLanguage == .systemDefault
-                ? "Parakeet automatically recognizes 25 European languages on-device."
-                : "Parakeet uses \(settings.transcriptionLanguage.displayName) as an on-device decoder hint."
+                ? L10n.text("Parakeet automatically recognizes 25 European languages on-device.")
+                : L10n.format(
+                    "Parakeet uses %@ as an on-device decoder hint.",
+                    arguments: [L10n.text(settings.transcriptionLanguage.displayName)]
+                )
         }
 
         guard let status = speechLanguages.status(for: settings.transcriptionLanguage) else {
-            return "Checking Apple's on-device language assets…"
+            return L10n.text("Checking Apple's on-device language assets…")
         }
         guard let identifier = status.resolvedLocaleIdentifier else {
-            return "Apple Speech does not support this language on this Mac. Nothing will fall back to English."
+            return L10n.text("Apple Speech does not support this language on this Mac. Nothing will fall back to English.")
         }
         let name = Locale.current.localizedString(forIdentifier: identifier) ?? identifier
         return status.isInstalled
-            ? "Apple Speech · \(name) · On-device model installed."
-            : "Apple Speech · \(name) · The system downloads its on-device model once when first used."
+            ? L10n.format("Apple Speech · %@ · On-device model installed.", arguments: [name])
+            : L10n.format(
+                "Apple Speech · %@ · The system downloads its on-device model once when first used.",
+                arguments: [name]
+            )
     }
 
     private var diagnosticsSnapshot: DiagnosticsSnapshot {
@@ -669,7 +697,10 @@ struct SettingsWindow: View {
             return "Checking Apple's on-device model availability…"
         }
         guard smartCleanupSupported else {
-            return "Smart cleanup does not support \(settings.transcriptionLanguage.displayName); deterministic local cleanup will be used."
+            return L10n.format(
+                "Smart cleanup does not support %@; deterministic local cleanup will be used.",
+                arguments: [L10n.text(settings.transcriptionLanguage.displayName)]
+            )
         }
         return nil
     }
@@ -687,7 +718,7 @@ struct SettingsWindow: View {
         case .starting:
             return "Opening the selected microphone…"
         case let .testing(name):
-            return "Listening to \(name). Test audio is not saved."
+            return L10n.format("Listening to %@. Test audio is not saved.", arguments: [name])
         case let .error(message):
             return message
         }
@@ -730,10 +761,10 @@ struct SettingsWindow: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: DS.Space.base) {
-            Text(title)
+            Text(L10n.text(title))
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.ink)
-            Text(detail)
+            Text(L10n.text(detail))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -797,15 +828,15 @@ struct SettingsWindow: View {
         HStack(spacing: DS.Space.snug) {
             Image(systemName: granted ? "checkmark.circle.fill" : "exclamationmark.circle")
                 .foregroundStyle(granted ? DS.Color.success : DS.Color.warning)
-            Text(title)
+            Text(L10n.text(title))
                 .font(DS.Font.bodyEmphasis)
                 .foregroundStyle(DS.Color.ink)
-            Text(granted ? "Granted" : "Needs access")
+            Text(L10n.text(granted ? "Granted" : "Needs access"))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
             Spacer()
             if !granted {
-                Button(actionTitle, action: action)
+                Button(L10n.text(actionTitle), action: action)
                     .buttonStyle(.link)
             }
         }
@@ -834,10 +865,10 @@ private struct DiagnosticsPreviewSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.base) {
-            Text("Sanitized diagnostics")
+            Text(L10n.text("Sanitized diagnostics"))
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.ink)
-            Text("Review the exact JSON before sharing it.")
+            Text(L10n.text("Review the exact JSON before sharing it."))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
             ScrollView {
@@ -850,7 +881,7 @@ private struct DiagnosticsPreviewSheet: View {
             .background(DS.Color.well, in: .rect(cornerRadius: DS.Radius.control))
             HStack {
                 Spacer()
-                Button("Done") { dismiss() }
+                Button(L10n.text("Done")) { dismiss() }
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -888,18 +919,18 @@ private struct StorageCard: View {
             HStack(spacing: DS.Space.snug) {
                 Image(systemName: isReady ? "externaldrive.fill.badge.checkmark" : "externaldrive.badge.exclamationmark")
                     .foregroundStyle(statusColor)
-                Text(MurmureDataStore.statusTitle)
+                Text(L10n.text(MurmureDataStore.statusTitle))
                     .font(DS.Font.bodyEmphasis)
                     .foregroundStyle(DS.Color.ink)
                 Spacer()
-                Button("Reveal data folder") {
+                Button(L10n.text("Reveal data folder")) {
                     NSWorkspace.shared.activateFileViewerSelecting([MurmureDataStore.rootURL])
                 }
                 .buttonStyle(.link)
-                .accessibilityLabel("Reveal Murmure data folder")
+                .accessibilityLabel(L10n.text("Reveal Murmure data folder"))
             }
 
-            Text("Migration: \(MurmureDataStore.migrationDetail)")
+            Text(L10n.format("Migration: %@", arguments: [L10n.text(MurmureDataStore.migrationDetail)]))
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -913,10 +944,10 @@ private struct StorageCard: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: DS.Space.base) {
-            Text(title)
+            Text(L10n.text(title))
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.ink)
-            Text(detail)
+            Text(L10n.text(detail))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -939,7 +970,7 @@ private struct UpdateCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.base) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Updates")
+                Text(L10n.text("Updates"))
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.ink)
                 Spacer()
@@ -948,29 +979,29 @@ private struct UpdateCard: View {
                     .foregroundStyle(DS.Color.inkSecondary)
             }
 
-            Text(statusText)
+            Text(L10n.text(statusText))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: DS.Space.snug) {
-                Button("Check for updates") {
+                Button(L10n.text("Check for updates")) {
                     Task { await coordinator.checkForUpdates() }
                 }
                 .buttonStyle(.bordered)
                 .disabled(coordinator.state == .checking || coordinator.state == .installing)
-                .accessibilityLabel("Check GitHub Releases for updates")
-                .accessibilityHint("Downloads and prepares a verified Murmure release when one is available")
+                .accessibilityLabel(L10n.text("Check GitHub Releases for updates"))
+                .accessibilityHint(L10n.text("Downloads and prepares a verified Murmure release when one is available"))
 
                 if case .available = coordinator.state {
-                    Button("Install and relaunch") {
+                    Button(L10n.text("Install and relaunch")) {
                         coordinator.installAvailableUpdate()
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(DS.Color.ink)
                     .disabled(!canInstall)
-                    .accessibilityLabel("Install and relaunch")
-                    .accessibilityHint("Replaces the installed bundle with the verified GitHub release")
+                    .accessibilityLabel(L10n.text("Install and relaunch"))
+                    .accessibilityHint(L10n.text("Replaces the installed bundle with the verified GitHub release"))
                 }
             }
         }
@@ -992,11 +1023,14 @@ private struct UpdateCard: View {
         case .upToDate:
             "Murmure is up to date."
         case let .available(manifest):
-            "Version \(manifest.version.marketing) (\(manifest.version.build)) is ready to install."
+            L10n.format(
+                "Version %@ (%@) is ready to install.",
+                arguments: [manifest.version.marketing, manifest.version.build]
+            )
         case .installing:
             "Installing and relaunching Murmure…"
         case let .failed(message):
-            "Update unavailable: \(message)"
+            L10n.format("Update unavailable: %@", arguments: [message])
         }
     }
 }

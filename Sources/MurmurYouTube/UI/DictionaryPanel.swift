@@ -18,7 +18,7 @@ struct DictionaryPanel: View {
                 SearchField(text: $query, placeholder: "Search terms and corrections")
                 PrimaryActionButton(title: "Add entry", systemImage: "plus") { isAdding = true }
                 .keyboardShortcut("n", modifiers: .command)
-                .accessibilityLabel("Add dictionary entry")
+                .accessibilityLabel(L10n.text("Add dictionary entry"))
             }
             .padding(.horizontal, DS.Space.panel)
             .padding(.vertical, DS.Space.roomy)
@@ -67,14 +67,17 @@ struct DictionaryPanel: View {
 
     private var footer: some View {
         HStack(spacing: DS.Space.snug) {
-            Text("\(store.entries.count) entr\(store.entries.count == 1 ? "y" : "ies")")
+            Text(L10n.format(
+                store.entries.count == 1 ? "%d entry" : "%d entries",
+                arguments: [store.entries.count]
+            ))
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.inkSecondary)
             Spacer()
             Button {
                 NSWorkspace.shared.activateFileViewerSelecting([DictionaryStore.fileURL])
             } label: {
-                Label("Reveal dictionary file", systemImage: "arrow.up.forward.app")
+                Label(L10n.text("Reveal dictionary file"), systemImage: "arrow.up.forward.app")
                     .font(DS.Font.caption)
             }
             .buttonStyle(.plain)
@@ -191,9 +194,9 @@ private struct DictionaryEditor: View {
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.ink)
 
-            Picker("Entry type", selection: $kind) {
-                Text("Term").tag(DictionaryEntry.Kind.term)
-                Text("Correction").tag(DictionaryEntry.Kind.correction)
+            Picker(L10n.text("Entry type"), selection: $kind) {
+                Text(L10n.text("Term")).tag(DictionaryEntry.Kind.term)
+                Text(L10n.text("Correction")).tag(DictionaryEntry.Kind.correction)
             }
             .pickerStyle(.segmented)
 
@@ -215,9 +218,9 @@ private struct DictionaryEditor: View {
 
             HStack {
                 Spacer()
-                Button("Cancel") { dismiss() }
+                Button(L10n.text("Cancel")) { dismiss() }
                     .keyboardShortcut(.cancelAction)
-                Button("Save") {
+                Button(L10n.text("Save")) {
                     guard isValid else { return }
                     onSave(draft)
                     dismiss()

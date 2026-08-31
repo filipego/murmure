@@ -36,7 +36,7 @@ struct CorrectionEditor: View {
                 intendedSection
                 learningSection
                 if let message {
-                    Text(message)
+                    Text(L10n.text(message))
                         .font(DS.Font.label)
                         .foregroundStyle(DS.Color.inkSecondary)
                 }
@@ -59,10 +59,10 @@ struct CorrectionEditor: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: DS.Space.tight) {
-            Text("Correct dictation")
+            Text(L10n.text("Correct dictation"))
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.ink)
-            Text("Edit the text first. Dictate can fill the field, but nothing is saved until you choose Save correction.")
+            Text(L10n.text("Edit the text first. Dictate can fill the field, but nothing is saved until you choose Save correction."))
                 .font(DS.Font.label)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -72,14 +72,14 @@ struct CorrectionEditor: View {
     private var heardSection: some View {
         VStack(alignment: .leading, spacing: DS.Space.snug) {
             HStack {
-                Text("MURMURE HEARD")
+                Text(L10n.text("MURMURE HEARD"))
                     .font(DS.Font.eyebrow)
                     .tracking(DS.Font.silkscreenTracking)
                     .foregroundStyle(DS.Color.inkSecondary)
                 Spacer()
                 if let audioFile = run.audioFile,
                    AudioHistoryStore.url(for: audioFile) != nil {
-                    Button("Play original", systemImage: "play.fill") { playOriginal(audioFile) }
+                    Button(L10n.text("Play original"), systemImage: "play.fill") { playOriginal(audioFile) }
                         .buttonStyle(.bordered)
                         .tint(DS.Color.ink)
                         .disabled(voiceController.state.isBusy || isSaving)
@@ -105,7 +105,7 @@ struct CorrectionEditor: View {
     private var intendedSection: some View {
         VStack(alignment: .leading, spacing: DS.Space.snug) {
             HStack {
-                Text("I MEANT")
+                Text(L10n.text("I MEANT"))
                     .font(DS.Font.eyebrow)
                     .tracking(DS.Font.silkscreenTracking)
                     .foregroundStyle(DS.Color.inkSecondary)
@@ -124,8 +124,8 @@ struct CorrectionEditor: View {
                         .strokeBorder(DS.Color.seam, lineWidth: DS.Border.hairline)
                 }
                 .disabled(voiceController.state.isBusy || isSaving)
-                .accessibilityLabel("I meant")
-                .accessibilityHint("Edit the text Murmure should have written")
+                .accessibilityLabel(L10n.text("I meant"))
+                .accessibilityHint(L10n.text("Edit the text Murmure should have written"))
         }
     }
 
@@ -156,7 +156,7 @@ struct CorrectionEditor: View {
 
     private var learningSection: some View {
         VStack(alignment: .leading, spacing: DS.Space.snug) {
-            Toggle("Remember for future dictations", isOn: $remember)
+            Toggle(L10n.text("Remember for future dictations"), isOn: $remember)
                 .font(DS.Font.bodyEmphasis)
                 .tint(DS.Color.ink)
                 .disabled(isSaving)
@@ -172,7 +172,7 @@ struct CorrectionEditor: View {
                         .foregroundStyle(DS.Color.ink)
                         .textSelection(.enabled)
                     if !remember {
-                        Text("The corrected history will be saved without adding this rule to the dictionary.")
+                        Text(L10n.text("The corrected history will be saved without adding this rule to the dictionary."))
                             .font(DS.Font.label)
                             .foregroundStyle(DS.Color.inkSecondary)
                     }
@@ -195,10 +195,10 @@ struct CorrectionEditor: View {
     private var actions: some View {
         HStack(spacing: DS.Space.snug) {
             Spacer()
-            Button("Cancel", role: .cancel) { dismiss() }
+            Button(L10n.text("Cancel"), role: .cancel) { dismiss() }
                 .keyboardShortcut(.cancelAction)
                 .disabled(isSaving)
-            Button("Save correction") {
+            Button(L10n.text("Save correction")) {
                 Task { await save() }
             }
                 .buttonStyle(.borderedProminent)

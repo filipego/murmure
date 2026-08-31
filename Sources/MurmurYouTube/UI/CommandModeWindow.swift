@@ -8,10 +8,10 @@ struct CommandModeWindow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.wide) {
             VStack(alignment: .leading, spacing: DS.Space.tight) {
-                Text("Command Mode")
+                Text(L10n.text("Command Mode"))
                     .font(DS.Font.display)
                     .foregroundStyle(DS.Color.ink)
-                Text(subtitle)
+                Text(L10n.text(subtitle))
                     .font(DS.Font.label)
                     .foregroundStyle(DS.Color.inkSecondary)
             }
@@ -31,7 +31,7 @@ struct CommandModeWindow: View {
 
     private var subtitle: String {
         if let source = controller.sourceApplicationName {
-            return "Local transformation for selected text in \(source)."
+            return L10n.format("Local transformation for selected text in %@.", arguments: [source])
         }
         return "Selected text and your instruction stay on this Mac."
     }
@@ -43,13 +43,13 @@ struct CommandModeWindow: View {
             messagePanel("Select text in another app, then hold the configured Command Mode shortcut.")
         case .recordingInstruction:
             VStack(alignment: .leading, spacing: DS.Space.base) {
-                Text("Recording instruction…")
+                Text(L10n.text("Recording instruction…"))
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.ink)
                 VUMeter(level: controller.level, isActive: true)
                     .frame(height: DS.Size.microphoneTestMeterHeight)
                 Text(controller.instructionTranscript.isEmpty
-                    ? "Speak the change you want, then release the shortcut."
+                    ? L10n.text("Speak the change you want, then release the shortcut.")
                     : controller.instructionTranscript)
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.inkSecondary)
@@ -59,10 +59,10 @@ struct CommandModeWindow: View {
         case .processing:
             VStack(alignment: .leading, spacing: DS.Space.base) {
                 ProgressView()
-                Text("Creating a local proposal…")
+                Text(L10n.text("Creating a local proposal…"))
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.ink)
-                Text("Murmure is using Apple's on-device model. Nothing has been replaced.")
+                Text(L10n.text("Murmure is using Apple's on-device model. Nothing has been replaced."))
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.inkSecondary)
             }
@@ -71,7 +71,7 @@ struct CommandModeWindow: View {
             HStack(alignment: .top, spacing: DS.Space.base) {
                 reviewPanel(title: "Original", text: original)
                 VStack(alignment: .leading, spacing: DS.Space.tight) {
-                    Text("Proposal")
+                    Text(L10n.text("Proposal"))
                         .font(DS.Font.bodyEmphasis)
                         .foregroundStyle(DS.Color.ink)
                     TextEditor(text: Binding(
@@ -86,7 +86,7 @@ struct CommandModeWindow: View {
                         RoundedRectangle(cornerRadius: DS.Radius.control)
                             .strokeBorder(DS.Color.seam, lineWidth: DS.Border.hairline)
                     }
-                    .accessibilityLabel("Proposed replacement")
+                    .accessibilityLabel(L10n.text("Proposed replacement"))
                     if let notice {
                         Text(notice)
                             .font(DS.Font.caption)
@@ -106,13 +106,13 @@ struct CommandModeWindow: View {
         HStack(spacing: DS.Space.snug) {
             switch controller.state {
             case .review:
-                Button("Cancel") { closeAndCancel() }
+                Button(L10n.text("Cancel")) { closeAndCancel() }
                 Spacer()
-                Button("Copy proposal") {
+                Button(L10n.text("Copy proposal")) {
                     if controller.copyProposal() { dismissWindow(id: "command-mode") }
                 }
                 .buttonStyle(.bordered)
-                Button("Replace selected text") {
+                Button(L10n.text("Replace selected text")) {
                     if controller.replaceProposal() == .replaced {
                         dismissWindow(id: "command-mode")
                     }
@@ -122,10 +122,10 @@ struct CommandModeWindow: View {
                 .keyboardShortcut(.defaultAction)
             case .recordingInstruction, .processing:
                 Spacer()
-                Button("Cancel") { closeAndCancel() }
+                Button(L10n.text("Cancel")) { closeAndCancel() }
             case .failed, .idle:
                 Spacer()
-                Button("Done") { closeAndCancel() }
+                Button(L10n.text("Done")) { closeAndCancel() }
                     .keyboardShortcut(.defaultAction)
             }
         }
@@ -138,7 +138,7 @@ struct CommandModeWindow: View {
 
     private func reviewPanel(title: String, text: String) -> some View {
         VStack(alignment: .leading, spacing: DS.Space.tight) {
-            Text(title)
+            Text(L10n.text(title))
                 .font(DS.Font.bodyEmphasis)
                 .foregroundStyle(DS.Color.ink)
             ScrollView {
@@ -159,7 +159,7 @@ struct CommandModeWindow: View {
     }
 
     private func messagePanel(_ message: String) -> some View {
-        Text(message)
+        Text(L10n.text(message))
             .font(DS.Font.body)
             .foregroundStyle(DS.Color.inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
