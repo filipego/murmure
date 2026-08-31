@@ -9,7 +9,7 @@ struct MurmurYouTubeApp: App {
         // The main window. A `Window` rather than a `WindowGroup`: this app has one front
         // panel, and letting ⌘N spawn a second copy of a tape deck makes no sense.
         Window("Murmure", id: "main") {
-            MainWindow(controller: delegate.controller, updates: delegate.updateCoordinator)
+            MainSceneRoot(controller: delegate.controller, updates: delegate.updateCoordinator)
         }
         .defaultSize(width: 860, height: 620)
         .windowResizability(.contentMinSize)
@@ -21,6 +21,11 @@ struct MurmurYouTubeApp: App {
                 }
             }
         }
+
+        Window("Set up Murmure", id: "onboarding") {
+            OnboardingWindow(controller: delegate.controller)
+        }
+        .windowResizability(.contentSize)
 
         // Fully qualified: this app has its own `Settings` type, which otherwise shadows
         // SwiftUI's settings scene.

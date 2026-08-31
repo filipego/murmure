@@ -3,6 +3,7 @@ import AVFoundation
 import MurmurAudioCore
 import MurmurPermissionCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Settings uses the same calm cards as Home. It can be shown as the standard Settings scene
 /// or embedded as the Settings destination in the main hub.
@@ -21,6 +22,10 @@ struct SettingsWindow: View {
     @State private var snippetDraft: SnippetEntry?
     @State private var pendingSnippetDeletion: SnippetEntry?
     @State private var snippetMessage: String?
+    @State private var diagnosticsPreview: DiagnosticsPreview?
+    @State private var diagnosticsMessage: String?
+
+    @Environment(\.openWindow) private var openWindow
 
     init(controller: DictationController, updates: AppUpdateCoordinator? = nil) {
         self.controller = controller
@@ -233,6 +238,33 @@ struct SettingsWindow: View {
 
                 StorageCard()
 
+                settingsCard(
+                    title: "Setup and diagnostics",
+                    detail: "Rerun the guided setup or create a private diagnostic report. Reports include configuration and permission states, never dictated text, history, snippets, dictionary entries, or file paths."
+                ) {
+                    HStack(spacing: DS.Space.snug) {
+                        Button("Run setup again") {
+                            OnboardingState.shared.reset()
+                            openWindow(id: "onboarding")
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button("Preview diagnostics") { previewDiagnostics() }
+                            .buttonStyle(.bordered)
+                        Button("Copy diagnostics") { copyDiagnostics() }
+                            .buttonStyle(.bordered)
+                        Button("Export diagnostics…") { exportDiagnostics() }
+                            .buttonStyle(.bordered)
+                    }
+
+                    if let diagnosticsMessage {
+                        Text(diagnosticsMessage)
+                            .font(DS.Font.caption)
+                            .foregroundStyle(DS.Color.inkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
                 if let updates {
                     UpdateCard(coordinator: updates, canInstall: !controller.state.isActive)
                 }
@@ -272,6 +304,9 @@ struct SettingsWindow: View {
         }
         .sheet(item: $snippetDraft) { entry in
             SnippetEditorSheet(entry: entry)
+        }
+        .sheet(item: $diagnosticsPreview) { preview in
+            DiagnosticsPreviewSheet(json: preview.json)
         }
         .alert("Use this shortcut?", isPresented: Binding(
             get: { pendingRiskyHotkey != nil },
@@ -442,6 +477,85 @@ struct SettingsWindow: View {
         return status.isInstalled
             ? "Apple Speech · \(name) · On-device model installed."
             : "Apple Speech · \(name) · The system downloads its on-device model once when first used."
+    }
+
+    private var diagnosticsSnapshot: DiagnosticsSnapshot {
+        let bundle = Bundle.main
+        let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
+        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Unknown"
+        let recentOperationFailed = if case .error = controller.state { true } else { false }
+
+        return DiagnosticsCollector.collect(from: DiagnosticsInput(
+            appVersion: version,
+            appBuild: build,
+            macOSVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+            architecture: currentArchitecture,
+            microphone: settings.microphoneSelection.displayName,
+            engine: settings.engine.displayName,
+            language: settings.transcriptionLanguage.displayName,
+            modelState: diagnosticsModelState,
+            microphonePermission: Permissions.hasMicrophone ? "Granted" : "Needs access",
+            accessibilityPermission: Permissions.hasAccessibility ? "Granted" : "Needs access",
+            storageState: MurmureDataStore.statusTitle,
+            recentOperationFailed: recentOperationFailed
+        ))
+    }
+
+    private var diagnosticsModelState: String {
+        if settings.engine == .parakeet {
+            return ParakeetModels.isDownloaded
+                ? "Parakeet local model installed"
+                : "Parakeet local model not installed"
+        }
+        guard let status = speechLanguages.status(for: settings.transcriptionLanguage) else {
+            return "Apple on-device model state is being checked"
+        }
+        return status.isInstalled
+            ? "Apple on-device model installed"
+            : "Apple on-device model not installed"
+    }
+
+    private func encodedDiagnostics() throws -> Data {
+        try DiagnosticsCollector.encoded(diagnosticsSnapshot)
+    }
+
+    private func previewDiagnostics() {
+        do {
+            let data = try encodedDiagnostics()
+            diagnosticsPreview = DiagnosticsPreview(
+                json: String(decoding: data, as: UTF8.self)
+            )
+            diagnosticsMessage = nil
+        } catch {
+            diagnosticsMessage = "The diagnostic report could not be prepared."
+        }
+    }
+
+    private func copyDiagnostics() {
+        do {
+            let string = String(decoding: try encodedDiagnostics(), as: UTF8.self)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(string, forType: .string)
+            diagnosticsMessage = "Sanitized diagnostics copied."
+        } catch {
+            diagnosticsMessage = "The diagnostic report could not be copied."
+        }
+    }
+
+    private func exportDiagnostics() {
+        do {
+            let data = try encodedDiagnostics()
+            let panel = NSSavePanel()
+            panel.title = "Export Sanitized Diagnostics"
+            panel.nameFieldStringValue = "Murmure Diagnostics.json"
+            panel.allowedContentTypes = [.json]
+            panel.canCreateDirectories = true
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            try data.write(to: url, options: .atomic)
+            diagnosticsMessage = "Sanitized diagnostics exported."
+        } catch {
+            diagnosticsMessage = "The diagnostic report could not be exported."
+        }
     }
 
     private var engineBinding: Binding<SpeechEngineChoice> {
@@ -628,6 +742,54 @@ struct SettingsWindow: View {
                     .buttonStyle(.link)
             }
         }
+    }
+}
+
+private var currentArchitecture: String {
+    #if arch(arm64)
+    "Apple Silicon (arm64)"
+    #elseif arch(x86_64)
+    "Intel (x86_64)"
+    #else
+    "Unknown"
+    #endif
+}
+
+private struct DiagnosticsPreview: Identifiable {
+    let id = UUID()
+    let json: String
+}
+
+private struct DiagnosticsPreviewSheet: View {
+    let json: String
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DS.Space.base) {
+            Text("Sanitized diagnostics")
+                .font(DS.Font.title)
+                .foregroundStyle(DS.Color.ink)
+            Text("Review the exact JSON before sharing it.")
+                .font(DS.Font.label)
+                .foregroundStyle(DS.Color.inkSecondary)
+            ScrollView {
+                Text(json)
+                    .font(.system(.body, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(DS.Space.base)
+            .background(DS.Color.well, in: .rect(cornerRadius: DS.Radius.control))
+            HStack {
+                Spacer()
+                Button("Done") { dismiss() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(DS.Space.panel)
+        .frame(width: DS.Size.diagnosticsWidth, height: DS.Size.diagnosticsHeight)
+        .background(DS.Color.canvas)
     }
 }
 

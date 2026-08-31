@@ -103,6 +103,10 @@ enum DS {
         static let microphoneTestMeterHeight: CGFloat = 72
         static let shortcutRecorderWidth: CGFloat = 440
         static let shortcutRecorderHeight: CGFloat = 180
+        static let onboardingWidth: CGFloat = 680
+        static let onboardingHeight: CGFloat = 560
+        static let diagnosticsWidth: CGFloat = 680
+        static let diagnosticsHeight: CGFloat = 520
     }
 
     enum Shadow {
