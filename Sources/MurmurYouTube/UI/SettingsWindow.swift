@@ -1,5 +1,6 @@
 import AppKit
 import AVFoundation
+import MurmurAudioCore
 import MurmurPermissionCore
 import SwiftUI
 
@@ -9,6 +10,8 @@ struct SettingsWindow: View {
     @Bindable var controller: DictationController
     var updates: AppUpdateCoordinator?
     @State private var settings = Settings.shared
+    @State private var audioInputs = AudioInputStore.shared
+    @State private var microphoneTest = MicrophoneTestCoordinator()
     @State private var permissionRefresh = 0
 
     init(controller: DictationController, updates: AppUpdateCoordinator? = nil) {
@@ -82,6 +85,57 @@ struct SettingsWindow: View {
                     Toggle("Play start and finish sounds", isOn: $settings.soundEnabled)
                 }
 
+                settingsCard(
+                    title: "Microphone",
+                    detail: "Choose a local input for dictation. System default follows macOS without changing it."
+                ) {
+                    Picker("Input", selection: Binding(
+                        get: { settings.microphoneSelection },
+                        set: { selection in
+                            microphoneTest.stop()
+                            controller.resumeHotkeyAfterModalInput()
+                            settings.microphoneSelection = selection
+                            audioInputs.refresh()
+                        }
+                    )) {
+                        Text("System default").tag(MicrophoneSelection.systemDefault)
+                        ForEach(audioInputs.devices) { device in
+                            Text(microphoneLabel(device)).tag(MicrophoneSelection.device(
+                                uniqueID: device.id,
+                                displayName: device.displayName
+                            ))
+                        }
+                        if selectedMicrophoneIsUnavailable {
+                            Text("\(settings.microphoneSelection.displayName) (unavailable)")
+                                .tag(settings.microphoneSelection)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 260, alignment: .leading)
+                    .disabled(microphoneTest.state.isBusy)
+
+                    VUMeter(
+                        level: microphoneTest.level,
+                        isActive: microphoneTest.state.isBusy
+                    )
+                    .frame(height: DS.Size.microphoneTestMeterHeight)
+
+                    HStack(spacing: DS.Space.snug) {
+                        Button(microphoneTest.state.isBusy ? "Stop test" : "Test microphone") {
+                            toggleMicrophoneTest()
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(controller.state.isActive)
+
+                        Text(microphoneStatusText)
+                            .font(DS.Font.caption)
+                            .foregroundStyle(microphoneStatusIsError
+                                ? DS.Color.warning
+                                : DS.Color.inkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
                 settingsCard(title: "Cleanup", detail: "Cleanup removes fillers and fixes punctuation before dictionary corrections run.") {
                     Toggle("Clean up transcripts", isOn: $settings.cleanupEnabled)
                     Toggle("Smart cleanup (on-device AI)", isOn: $settings.smartCleanup)
@@ -120,10 +174,64 @@ struct SettingsWindow: View {
         }
         .background(DS.Color.canvas)
         .task {
+            audioInputs.refresh()
             updates?.refreshStagedUpdate()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 permissionRefresh += 1
+            }
+        }
+        .onDisappear {
+            microphoneTest.stop()
+            controller.resumeHotkeyAfterModalInput()
+        }
+    }
+
+    private var selectedMicrophoneIsUnavailable: Bool {
+        guard case let .device(uniqueID, _) = settings.microphoneSelection else { return false }
+        return !audioInputs.devices.contains { $0.id == uniqueID }
+    }
+
+    private var microphoneStatusText: String {
+        switch microphoneTest.state {
+        case .idle:
+            if let error = audioInputs.errorMessage { return error }
+            return audioInputs.resolution(for: settings.microphoneSelection).statusText
+        case .starting:
+            return "Opening the selected microphone…"
+        case let .testing(name):
+            return "Listening to \(name). Test audio is not saved."
+        case let .error(message):
+            return message
+        }
+    }
+
+    private var microphoneStatusIsError: Bool {
+        if audioInputs.errorMessage != nil { return true }
+        if case .error = microphoneTest.state { return true }
+        if case .unavailable = audioInputs.resolution(for: settings.microphoneSelection) {
+            return true
+        }
+        return false
+    }
+
+    private func microphoneLabel(_ device: AudioInputDevice) -> String {
+        let defaultLabel = device.isSystemDefault ? " · Default" : ""
+        return "\(device.displayName) · \(device.transport.displayName)\(defaultLabel)"
+    }
+
+    private func toggleMicrophoneTest() {
+        if microphoneTest.state.isBusy {
+            microphoneTest.stop()
+            controller.resumeHotkeyAfterModalInput()
+            return
+        }
+
+        controller.suspendHotkeyForModalInput()
+        Task { @MainActor in
+            await microphoneTest.start(selection: settings.microphoneSelection)
+            if !microphoneTest.state.isBusy {
+                controller.resumeHotkeyAfterModalInput()
             }
         }
     }

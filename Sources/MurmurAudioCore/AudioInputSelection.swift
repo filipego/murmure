@@ -1,6 +1,6 @@
 import Foundation
 
-public enum MicrophoneSelection: Codable, Sendable, Equatable {
+public enum MicrophoneSelection: Codable, Sendable, Equatable, Hashable {
     case systemDefault
     case device(uniqueID: String, displayName: String)
 
@@ -14,7 +14,7 @@ public enum MicrophoneSelection: Codable, Sendable, Equatable {
     }
 }
 
-public enum AudioInputTransport: String, Codable, Sendable, Equatable {
+public enum AudioInputTransport: String, Codable, Sendable, Equatable, Hashable {
     case builtIn
     case usb
     case bluetooth
@@ -38,7 +38,7 @@ public enum AudioInputTransport: String, Codable, Sendable, Equatable {
     }
 }
 
-public struct AudioInputDevice: Identifiable, Codable, Sendable, Equatable {
+public struct AudioInputDevice: Identifiable, Codable, Sendable, Equatable, Hashable {
     public let id: String
     public let displayName: String
     public let transport: AudioInputTransport
