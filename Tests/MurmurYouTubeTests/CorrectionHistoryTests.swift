@@ -294,6 +294,29 @@ struct CorrectionHistoryTests {
         #expect(state.runs == [superseding])
     }
 
+    @Test("replacement rejects a stale expected run before persistence")
+    @MainActor
+    func replacementRejectsStaleExpectedValue() async {
+        let expected = sampleRun()
+        var current = expected
+        current.text = "Corrected after preview"
+        var replacement = expected
+        replacement.text = "Stale retranscription"
+        let state = RunCacheState(runs: [current])
+        let transaction = DurableRunReplacementTransaction(
+            persist: { _ in
+                state.persistCalls += 1
+                return Task { true }
+            },
+            load: { state.runs },
+            store: { state.runs = $0 }
+        )
+
+        #expect(!(await transaction.replace(expected: expected, with: replacement)))
+        #expect(state.runs == [current])
+        #expect(state.persistCalls == 0)
+    }
+
     @Test("a pending rule survives a history JSON round trip for later reconciliation")
     func pendingRuleJournalRoundTrip() throws {
         let suggestion = CorrectionRuleSuggestion(hear: "a lie", write: "a line")

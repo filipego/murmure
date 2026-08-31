@@ -134,11 +134,24 @@ struct DurableRunReplacementTransaction {
     let store: ([DictationRun]) -> Void
 
     func replace(id: UUID, with replacement: DictationRun) async -> Bool {
+        await replace(id: id, expected: nil, with: replacement)
+    }
+
+    func replace(expected: DictationRun, with replacement: DictationRun) async -> Bool {
+        await replace(id: expected.id, expected: expected, with: replacement)
+    }
+
+    private func replace(
+        id: UUID,
+        expected: DictationRun?,
+        with replacement: DictationRun
+    ) async -> Bool {
         guard replacement.id == id else { return false }
         let originalRuns = load()
         guard let index = originalRuns.firstIndex(where: { $0.id == id }) else {
             return false
         }
+        if let expected, originalRuns[index] != expected { return false }
 
         let original = originalRuns[index]
         var attemptedRuns = originalRuns
@@ -320,6 +333,23 @@ enum RunLog {
             }
         )
         return await transaction.replace(id: id, with: replacement)
+    }
+
+    static func replaceDurably(
+        expected: DictationRun,
+        with replacement: DictationRun
+    ) async -> Bool {
+        await ensureHistoryHydrated()
+        let transaction = DurableRunReplacementTransaction(
+            persist: { enqueueRewrite($0) },
+            load: { cachedRuns },
+            store: { runs in
+                cachedRuns = runs
+                regenerate()
+                RunStore.shared.reload()
+            }
+        )
+        return await transaction.replace(expected: expected, with: replacement)
     }
 
     static func saveCorrection(
