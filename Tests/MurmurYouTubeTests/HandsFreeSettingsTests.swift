@@ -12,6 +12,19 @@ struct HandsFreeSettingsTests {
 
         #expect(snapshot.resolvedHandsFreeEnabled == false)
         #expect(snapshot.resolvedHandsFreeKey == .rightCommand)
+        #expect(snapshot.resolvedMicrophoneSelection == .systemDefault)
+    }
+
+    @Test("an explicit microphone survives settings decoding")
+    func microphoneSnapshot() throws {
+        let data = Data(#"{"pushToTalkKey":"fn","engine":"apple","compareMode":false,"cleanupEnabled":true,"smartCleanup":false,"soundEnabled":true,"microphoneSelection":{"device":{"uniqueID":"usb-123","displayName":"Studio Mic"}}}"#.utf8)
+
+        let snapshot = try JSONDecoder().decode(SettingsSnapshot.self, from: data)
+
+        #expect(snapshot.resolvedMicrophoneSelection == .device(
+            uniqueID: "usb-123",
+            displayName: "Studio Mic"
+        ))
     }
 
     @Test("a duplicate persisted binding is normalized")
