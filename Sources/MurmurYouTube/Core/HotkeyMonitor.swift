@@ -70,6 +70,7 @@ final class HotkeyMonitor {
 
     var binding = PushToTalkKey.rightOption.binding(gesture: .hold)
     var handsFreeBinding: HotkeyBinding?
+    var commandModeBinding: HotkeyBinding?
     var handsFreeSessionIsActive = false {
         didSet { callbackContext.router.handsFreeSessionIsActive = handsFreeSessionIsActive }
     }
@@ -78,6 +79,8 @@ final class HotkeyMonitor {
     var onHandsFreeToggle: (() -> Void)?
     var onHandsFreeFinish: (() -> Void)?
     var onHandsFreeCancel: (() -> Void)?
+    var onCommandModePress: (() -> Void)?
+    var onCommandModeRelease: (() -> Void)?
 
     /// - Returns: `false` if the tap couldn't be created — almost always missing Accessibility permission.
     @discardableResult
@@ -90,6 +93,7 @@ final class HotkeyMonitor {
         callbackContext.router.configure(
             binding: binding,
             handsFreeBinding: handsFreeBinding,
+            commandModeBinding: commandModeBinding,
             handsFreeSessionIsActive: handsFreeSessionIsActive
         )
         let refcon = Unmanaged.passUnretained(callbackContext).toOpaque()
@@ -146,6 +150,8 @@ final class HotkeyMonitor {
         case .handsFreeToggle: onHandsFreeToggle?()
         case .handsFreeFinish: onHandsFreeFinish?()
         case .handsFreeCancel: onHandsFreeCancel?()
+        case .commandModePress: onCommandModePress?()
+        case .commandModeRelease: onCommandModeRelease?()
         case .reenable:
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
         }
@@ -158,6 +164,8 @@ enum HotkeyTapAction: Sendable, Equatable {
     case handsFreeToggle
     case handsFreeFinish
     case handsFreeCancel
+    case commandModePress
+    case commandModeRelease
     case reenable
 }
 
@@ -184,25 +192,31 @@ private final class HotkeyCallbackContext: @unchecked Sendable {
 final class HotkeyEventRouter: @unchecked Sendable {
     private var binding = PushToTalkKey.rightOption.binding(gesture: .hold)
     private var handsFreeBinding: HotkeyBinding?
+    private var commandModeBinding: HotkeyBinding?
     private var isPressed = false
     private var isHandsFreePressed = false
+    private var isCommandModePressed = false
     var handsFreeSessionIsActive = false
 
     func configure(
         binding: HotkeyBinding,
         handsFreeBinding: HotkeyBinding?,
+        commandModeBinding: HotkeyBinding? = nil,
         handsFreeSessionIsActive: Bool
     ) {
         self.binding = binding
         self.handsFreeBinding = handsFreeBinding
+        self.commandModeBinding = commandModeBinding
         self.handsFreeSessionIsActive = handsFreeSessionIsActive
         isPressed = false
         isHandsFreePressed = false
+        isCommandModePressed = false
     }
 
     func reset() {
         isPressed = false
         isHandsFreePressed = false
+        isCommandModePressed = false
         handsFreeSessionIsActive = false
     }
 
@@ -221,6 +235,24 @@ final class HotkeyEventRouter: @unchecked Sendable {
                isHandsFreeActive: handsFreeSessionIsActive
            ) {
             return (true, control == .finish ? .handsFreeFinish : .handsFreeCancel)
+        }
+
+        if let commandModeBinding,
+           let event = physicalEvent(
+               for: commandModeBinding,
+               type: type,
+               keyCode: keyCode,
+               flags: flags,
+               wasPressed: isCommandModePressed
+           ) {
+            if event == .press { isCommandModePressed = true }
+            if event == .release { isCommandModePressed = false }
+            let action: HotkeyTapAction? = switch event {
+            case .press: .commandModePress
+            case .release: .commandModeRelease
+            case .repeatPress: nil
+            }
+            return (commandModeBinding.consumption == .suppress, action)
         }
 
         if let handsFreeBinding,

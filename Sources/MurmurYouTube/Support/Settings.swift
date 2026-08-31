@@ -46,8 +46,13 @@ struct HotkeyBindingSelection: Equatable {
 struct HotkeyBindingRegistry: Equatable {
     let pushToTalk: HotkeyBinding
     let handsFree: HotkeyBinding
+    let commandMode: HotkeyBinding
 
-    init(pushToTalk: HotkeyBinding, handsFree: HotkeyBinding) {
+    init(
+        pushToTalk: HotkeyBinding,
+        handsFree: HotkeyBinding,
+        commandMode: HotkeyBinding = .commandModeDefault
+    ) {
         let safePrimary = HotkeyBindingValidator.issues(for: pushToTalk).contains {
             $0.severity == .error
         } ? PushToTalkKey.rightOption.binding(gesture: .hold) : pushToTalk
@@ -62,9 +67,31 @@ struct HotkeyBindingRegistry: Equatable {
             PushToTalkKey.rightOption.binding(gesture: .toggle)
         ].compactMap { $0 }
 
-        self.pushToTalk = safePrimary
-        self.handsFree = candidates.first { $0.id != safePrimary.id }
+        let safeHandsFree = candidates.first { $0.id != safePrimary.id }
             ?? PushToTalkKey.rightCommand.binding(gesture: .toggle)
+        self.pushToTalk = safePrimary
+        self.handsFree = safeHandsFree
+
+        let requestedCommand = HotkeyBindingValidator.issues(for: commandMode).contains {
+            $0.severity == .error
+        } ? nil : commandMode.withGesture(.hold)
+        let commandCandidates = [
+            requestedCommand,
+            .commandModeDefault,
+            HotkeyBinding(
+                keyCode: 15,
+                requiredFlags: HotkeyModifier.control.rawValue
+                    | HotkeyModifier.option.rawValue
+                    | HotkeyModifier.command.rawValue,
+                side: nil,
+                gesture: .hold,
+                consumption: .suppress,
+                label: "⌃⌥⌘R"
+            )
+        ].compactMap { $0 }
+        self.commandMode = commandCandidates.first {
+            $0.id != safePrimary.id && $0.id != safeHandsFree.id
+        } ?? .commandModeDefault
     }
 }
 
@@ -81,6 +108,8 @@ struct SettingsSnapshot: Codable {
     let transcriptionLanguage: TranscriptionLanguageOption?
     let pushToTalkBinding: HotkeyBinding?
     let handsFreeBinding: HotkeyBinding?
+    let commandModeEnabled: Bool?
+    let commandModeBinding: HotkeyBinding?
 
     var resolvedHandsFreeEnabled: Bool { handsFreeEnabled ?? false }
     var resolvedHandsFreeKey: PushToTalkKey {
@@ -99,6 +128,10 @@ struct SettingsSnapshot: Codable {
     var resolvedHandsFreeBinding: HotkeyBinding {
         handsFreeBinding ?? resolvedHandsFreeKey.binding(gesture: .toggle)
     }
+    var resolvedCommandModeEnabled: Bool { commandModeEnabled ?? true }
+    var resolvedCommandModeBinding: HotkeyBinding {
+        commandModeBinding ?? .commandModeDefault
+    }
 }
 
 @MainActor
@@ -115,6 +148,12 @@ final class Settings {
 
     private(set) var handsFreeKey: PushToTalkKey
     private(set) var handsFreeBinding: HotkeyBinding
+
+    var commandModeEnabled: Bool {
+        didSet { persist() }
+    }
+
+    private(set) var commandModeBinding: HotkeyBinding
 
     var microphoneSelection: MicrophoneSelection {
         didSet { persist() }
@@ -158,6 +197,8 @@ final class Settings {
         static let handsFreeKey = "handsFreeKey"
         static let pushToTalkBinding = "pushToTalkBinding"
         static let handsFreeBinding = "handsFreeBinding"
+        static let commandModeEnabled = "commandModeEnabled"
+        static let commandModeBinding = "commandModeBinding"
         static let microphoneSelection = "microphoneSelection"
         static let transcriptionLanguage = "transcriptionLanguage"
         static let cleanupEnabled = "cleanupEnabled"
@@ -186,14 +227,22 @@ final class Settings {
             ?? selection.pushToTalk.binding(gesture: .hold)
         let requestedHandsFreeBinding = snapshot?.resolvedHandsFreeBinding
             ?? selection.handsFree.binding(gesture: .toggle)
+        let requestedCommandModeBinding = snapshot?.resolvedCommandModeBinding
+            ?? defaults.data(forKey: Keys.commandModeBinding)
+                .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) }
+            ?? .commandModeDefault
         let registry = HotkeyBindingRegistry(
             pushToTalk: requestedPrimaryBinding,
-            handsFree: requestedHandsFreeBinding
+            handsFree: requestedHandsFreeBinding,
+            commandMode: requestedCommandModeBinding
         )
         pushToTalkBinding = registry.pushToTalk
         handsFreeBinding = registry.handsFree
+        commandModeBinding = registry.commandMode
         handsFreeEnabled = snapshot?.resolvedHandsFreeEnabled
             ?? (defaults.object(forKey: Keys.handsFreeEnabled) as? Bool ?? false)
+        commandModeEnabled = snapshot?.resolvedCommandModeEnabled
+            ?? (defaults.object(forKey: Keys.commandModeEnabled) as? Bool ?? true)
         if let snapshot {
             microphoneSelection = snapshot.resolvedMicrophoneSelection
         } else if let data = defaults.data(forKey: Keys.microphoneSelection),
@@ -238,6 +287,8 @@ final class Settings {
             Keys.handsFreeKey,
             Keys.pushToTalkBinding,
             Keys.handsFreeBinding,
+            Keys.commandModeEnabled,
+            Keys.commandModeBinding,
             Keys.microphoneSelection,
             Keys.transcriptionLanguage,
             Keys.cleanupEnabled,
@@ -265,6 +316,9 @@ final class Settings {
             pushToTalkBinding: defaults.data(forKey: Keys.pushToTalkBinding)
                 .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) },
             handsFreeBinding: defaults.data(forKey: Keys.handsFreeBinding)
+                .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) },
+            commandModeEnabled: defaults.object(forKey: Keys.commandModeEnabled) as? Bool,
+            commandModeBinding: defaults.data(forKey: Keys.commandModeBinding)
                 .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) }
         )
     }
@@ -289,11 +343,14 @@ final class Settings {
                 settings.handsFreeKey = selection.handsFree
                 let registry = HotkeyBindingRegistry(
                     pushToTalk: snapshot.resolvedPushToTalkBinding,
-                    handsFree: snapshot.resolvedHandsFreeBinding
+                    handsFree: snapshot.resolvedHandsFreeBinding,
+                    commandMode: snapshot.resolvedCommandModeBinding
                 )
                 settings.pushToTalkBinding = registry.pushToTalk
                 settings.handsFreeBinding = registry.handsFree
+                settings.commandModeBinding = registry.commandMode
                 settings.handsFreeEnabled = snapshot.resolvedHandsFreeEnabled
+                settings.commandModeEnabled = snapshot.resolvedCommandModeEnabled
                 settings.microphoneSelection = snapshot.resolvedMicrophoneSelection
                 settings.transcriptionLanguage = snapshot.resolvedTranscriptionLanguage
                 settings.engine = resolvedEngineChoice(
@@ -311,6 +368,7 @@ final class Settings {
                 settings.defaults.set(settings.pushToTalkKey.rawValue, forKey: Keys.pushToTalkKey)
                 settings.defaults.set(settings.handsFreeEnabled, forKey: Keys.handsFreeEnabled)
                 settings.defaults.set(settings.handsFreeKey.rawValue, forKey: Keys.handsFreeKey)
+                settings.defaults.set(settings.commandModeEnabled, forKey: Keys.commandModeEnabled)
                 settings.persistBindingMirrors()
                 if let microphoneData = try? JSONEncoder().encode(settings.microphoneSelection) {
                     settings.defaults.set(microphoneData, forKey: Keys.microphoneSelection)
@@ -346,7 +404,8 @@ final class Settings {
     func selectPushToTalkBinding(_ binding: HotkeyBinding) -> Bool {
         guard !HotkeyBindingValidator.validate(
             primary: binding,
-            handsFree: handsFreeEnabled ? handsFreeBinding : nil
+            handsFree: handsFreeEnabled ? handsFreeBinding : nil,
+            commandMode: commandModeEnabled ? commandModeBinding : nil
         ).contains(where: { $0.severity == .error }) else { return false }
         pushToTalkBinding = binding
         if let preset = PushToTalkKey.allCases.first(where: { $0.keyCode == binding.keyCode }) {
@@ -360,12 +419,25 @@ final class Settings {
     func selectHandsFreeBinding(_ binding: HotkeyBinding) -> Bool {
         guard !HotkeyBindingValidator.validate(
             primary: pushToTalkBinding,
-            handsFree: binding
+            handsFree: binding,
+            commandMode: commandModeEnabled ? commandModeBinding : nil
         ).contains(where: { $0.severity == .error }) else { return false }
         handsFreeBinding = binding.withGesture(.toggle)
         if let preset = PushToTalkKey.allCases.first(where: { $0.keyCode == binding.keyCode }) {
             handsFreeKey = preset
         }
+        persist()
+        return true
+    }
+
+    @discardableResult
+    func selectCommandModeBinding(_ binding: HotkeyBinding) -> Bool {
+        guard !HotkeyBindingValidator.validate(
+            primary: pushToTalkBinding,
+            handsFree: handsFreeEnabled ? handsFreeBinding : nil,
+            commandMode: binding
+        ).contains(where: { $0.severity == .error }) else { return false }
+        commandModeBinding = binding.withGesture(.hold)
         persist()
         return true
     }
@@ -380,7 +452,9 @@ final class Settings {
         handsFreeKey = .rightCommand
         pushToTalkBinding = PushToTalkKey.rightOption.binding(gesture: .hold)
         handsFreeBinding = PushToTalkKey.rightCommand.binding(gesture: .toggle)
+        commandModeBinding = .commandModeDefault
         handsFreeEnabled = false
+        commandModeEnabled = true
         persist()
     }
 
@@ -408,12 +482,15 @@ final class Settings {
             microphoneSelection: microphoneSelection,
             transcriptionLanguage: transcriptionLanguage,
             pushToTalkBinding: pushToTalkBinding,
-            handsFreeBinding: handsFreeBinding
+            handsFreeBinding: handsFreeBinding,
+            commandModeEnabled: commandModeEnabled,
+            commandModeBinding: commandModeBinding
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(snapshot.pushToTalkKey, forKey: Keys.pushToTalkKey)
         defaults.set(snapshot.resolvedHandsFreeEnabled, forKey: Keys.handsFreeEnabled)
         defaults.set(snapshot.resolvedHandsFreeKey.rawValue, forKey: Keys.handsFreeKey)
+        defaults.set(snapshot.resolvedCommandModeEnabled, forKey: Keys.commandModeEnabled)
         persistBindingMirrors()
         if let microphoneData = try? JSONEncoder().encode(snapshot.resolvedMicrophoneSelection) {
             defaults.set(microphoneData, forKey: Keys.microphoneSelection)
@@ -436,6 +513,9 @@ final class Settings {
         }
         if let data = try? JSONEncoder().encode(handsFreeBinding) {
             defaults.set(data, forKey: Keys.handsFreeBinding)
+        }
+        if let data = try? JSONEncoder().encode(commandModeBinding) {
+            defaults.set(data, forKey: Keys.commandModeBinding)
         }
     }
 }

@@ -44,6 +44,31 @@ struct HotkeyRegistryTests {
         #expect(issues.contains { $0.code == .duplicate && $0.severity == .error })
     }
 
+    @Test("Command Mode has a distinct safe default")
+    func commandDefault() {
+        let command = HotkeyBinding.commandModeDefault
+        let registry = HotkeyBindingRegistry(
+            pushToTalk: PushToTalkKey.fn.binding(gesture: .hold),
+            handsFree: PushToTalkKey.rightCommand.binding(gesture: .toggle),
+            commandMode: command
+        )
+
+        #expect(command.label == "⌃⌥⌘D")
+        #expect(command.gesture == .hold)
+        #expect(Set([registry.pushToTalk.id, registry.handsFree.id, registry.commandMode.id]).count == 3)
+    }
+
+    @Test("Command Mode cannot duplicate either dictation shortcut")
+    func commandDuplicate() {
+        let primary = PushToTalkKey.fn.binding(gesture: .hold)
+        let issues = HotkeyBindingValidator.validate(
+            primary: primary,
+            handsFree: PushToTalkKey.rightCommand.binding(gesture: .toggle),
+            commandMode: primary
+        )
+        #expect(issues.contains { $0.code == .duplicate && $0.severity == .error })
+    }
+
     @Test("bare ordinary keys are rejected")
     func bareKey() {
         let binding = HotkeyBinding(
@@ -141,6 +166,25 @@ struct HotkeyEventRouterTests {
 
         #expect(!inactive.consume && inactive.action == nil)
         #expect(active.consume && active.action == .handsFreeFinish)
+    }
+
+    @Test("the Command Mode chord emits dedicated hold edges")
+    func commandModeChord() {
+        let binding = HotkeyBinding.commandModeDefault
+        let flags = CGEventFlags(rawValue: binding.requiredFlags)
+        let router = HotkeyEventRouter()
+        router.configure(
+            binding: PushToTalkKey.fn.binding(gesture: .hold),
+            handsFreeBinding: nil,
+            commandModeBinding: binding,
+            handsFreeSessionIsActive: false
+        )
+
+        let press = router.route(type: .keyDown, keyCode: binding.keyCode, flags: flags)
+        let release = router.route(type: .keyUp, keyCode: binding.keyCode, flags: flags)
+
+        #expect(press.consume && press.action == .commandModePress)
+        #expect(release.consume && release.action == .commandModeRelease)
     }
 }
 

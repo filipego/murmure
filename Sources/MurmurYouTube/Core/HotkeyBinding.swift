@@ -60,6 +60,19 @@ struct HotkeyBinding: Codable, Sendable, Hashable, Identifiable {
     }
 }
 
+extension HotkeyBinding {
+    static let commandModeDefault = HotkeyBinding(
+        keyCode: 2,
+        requiredFlags: HotkeyModifier.control.rawValue
+            | HotkeyModifier.option.rawValue
+            | HotkeyModifier.command.rawValue,
+        side: nil,
+        gesture: .hold,
+        consumption: .suppress,
+        label: "⌃⌥⌘D"
+    )
+}
+
 struct HotkeyBindingIssue: Equatable, Sendable {
     enum Severity: Sendable {
         case warning
@@ -81,7 +94,8 @@ struct HotkeyBindingIssue: Equatable, Sendable {
 enum HotkeyBindingValidator {
     static func validate(
         primary: HotkeyBinding,
-        handsFree: HotkeyBinding?
+        handsFree: HotkeyBinding?,
+        commandMode: HotkeyBinding? = nil
     ) -> [HotkeyBindingIssue] {
         var result = issues(for: primary)
         if let handsFree {
@@ -91,6 +105,16 @@ enum HotkeyBindingValidator {
                     severity: .error,
                     code: .duplicate,
                     message: "Hold-to-talk and hands-free cannot use the same shortcut."
+                ))
+            }
+        }
+        if let commandMode {
+            result.append(contentsOf: issues(for: commandMode))
+            if commandMode.id == primary.id || commandMode.id == handsFree?.id {
+                result.append(HotkeyBindingIssue(
+                    severity: .error,
+                    code: .duplicate,
+                    message: "Command Mode must use a different shortcut from dictation."
                 ))
             }
         }
