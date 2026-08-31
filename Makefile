@@ -139,27 +139,41 @@ share: app
 	@{ \
 		echo '# Murmure'; \
 		echo; \
+		echo '**Requirements: Apple Silicon (M1 or newer) and macOS 26 or later.**'; \
+		echo 'This modern archive does not support Intel Macs. Intel remains a separate hardware'; \
+		echo 'compatibility investigation; do not bypass this requirement.'; \
+		echo; \
 		echo 'Download the latest release: https://github.com/filipego/murmure/releases/latest/download/Murmure.app.zip'; \
 		echo; \
 		echo '1. Unzip the archive and drag **Murmure.app** to `/Applications`.'; \
 		echo '2. If macOS blocks the first launch, Control-click the app, choose Open, and confirm.'; \
-		echo '3. Grant Microphone and Accessibility access, then restart Murmure after Accessibility.'; \
-		echo '4. Hold the configured push-to-talk key to dictate into the focused app.'; \
-		echo '5. Later, use Settings → Updates → Check for updates → Install and relaunch.'; \
-		echo '6. To correct a saved dictation, use the pencil Correct action on its history row.'; \
+		echo '   If needed, use System Settings → Privacy & Security → Open Anyway.'; \
+		echo '3. Follow Set up Murmure. Grant Microphone and Accessibility access yourself, choose'; \
+		echo '   a shortcut, test the microphone, choose language behavior, and finish one test.'; \
+		echo '4. Automatic uses the free local Parakeet model to recognize 25 European languages.'; \
+		echo '   The first use may download that model. Explicit languages can use Apple Speech.'; \
+		echo '5. Hold the configured push-to-talk key in any app, speak, then finish the gesture.'; \
+		echo '6. Later, use Settings → Updates → Check for updates → Install and relaunch.'; \
+		echo '7. To correct a saved dictation, use the pencil Correct action on its history row.'; \
 		echo '   Review “Murmure heard” and edit “I meant”; Play original is optional, and Dictate'; \
 		echo '   only fills the draft. Remember is on by default, and Save correction is the only'; \
 		echo '   action that persists history or a safe contextual local dictionary rule. An'; \
 		echo '   interrupted rule stays pending in history and retries safely on the next launch.'; \
 		echo; \
-		echo 'Murmure stores dictionary entries, settings, transcript history, the dashboard, and'; \
-		echo 'captured audio in its Murmure data folder. On this Mac that is'; \
-		echo '`/Volumes/Extreme Pro/Murmure Data`; without that drive it uses a local emergency'; \
-		echo 'folder and shows the location in Settings. It never removes unrelated drive files.'; \
+		echo 'Snippets replace an exact whole spoken phrase with reusable local text. Automatic'; \
+		echo 'recognition, deterministic cleanup, snippets, dictionary corrections, history, and audio'; \
+		echo 'all run locally. Model downloads and update checks are the only network operations.'; \
 		echo; \
-		echo 'Murmure processes audio, cleanup, dictionary corrections, and history locally on'; \
-		echo 'your Mac. Update checks use the fixed public GitHub Releases endpoint and download'; \
-		echo 'only the signed app archive. No dictation, audio, history, or dictionary data is sent.'; \
+		echo 'Murmure stores settings, snippets, dictionary entries, transcript history, and captured'; \
+		echo 'audio in its local data folder under Application Support. On the operator Mac only,'; \
+		echo 'the specifically configured Extreme Pro drive is used when mounted. Settings always'; \
+		echo 'shows the active location. Installation and app updates never replace that data folder,'; \
+		echo 'and Murmure never removes unrelated drive files.'; \
+		echo; \
+		echo 'Use Settings → Setup and diagnostics to rerun setup or preview/copy/export a sanitized'; \
+		echo 'report. Diagnostics contain app, Mac, engine, language, model, permission, microphone,'; \
+		echo 'and storage status only—never dictated text, history, audio, snippets, dictionary data,'; \
+		echo 'or local file paths.'; \
 		echo; \
 		echo 'The archive uses a stable Developer ID or local signing identity when available.'; \
 		echo 'If neither is available, it falls back to ad-hoc signing and macOS may ask for'; \
@@ -187,11 +201,18 @@ release: require-stable-update-signing
 	verify_code "$(HELPERS)/MurmurUpdateHelper"; \
 	ACTUAL=$$(codesign -d -r- "$(BUNDLE)" 2>&1 | sed -n 's/^designated => //p'); \
 	[ "$$ACTUAL" = '$(PINNED_REQUIREMENT)' ] || { echo "unexpected release requirement: $$ACTUAL" >&2; exit 1; }; \
+	ARCHS=$$(lipo -archs "$(CONTENTS)/MacOS/$(EXEC)"); \
+	[ "$$ARCHS" = 'arm64' ] || { echo "unexpected release architectures: $$ARCHS" >&2; exit 1; }; \
+	MIN_OS=$$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$(CONTENTS)/Info.plist"); \
+	[ "$$MIN_OS" = '26.0' ] || { echo "unexpected minimum macOS version: $$MIN_OS" >&2; exit 1; }; \
+	ROOTS=$$(unzip -Z1 "$(DIST)/$(APPNAME).zip" | sed 's#/.*##' | sort -u); \
+	[ "$$ROOTS" = '$(APPNAME)' ] || { echo "archive contains unexpected roots: $$ROOTS" >&2; exit 1; }; \
 	(cd "$(DIST)" && shasum -a 256 -c "$(APPNAME).zip.sha256"); \
 	VERSION=$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$(CONTENTS)/Info.plist"); \
 	BUILD_NUMBER=$$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$(CONTENTS)/Info.plist"); \
 	echo "release tag: v$$VERSION+$$BUILD_NUMBER"; \
 	echo "release assets:"; \
+	echo "requirements: Apple Silicon, macOS $$MIN_OS or later"; \
 	echo "$(DIST)/$(APPNAME).zip"; \
 	echo "$(DIST)/$(APPNAME).zip.sha256"; \
 	echo "$(DIST)/INSTALL.md"

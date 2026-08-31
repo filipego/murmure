@@ -118,6 +118,10 @@ emergency folder).
 
 ### Install the prebuilt archive (recommended for friends)
 
+The modern Murmure app requires **Apple Silicon (M1 or newer) and macOS 26 or later**. This
+archive does not run on Intel Macs. Intel remains a separate hardware compatibility
+investigation; do not try to bypass the requirement on a 2020 Intel Air or a 2014/2015 Mac.
+
 1. Download the latest fixed release asset:
    <https://github.com/filipego/murmure/releases/latest/download/Murmure.app.zip>
    Then unzip it.
@@ -125,15 +129,25 @@ emergency folder).
 3. This development archive is signed but **not notarized**. If macOS blocks the first launch,
    Control-click the app, choose **Open**, and confirm. If needed, use System Settings → Privacy
    & Security → **Open Anyway**.
-4. Grant Microphone and Accessibility access when macOS asks. The friend must do this on their
-   own Mac; Codex cannot grant TCC permissions for them.
-5. If the Extreme Pro drive is not mounted, Murmure uses its local emergency folder at
-   `~/Library/Application Support/MurmurYouTube` and shows that status in Settings. It never
-   deletes or overwrites unrelated files on a drive.
+4. Follow **Set up Murmure**. Grant Microphone and Accessibility access, choose a shortcut,
+   test the microphone, choose language behavior, and complete one short test. The friend must
+   grant macOS permissions themselves; Codex cannot grant TCC permissions for them.
+5. **Automatic** uses the free local Parakeet model to recognize 25 European languages and may
+   download the model once. Explicit language choices can use Apple Speech. Speech, cleanup,
+   snippets, dictionary corrections, history, and audio stay local; only model downloads and
+   update checks use the network.
+6. On a friend's Mac, data normally lives under
+   `~/Library/Application Support/MurmurYouTube`. Settings shows the active storage location.
+   Installing or updating the app does not replace that folder. The operator's specifically
+   configured Extreme Pro drive remains a separate local storage option and unrelated drive
+   files are never deleted or overwritten.
+7. Use **Settings → Setup and diagnostics** to rerun setup or preview, copy, or export a
+   sanitized report. It contains configuration and status only—never dictated text, history,
+   audio, snippets, dictionary entries, or local paths.
 
 ### Build and install from source
 
-Source installation requires macOS 26 and a Swift/Xcode toolchain:
+Source installation requires Apple Silicon, macOS 26, and a Swift/Xcode toolchain:
 
 ```bash
 git clone https://github.com/filipego/murmure.git
@@ -154,10 +168,14 @@ Give a friend this prompt after they open Codex:
 Install Murmure from the fixed latest release asset:
 https://github.com/filipego/murmure/releases/latest/download/Murmure.app.zip
 
+First confirm this Mac has Apple Silicon and macOS 26 or later. Do not install this modern
+archive on Intel.
+
 Unzip it, move Murmure.app to /Applications, and help me Control-click Open if macOS blocks
 the first launch. Do not delete or modify unrelated files, especially anything on an external
-drive. Then explain how I grant Microphone and Accessibility access, run one short test
-dictation, and confirm where Murmure stores local data. Use a source build from
+drive. Then walk me through Murmure's setup window: Microphone and Accessibility access,
+shortcut, microphone test, Automatic language recognition, and one short test dictation.
+Confirm where Murmure stores local data and show me the sanitized diagnostics preview. Use a source build from
 https://github.com/filipego/murmure.git only if the release asset is unavailable; in that case,
 read README.md and AGENTS.md and use `make install`, never a bare `swift build`.
 ```
