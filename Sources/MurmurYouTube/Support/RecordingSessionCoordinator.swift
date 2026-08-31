@@ -153,6 +153,7 @@ actor RecordingSessionCoordinator {
                 id: session.id,
                 date: releasedAt,
                 engine: session.engine.displayName,
+                language: session.language,
                 audioSeconds: max(0, releasedAt.timeIntervalSince(session.startedAt)),
                 processSeconds: 0,
                 text: finalText

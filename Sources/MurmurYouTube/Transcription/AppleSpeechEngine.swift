@@ -1,4 +1,5 @@
 import MurmurDictionary
+import MurmurSessionCore
 import AVFoundation
 import Foundation
 import Speech
@@ -8,7 +9,7 @@ import Speech
 /// No model ships with the app — the OS downloads and manages the assets, so the first
 /// run for a given locale may block briefly while `AssetInstallationRequest` completes.
 actor AppleSpeechEngine: TranscriptionEngine {
-    private let locale: Locale
+    private let selection: TranscriptionLanguageSelection
 
     private var transcriber: SpeechTranscriber?
     private var analyzer: SpeechAnalyzer?
@@ -19,22 +20,24 @@ actor AppleSpeechEngine: TranscriptionEngine {
     /// but discarded as soon as a final result covering the same range arrives.
     private var finalizedText = ""
 
-    init(locale: Locale = Locale.current) {
-        self.locale = locale
+    init(language: TranscriptionLanguageSelection = .systemDefault) {
+        self.selection = language
     }
 
     func preferredInputFormat() async -> AVAudioFormat? {
+        guard let locale = await resolvedLocale() else { return nil }
         let module = transcriber ?? Self.makeTranscriber(locale: locale)
         return await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [module])
     }
 
     func start() async throws -> AsyncThrowingStream<TranscriptionChunk, Error> {
         guard SpeechTranscriber.isAvailable else {
-            throw TranscriptionError.localeUnsupported(locale)
+            throw TranscriptionError.localeUnsupported(requestedLocale)
         }
 
-        let resolvedLocale = await SpeechTranscriber.supportedLocale(equivalentTo: locale)
-            ?? Locale(identifier: "en-US")
+        guard let resolvedLocale = await resolvedLocale() else {
+            throw TranscriptionError.localeUnsupported(requestedLocale)
+        }
 
         let transcriber = Self.makeTranscriber(locale: resolvedLocale)
         self.transcriber = transcriber
@@ -153,6 +156,17 @@ actor AppleSpeechEngine: TranscriptionEngine {
             reportingOptions: [.volatileResults],
             attributeOptions: []
         )
+    }
+
+    private var requestedLocale: Locale {
+        switch selection {
+        case .systemDefault: .current
+        case .locale(let identifier): Locale(identifier: identifier)
+        }
+    }
+
+    private func resolvedLocale() async -> Locale? {
+        await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale)
     }
 
     private static func ensureModelInstalled(for transcriber: SpeechTranscriber) async throws {

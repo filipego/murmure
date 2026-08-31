@@ -53,6 +53,7 @@ struct SettingsSnapshot: Codable {
     let handsFreeEnabled: Bool?
     let handsFreeKey: String?
     let microphoneSelection: MicrophoneSelection?
+    let transcriptionLanguage: TranscriptionLanguageOption?
 
     var resolvedHandsFreeEnabled: Bool { handsFreeEnabled ?? false }
     var resolvedHandsFreeKey: PushToTalkKey {
@@ -60,6 +61,9 @@ struct SettingsSnapshot: Codable {
     }
     var resolvedMicrophoneSelection: MicrophoneSelection {
         microphoneSelection ?? .systemDefault
+    }
+    var resolvedTranscriptionLanguage: TranscriptionLanguageOption {
+        transcriptionLanguage ?? .systemDefault
     }
 }
 
@@ -77,6 +81,10 @@ final class Settings {
     private(set) var handsFreeKey: PushToTalkKey
 
     var microphoneSelection: MicrophoneSelection {
+        didSet { persist() }
+    }
+
+    var transcriptionLanguage: TranscriptionLanguageOption {
         didSet { persist() }
     }
 
@@ -113,6 +121,7 @@ final class Settings {
         static let handsFreeEnabled = "handsFreeEnabled"
         static let handsFreeKey = "handsFreeKey"
         static let microphoneSelection = "microphoneSelection"
+        static let transcriptionLanguage = "transcriptionLanguage"
         static let cleanupEnabled = "cleanupEnabled"
         static let soundEnabled = "soundEnabled"
         static let engine = "engine"
@@ -145,6 +154,11 @@ final class Settings {
         } else {
             microphoneSelection = .systemDefault
         }
+        transcriptionLanguage = snapshot?.resolvedTranscriptionLanguage
+            ?? TranscriptionLanguageOption(
+                rawValue: defaults.string(forKey: Keys.transcriptionLanguage) ?? ""
+            )
+            ?? .systemDefault
         // Apple by default: no download, no dependency, live text while speaking.
         engine = snapshot?.engine
             ?? SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "")
@@ -170,6 +184,7 @@ final class Settings {
             Keys.handsFreeEnabled,
             Keys.handsFreeKey,
             Keys.microphoneSelection,
+            Keys.transcriptionLanguage,
             Keys.cleanupEnabled,
             Keys.soundEnabled,
             Keys.engine,
@@ -188,7 +203,10 @@ final class Settings {
             handsFreeEnabled: defaults.object(forKey: Keys.handsFreeEnabled) as? Bool,
             handsFreeKey: defaults.string(forKey: Keys.handsFreeKey),
             microphoneSelection: defaults.data(forKey: Keys.microphoneSelection)
-                .flatMap { try? JSONDecoder().decode(MicrophoneSelection.self, from: $0) }
+                .flatMap { try? JSONDecoder().decode(MicrophoneSelection.self, from: $0) },
+            transcriptionLanguage: TranscriptionLanguageOption(
+                rawValue: defaults.string(forKey: Keys.transcriptionLanguage) ?? ""
+            )
         )
     }
 
@@ -212,6 +230,7 @@ final class Settings {
                 settings.handsFreeKey = selection.handsFree
                 settings.handsFreeEnabled = snapshot.resolvedHandsFreeEnabled
                 settings.microphoneSelection = snapshot.resolvedMicrophoneSelection
+                settings.transcriptionLanguage = snapshot.resolvedTranscriptionLanguage
                 settings.engine = snapshot.engine
                 settings.compareMode = snapshot.compareMode
                 settings.cleanupEnabled = snapshot.cleanupEnabled
@@ -227,6 +246,10 @@ final class Settings {
                 if let microphoneData = try? JSONEncoder().encode(settings.microphoneSelection) {
                     settings.defaults.set(microphoneData, forKey: Keys.microphoneSelection)
                 }
+                settings.defaults.set(
+                    settings.transcriptionLanguage.rawValue,
+                    forKey: Keys.transcriptionLanguage
+                )
                 settings.defaults.set(settings.engine.rawValue, forKey: Keys.engine)
                 settings.defaults.set(settings.compareMode, forKey: Keys.compareMode)
                 settings.defaults.set(settings.cleanupEnabled, forKey: Keys.cleanupEnabled)
@@ -269,7 +292,8 @@ final class Settings {
             soundEnabled: soundEnabled,
             handsFreeEnabled: handsFreeEnabled,
             handsFreeKey: handsFreeKey.rawValue,
-            microphoneSelection: microphoneSelection
+            microphoneSelection: microphoneSelection,
+            transcriptionLanguage: transcriptionLanguage
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(snapshot.pushToTalkKey, forKey: Keys.pushToTalkKey)
@@ -278,6 +302,7 @@ final class Settings {
         if let microphoneData = try? JSONEncoder().encode(snapshot.resolvedMicrophoneSelection) {
             defaults.set(microphoneData, forKey: Keys.microphoneSelection)
         }
+        defaults.set(snapshot.resolvedTranscriptionLanguage.rawValue, forKey: Keys.transcriptionLanguage)
         defaults.set(snapshot.engine.rawValue, forKey: Keys.engine)
         defaults.set(snapshot.compareMode, forKey: Keys.compareMode)
         defaults.set(snapshot.cleanupEnabled, forKey: Keys.cleanupEnabled)

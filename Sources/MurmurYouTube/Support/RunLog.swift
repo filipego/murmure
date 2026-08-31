@@ -1,4 +1,5 @@
 import MurmurDictionary
+import MurmurSessionCore
 import Foundation
 
 struct TranscriptCorrectionRecord: Codable, Equatable, Sendable {
@@ -191,6 +192,9 @@ struct DictationRun: Codable, Equatable, Sendable, Identifiable {
 
     let date: Date
     let engine: String
+    /// Language selection snapshotted for this recording. Optional so history written
+    /// before multilingual dictation remains readable.
+    let language: TranscriptionLanguageSelection?
     /// How long the key was held.
     let audioSeconds: Double
     /// Release → final text ready. This is the latency you actually feel.
@@ -220,6 +224,7 @@ struct DictationRun: Codable, Equatable, Sendable, Identifiable {
         id: UUID = UUID(),
         date: Date,
         engine: String,
+        language: TranscriptionLanguageSelection? = nil,
         audioSeconds: Double,
         processSeconds: Double,
         text: String,
@@ -231,6 +236,7 @@ struct DictationRun: Codable, Equatable, Sendable, Identifiable {
         self.id = id
         self.date = date
         self.engine = engine
+        self.language = language
         self.audioSeconds = audioSeconds
         self.processSeconds = processSeconds
         self.text = text
@@ -245,6 +251,10 @@ struct DictationRun: Codable, Equatable, Sendable, Identifiable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         date = try container.decode(Date.self, forKey: .date)
         engine = try container.decode(String.self, forKey: .engine)
+        language = try container.decodeIfPresent(
+            TranscriptionLanguageSelection.self,
+            forKey: .language
+        )
         audioSeconds = try container.decode(Double.self, forKey: .audioSeconds)
         processSeconds = try container.decode(Double.self, forKey: .processSeconds)
         text = try container.decode(String.self, forKey: .text)

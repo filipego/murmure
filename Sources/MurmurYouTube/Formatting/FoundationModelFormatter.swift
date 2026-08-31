@@ -15,13 +15,24 @@ import FoundationModels
 ///   of cleaning it — the classic failure when dictation reads as an instruction.
 struct FoundationModelFormatter: TextFormatter {
     /// Deterministic fallback used on timeout, unavailability, or a rejected response.
-    private let fallback = RuleBasedFormatter()
+    private let fallback: RuleBasedFormatter
+    private let profile: CleanupProfile
 
     /// Past this, taking the raw text beats making the user wait.
     private let timeout: Duration = .seconds(4)
 
+    init(profile: CleanupProfile = .english) {
+        self.profile = profile
+        fallback = RuleBasedFormatter(profile: profile)
+    }
+
     static var isAvailable: Bool {
         SystemLanguageModel.default.availability == .available
+    }
+
+    static func supports(_ profile: CleanupProfile) -> Bool {
+        guard let locale = profile.locale else { return false }
+        return isAvailable && SystemLanguageModel.default.supportsLocale(locale)
     }
 
     static var unavailableReason: String? {
@@ -44,14 +55,14 @@ struct FoundationModelFormatter: TextFormatter {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return trimmed }
 
-        guard Self.isAvailable else {
+        guard Self.supports(profile) else {
             Log.speech.info("Foundation model unavailable — using rule-based cleanup")
             return await fallback.format(trimmed)
         }
 
         do {
             let cleaned = try await withThrowingTaskGroup(of: String.self) { group in
-                group.addTask { try await Self.clean(trimmed) }
+                group.addTask { try await Self.clean(trimmed, profile: profile) }
                 group.addTask {
                     try await Task.sleep(for: timeout)
                     throw CleanupError.timedOut
@@ -96,7 +107,10 @@ struct FoundationModelFormatter: TextFormatter {
         }
     }
 
-    private static func clean(_ text: String) async throws -> String {
+    private static func clean(_ text: String, profile: CleanupProfile) async throws -> String {
+        let language = profile.locale?.localizedString(
+            forLanguageCode: profile.locale?.language.languageCode?.identifier ?? ""
+        ) ?? "the transcript's original language"
         let session = LanguageModelSession(instructions: """
             You clean up raw speech-to-text transcripts. You are a text processor, not an \
             assistant.
@@ -111,7 +125,9 @@ struct FoundationModelFormatter: TextFormatter {
             - Apply the speaker's self-corrections. "Send it Tuesday, actually Wednesday" \
             becomes "Send it Wednesday."
             - Preserve the speaker's wording, tone, and meaning. Do not summarize, expand, \
-            translate, or improve the writing.
+              translate, or improve the writing.
+            - The transcript language is (language). Preserve that language exactly and \
+              never translate it.
             """)
 
         let response = try await session.respond(

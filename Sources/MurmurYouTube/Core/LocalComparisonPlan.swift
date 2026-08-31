@@ -1,3 +1,5 @@
+import MurmurSessionCore
+
 enum LocalComparisonParticipant: CaseIterable, Sendable {
     case apple
     case parakeet
@@ -11,12 +13,12 @@ enum LocalComparisonParticipant: CaseIterable, Sendable {
         }
     }
 
-    func makeEngine() -> any TranscriptionEngine {
+    func makeEngine(language: TranscriptionLanguageSelection = .systemDefault) -> any TranscriptionEngine {
         switch self {
         case .apple:
-            AppleSpeechEngine()
+            AppleSpeechEngine(language: language)
         case .parakeet:
-            ParakeetEngine()
+            ParakeetEngine(language: language)
         }
     }
 }

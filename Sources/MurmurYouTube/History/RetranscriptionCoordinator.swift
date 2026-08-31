@@ -61,18 +61,19 @@ struct RetranscriptionDependencies: Sendable {
     static func live() -> RetranscriptionDependencies {
         RetranscriptionDependencies(
             transcribe: { url, choice in
-                let engine: any TranscriptionEngine = switch choice {
-                case .apple: AppleSpeechEngine()
-                case .parakeet: ParakeetEngine()
+                let language = await MainActor.run {
+                    Settings.shared.transcriptionLanguage.selection
                 }
+                let engine = makeTranscriptionEngine(choice: choice, language: language)
                 return try await ArchivedAudioTranscriber.transcribe(url: url, engine: engine)
             },
             format: { raw in
                 let formatter: any TextFormatter = await MainActor.run {
                     guard Settings.shared.cleanupEnabled else { return PassthroughFormatter() }
-                    return Settings.shared.smartCleanup
-                        ? FoundationModelFormatter()
-                        : RuleBasedFormatter()
+                    let profile = Settings.shared.transcriptionLanguage.cleanupProfile
+                    return Settings.shared.smartCleanup && FoundationModelFormatter.supports(profile)
+                        ? FoundationModelFormatter(profile: profile)
+                        : RuleBasedFormatter(profile: profile)
                 }
                 return await formatter.format(raw)
             },
@@ -195,6 +196,7 @@ final class RetranscriptionCoordinator {
                 id: original.id,
                 date: original.date,
                 engine: engine.historyName,
+                language: original.language,
                 audioSeconds: original.audioSeconds,
                 processSeconds: processSeconds,
                 text: text,
@@ -209,6 +211,7 @@ final class RetranscriptionCoordinator {
                 id: recording.id,
                 date: releasedAt,
                 engine: engine.historyName,
+                language: recording.language,
                 audioSeconds: max(0, releasedAt.timeIntervalSince(recording.startedAt)),
                 processSeconds: processSeconds,
                 text: text,

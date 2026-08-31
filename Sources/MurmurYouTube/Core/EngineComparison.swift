@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import MurmurSessionCore
 
 /// One engine's result from a comparison run.
 struct ComparisonResult: Sendable {
@@ -19,6 +20,7 @@ enum EngineComparison {
     ///   incrementally instead of waiting for the whole set.
     static func run(
         chunks: [AudioChunk],
+        language: TranscriptionLanguageSelection = .systemDefault,
         onResult: @MainActor (ComparisonResult) -> Void = { _ in }
     ) async -> [ComparisonResult] {
         var results: [ComparisonResult] = []
@@ -28,7 +30,7 @@ enum EngineComparison {
         for participant in LocalComparisonParticipant.allCases {
             let result = await measure(
                 name: participant.displayName,
-                engine: participant.makeEngine(),
+                engine: participant.makeEngine(language: language),
                 chunks: chunks
             )
             results.append(result)

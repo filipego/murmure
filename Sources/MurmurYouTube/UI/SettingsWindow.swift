@@ -11,6 +11,7 @@ struct SettingsWindow: View {
     var updates: AppUpdateCoordinator?
     @State private var settings = Settings.shared
     @State private var audioInputs = AudioInputStore.shared
+    @State private var speechLanguages = SpeechLanguageCatalog.shared
     @State private var microphoneTest = MicrophoneTestCoordinator()
     @State private var permissionRefresh = 0
 
@@ -81,6 +82,21 @@ struct SettingsWindow: View {
                     }
                     .pickerStyle(.segmented)
 
+                    Picker("Language", selection: $settings.transcriptionLanguage) {
+                        ForEach(TranscriptionLanguageOption.allCases, id: \.self) { option in
+                            Text(option.displayName).tag(option)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 260, alignment: .leading)
+
+                    Text(transcriptionLanguageStatus)
+                        .font(DS.Font.caption)
+                        .foregroundStyle(transcriptionLanguageIsError
+                            ? DS.Color.warning
+                            : DS.Color.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
                     Toggle("Compare both local engines", isOn: $settings.compareMode)
                     Toggle("Play start and finish sounds", isOn: $settings.soundEnabled)
                 }
@@ -138,9 +154,9 @@ struct SettingsWindow: View {
 
                 settingsCard(title: "Cleanup", detail: "Cleanup removes fillers and fixes punctuation before dictionary corrections run.") {
                     Toggle("Clean up transcripts", isOn: $settings.cleanupEnabled)
-                    Toggle("Smart cleanup (on-device AI)", isOn: $settings.smartCleanup)
-                        .disabled(!settings.cleanupEnabled || !FoundationModelFormatter.isAvailable)
-                    if let reason = FoundationModelFormatter.unavailableReason {
+                    Toggle("Smart cleanup (on-device AI)", isOn: smartCleanupBinding)
+                        .disabled(!settings.cleanupEnabled || !smartCleanupSupported)
+                    if let reason = smartCleanupUnavailableReason {
                         Text(reason)
                             .font(DS.Font.caption)
                             .foregroundStyle(DS.Color.inkSecondary)
@@ -175,6 +191,7 @@ struct SettingsWindow: View {
         .background(DS.Color.canvas)
         .task {
             audioInputs.refresh()
+            await speechLanguages.refresh()
             updates?.refreshStagedUpdate()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
@@ -185,6 +202,50 @@ struct SettingsWindow: View {
             microphoneTest.stop()
             controller.resumeHotkeyAfterModalInput()
         }
+    }
+
+    private var transcriptionLanguageStatus: String {
+        if settings.engine == .parakeet {
+            return settings.transcriptionLanguage == .systemDefault
+                ? "Parakeet automatically detects among its multilingual v3 languages."
+                : "Parakeet uses \(settings.transcriptionLanguage.displayName) as an on-device decoder hint."
+        }
+
+        guard let status = speechLanguages.status(for: settings.transcriptionLanguage) else {
+            return "Checking Apple's on-device language assets…"
+        }
+        guard let identifier = status.resolvedLocaleIdentifier else {
+            return "Apple Speech does not support this language on this Mac. Nothing will fall back to English."
+        }
+        let name = Locale.current.localizedString(forIdentifier: identifier) ?? identifier
+        return status.isInstalled
+            ? "Apple Speech · \(name) · On-device model installed."
+            : "Apple Speech · \(name) · The system downloads its on-device model once when first used."
+    }
+
+    private var transcriptionLanguageIsError: Bool {
+        settings.engine == .apple
+            && speechLanguages.status(for: settings.transcriptionLanguage)?.isSupported == false
+    }
+
+    private var smartCleanupSupported: Bool {
+        FoundationModelFormatter.supports(settings.transcriptionLanguage.cleanupProfile)
+    }
+
+    private var smartCleanupBinding: Binding<Bool> {
+        Binding(
+            get: { settings.smartCleanup && smartCleanupSupported },
+            set: { settings.smartCleanup = $0 }
+        )
+    }
+
+    private var smartCleanupUnavailableReason: String? {
+        guard settings.cleanupEnabled else { return nil }
+        if let reason = FoundationModelFormatter.unavailableReason { return reason }
+        guard smartCleanupSupported else {
+            return "Smart cleanup does not support \(settings.transcriptionLanguage.displayName); deterministic local cleanup will be used."
+        }
+        return nil
     }
 
     private var selectedMicrophoneIsUnavailable: Bool {

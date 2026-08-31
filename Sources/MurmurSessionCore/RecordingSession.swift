@@ -5,7 +5,7 @@ public enum SessionEngineID: String, Codable, Sendable, Equatable {
     case parakeet
 }
 
-public enum TranscriptionLanguageSelection: Codable, Sendable, Equatable {
+public enum TranscriptionLanguageSelection: Codable, Sendable, Equatable, Hashable {
     case systemDefault
     case locale(identifier: String)
 }

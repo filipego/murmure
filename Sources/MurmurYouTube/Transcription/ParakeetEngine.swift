@@ -1,6 +1,7 @@
 import AVFoundation
 import FluidAudio
 import Foundation
+import MurmurSessionCore
 
 /// NVIDIA Parakeet TDT 0.6B, compiled to CoreML and run on the Neural Engine via FluidAudio.
 ///
@@ -16,6 +17,21 @@ actor ParakeetEngine: TranscriptionEngine {
 
     /// Defaults to 16 kHz mono float32 — exactly what Parakeet is trained on.
     private let converter = AudioConverter()
+    private let languageHint: Language?
+
+    init(language: TranscriptionLanguageSelection = .systemDefault) {
+        switch language {
+        case .systemDefault:
+            languageHint = nil
+        case .locale(let identifier):
+            let code = identifier
+                .replacingOccurrences(of: "_", with: "-")
+                .split(separator: "-", maxSplits: 1)
+                .first
+                .map { String($0).lowercased() }
+            languageHint = code.flatMap(Language.init(rawValue:))
+        }
+    }
 
     func preferredInputFormat() async -> AVAudioFormat? {
         // Parakeet is trained on 16 kHz mono; AudioCapture converts to whatever we ask for.
@@ -75,7 +91,11 @@ actor ParakeetEngine: TranscriptionEngine {
             let manager = try await ParakeetModels.shared.manager()
             var decoderState = try TdtDecoderState()
             let started = Date()
-            let result = try await manager.transcribe(samples, decoderState: &decoderState)
+            let result = try await manager.transcribe(
+                samples,
+                decoderState: &decoderState,
+                language: languageHint
+            )
             let elapsed = Date().timeIntervalSince(started)
             let audioSeconds = Double(samples.count) / 16_000
 

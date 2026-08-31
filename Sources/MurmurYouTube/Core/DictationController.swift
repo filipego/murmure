@@ -15,11 +15,29 @@ import MurmurSessionCore
 func engineForCurrentSetting() -> any TranscriptionEngine {
     // Always invoked from `beginDictation`, which runs on the main actor.
     MainActor.assumeIsolated {
-        switch Settings.shared.engine {
-        case .apple: AppleSpeechEngine()
-        case .parakeet: ParakeetEngine()
-        }
+        makeTranscriptionEngine(
+            choice: Settings.shared.engine,
+            language: Settings.shared.transcriptionLanguage.selection
+        )
     }
+}
+
+@Sendable
+func makeTranscriptionEngine(
+    choice: SpeechEngineChoice,
+    language: TranscriptionLanguageSelection
+) -> any TranscriptionEngine {
+    switch choice {
+    case .apple: AppleSpeechEngine(language: language)
+    case .parakeet: ParakeetEngine(language: language)
+    }
+}
+
+private struct LiveTranscriptionConfiguration {
+    let engine: SpeechEngineChoice
+    let language: TranscriptionLanguageOption
+    let cleanupEnabled: Bool
+    let smartCleanup: Bool
 }
 
 @MainActor
@@ -48,7 +66,7 @@ final class DictationController {
 
     private let hotkey = HotkeyMonitor()
     private let capture = AudioCapture()
-    private let makeEngine: @Sendable () -> any TranscriptionEngine
+    private let makeEngine: (@Sendable () -> any TranscriptionEngine)?
     private let sessionCoordinator: RecordingSessionCoordinator
     private var wantsHotkeyActive = false
     private var isHotkeySuspendedForModalInput = false
@@ -64,11 +82,12 @@ final class DictationController {
     private let formatter: (any TextFormatter)?
 
     /// Chosen per-utterance so the menu toggle applies to the very next hold.
-    private var activeFormatter: any TextFormatter {
+    private func activeFormatter(for configuration: LiveTranscriptionConfiguration) -> any TextFormatter {
         if let formatter { return formatter }
-        return Settings.shared.smartCleanup
-            ? FoundationModelFormatter()
-            : RuleBasedFormatter()
+        let profile = configuration.language.cleanupProfile
+        return configuration.smartCleanup && FoundationModelFormatter.supports(profile)
+            ? FoundationModelFormatter(profile: profile)
+            : RuleBasedFormatter(profile: profile)
     }
 
     private var engine: (any TranscriptionEngine)?
@@ -88,10 +107,11 @@ final class DictationController {
     private var recorded: [AudioChunk] = []
     private var isComparing = false
     private var activeSessionID: UUID?
+    private var activeConfiguration: LiveTranscriptionConfiguration?
 
     init(
         formatter: (any TextFormatter)? = nil,
-        makeEngine: @escaping @Sendable () -> any TranscriptionEngine = engineForCurrentSetting,
+        makeEngine: (@Sendable () -> any TranscriptionEngine)? = nil,
         sessionCoordinator: RecordingSessionCoordinator = RecordingSessionRuntime.coordinator
     ) {
         self.formatter = formatter
@@ -213,7 +233,14 @@ final class DictationController {
         isComparing = Settings.shared.compareMode
         activeSessionID = nil
         recorded.removeAll(keepingCapacity: true)
-        engineName = isComparing ? "Comparing…" : Settings.shared.engine.displayName
+        let configuration = LiveTranscriptionConfiguration(
+            engine: Settings.shared.engine,
+            language: Settings.shared.transcriptionLanguage,
+            cleanupEnabled: Settings.shared.cleanupEnabled,
+            smartCleanup: Settings.shared.smartCleanup
+        )
+        activeConfiguration = configuration
+        engineName = isComparing ? "Comparing…" : configuration.engine.displayName
 
         Task { @MainActor in
             do {
@@ -223,17 +250,20 @@ final class DictationController {
                 }
 
                 if !isComparing {
-                    let engineID: SessionEngineID = Settings.shared.engine == .apple ? .apple : .parakeet
+                    let engineID: SessionEngineID = configuration.engine == .apple ? .apple : .parakeet
                     let session = try await sessionCoordinator.begin(
                         startedAt: holdStarted ?? Date(),
                         trigger: trigger,
                         engine: engineID,
-                        language: .systemDefault
+                        language: configuration.language.selection
                     )
                     activeSessionID = session.id
                 }
 
-                let engine = makeEngine()
+                let engine = makeEngine?() ?? makeTranscriptionEngine(
+                        choice: configuration.engine,
+                        language: configuration.language.selection
+                    )
                 self.engine = engine
 
                 let chunks = try await engine.start()
@@ -245,7 +275,9 @@ final class DictationController {
                 // kills the process. Parakeet is the flexible one (its `feed` converts
                 // int16/int32/float32), so the strict engine picks the format and the
                 // tolerant engine adapts. Both still replay the identical buffers.
-                let formatOwner: any TranscriptionEngine = isComparing ? AppleSpeechEngine() : engine
+                let formatOwner: any TranscriptionEngine = isComparing
+                    ? AppleSpeechEngine(language: configuration.language.selection)
+                    : engine
                 guard let format = await formatOwner.preferredInputFormat() else {
                     throw TranscriptionError.noAudioFormat
                 }
@@ -387,8 +419,12 @@ final class DictationController {
                 return
             }
 
-            let cleaned = Settings.shared.cleanupEnabled
-                ? await activeFormatter.format(raw)
+            guard let configuration = activeConfiguration else {
+                fail("The recording language configuration could not be recovered.")
+                return
+            }
+            let cleaned = configuration.cleanupEnabled
+                ? await activeFormatter(for: configuration).format(raw)
                 : raw
 
             // The dictionary runs last, and runs regardless of the cleanup setting. Biasing
@@ -413,6 +449,7 @@ final class DictationController {
                 id: sessionID,
                 date: releasedAt,
                 engine: engineName,
+                language: configuration.language.selection,
                 audioSeconds: releasedAt.timeIntervalSince(holdStarted ?? releasedAt),
                 processSeconds: Date().timeIntervalSince(releasedAt),
                 text: output,
@@ -505,11 +542,13 @@ final class DictationController {
 
         // Filed one at a time as each engine finishes, so the window fills in progressively
         // rather than snapping both rows into place at the end.
-        let results = await EngineComparison.run(chunks: chunks) { result in
+        let language = activeConfiguration?.language.selection ?? .systemDefault
+        let results = await EngineComparison.run(chunks: chunks, language: language) { result in
             RunLog.record(
                 DictationRun(
                     date: releasedAt,
                     engine: result.engine,
+                    language: language,
                     audioSeconds: held,
                     processSeconds: result.seconds,
                     text: result.text,
@@ -549,6 +588,7 @@ final class DictationController {
 
     private func resetTriggerLifecycle() {
         activeTrigger = nil
+        activeConfiguration = nil
         _ = handsFreePolicy.handle(.sessionEnded)
     }
 
