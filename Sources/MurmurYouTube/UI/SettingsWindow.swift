@@ -219,7 +219,7 @@ struct SettingsWindow: View {
         }) { target in
             ShortcutRecorderSheet(
                 title: target == .pushToTalk
-                    ? "Record hold-to-talk shortcut"
+                    ? "Record dictation shortcut"
                     : "Record hands-free shortcut",
                 gesture: target == .pushToTalk
                     ? settings.pushToTalkBinding.gesture
