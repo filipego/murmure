@@ -17,6 +17,24 @@ enum AudioCaptureError: LocalizedError {
     }
 }
 
+enum AudioConfigurationChangePolicy {
+    enum Action: Equatable {
+        case ignore
+        case restart
+        case fail
+    }
+
+    static func action(
+        selectedDeviceID: AudioDeviceID,
+        currentDeviceID: AudioDeviceID,
+        isAlive: Bool,
+        engineIsRunning: Bool
+    ) -> Action {
+        guard selectedDeviceID == currentDeviceID, isAlive else { return .fail }
+        return engineIsRunning ? .ignore : .restart
+    }
+}
+
 /// Microphone capture with on-the-fly conversion to whatever format the speech engine wants.
 ///
 /// The tap runs on a real-time audio thread, so everything it touches lives behind
@@ -90,7 +108,8 @@ final class AudioCapture: @unchecked Sendable {
             object: engine,
             queue: .main
         ) { [weak self] _ in
-            guard self?.isRunning == true else { return }
+            guard let self, self.isRunning else { return }
+            if self.recoverConfigurationChange(for: deviceID) { return }
             onDeviceChange()
         }
         Log.audio.info("capture started — native \(nativeFormat.sampleRate)Hz → engine \(outputFormat.sampleRate)Hz")
@@ -117,6 +136,67 @@ final class AudioCapture: @unchecked Sendable {
         outputFormat = nil
         onBuffer = nil
         onLevel = nil
+    }
+
+    /// AVAudioEngine emits configuration-change notifications for benign format updates as
+    /// well as real unplug events (Bluetooth inputs do this immediately after opening). Keep
+    /// the session when the same device is alive, restarting the engine if CoreAudio paused it.
+    private func recoverConfigurationChange(for selectedDeviceID: AudioDeviceID) -> Bool {
+        guard let audioUnit = engine.inputNode.audioUnit else { return false }
+
+        var currentDeviceID = AudioDeviceID(kAudioObjectUnknown)
+        var currentSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioUnitGetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &currentDeviceID,
+            &currentSize
+        ) == noErr,
+        currentDeviceID == selectedDeviceID else {
+            return false
+        }
+
+        var aliveAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsAlive,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var isAlive: UInt32 = 0
+        var aliveSize = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(
+            selectedDeviceID,
+            &aliveAddress,
+            0,
+            nil,
+            &aliveSize,
+            &isAlive
+        ) == noErr else {
+            return false
+        }
+
+        switch AudioConfigurationChangePolicy.action(
+            selectedDeviceID: selectedDeviceID,
+            currentDeviceID: currentDeviceID,
+            isAlive: isAlive != 0,
+            engineIsRunning: engine.isRunning
+        ) {
+        case .ignore:
+            return true
+        case .fail:
+            return false
+        case .restart:
+            do {
+                engine.prepare()
+                try engine.start()
+                Log.audio.info("capture recovered after a benign configuration change")
+                return true
+            } catch {
+                Log.audio.error("capture recovery failed: \(error.localizedDescription)")
+                return false
+            }
+        }
     }
 
     // MARK: - Audio thread
