@@ -27,6 +27,7 @@ enum MurmureDataStore {
     static var dictionaryURL: URL { rootURL.appendingPathComponent("dictionary.txt") }
     static var dashboardURL: URL { rootURL.appendingPathComponent("dashboard.html") }
     static var settingsURL: URL { rootURL.appendingPathComponent("settings.json") }
+    static var snippetsURL: URL { rootURL.appendingPathComponent("snippets.json") }
 
     /// The folder selected during launch. If the preferred drive is not mounted, we keep the
     /// app usable with a clearly surfaced local emergency path rather than silently losing a
