@@ -33,6 +33,39 @@ struct SettingsWindow: View {
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: 260, alignment: .leading)
+
+                    Divider()
+
+                    Toggle("Enable hands-free dictation", isOn: Binding(
+                        get: { settings.handsFreeEnabled },
+                        set: { enabled in
+                            settings.handsFreeEnabled = enabled
+                            controller.reloadHotkey()
+                        }
+                    ))
+
+                    Picker("Hands-free key", selection: Binding(
+                        get: { settings.handsFreeKey },
+                        set: { key in
+                            settings.selectHandsFreeKey(key)
+                            controller.reloadHotkey()
+                        }
+                    )) {
+                        ForEach(
+                            PushToTalkKey.allCases.filter { $0 != settings.pushToTalkKey },
+                            id: \.self
+                        ) { key in
+                            Text(key.displayName).tag(key)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: 260, alignment: .leading)
+                    .disabled(!settings.handsFreeEnabled)
+
+                    Text("Press once to start. Press the same key or Enter to finish; Escape cancels.")
+                        .font(DS.Font.caption)
+                        .foregroundStyle(DS.Color.inkSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 settingsCard(title: "Transcription", detail: settings.engine == .apple
