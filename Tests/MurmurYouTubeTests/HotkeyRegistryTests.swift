@@ -1,0 +1,131 @@
+import Foundation
+import Testing
+@testable import MurmurYouTube
+
+@Suite("Typed hotkey registry")
+struct HotkeyRegistryTests {
+    @Test("legacy presets migrate without changing their physical key")
+    func presetMigration() {
+        let fn = PushToTalkKey.fn.binding(gesture: .hold)
+        let command = PushToTalkKey.rightCommand.binding(gesture: .toggle)
+
+        #expect(fn.keyCode == 63)
+        #expect(fn.consumption == .observe)
+        #expect(fn.gesture == .hold)
+        #expect(command.keyCode == 54)
+        #expect(command.consumption == .suppress)
+        #expect(command.gesture == .toggle)
+    }
+
+    @Test("typed bindings survive a JSON round trip")
+    func codable() throws {
+        let binding = HotkeyBinding(
+            keyCode: 49,
+            requiredFlags: HotkeyModifier.command.rawValue | HotkeyModifier.shift.rawValue,
+            side: nil,
+            gesture: .doubleTapHold,
+            consumption: .suppress,
+            label: "⇧⌘Space"
+        )
+
+        let restored = try JSONDecoder().decode(
+            HotkeyBinding.self,
+            from: JSONEncoder().encode(binding)
+        )
+        #expect(restored == binding)
+    }
+
+    @Test("duplicate shortcuts are rejected")
+    func duplicate() {
+        let binding = PushToTalkKey.rightCommand.binding(gesture: .hold)
+        let issues = HotkeyBindingValidator.validate(primary: binding, handsFree: binding)
+
+        #expect(issues.contains { $0.code == .duplicate && $0.severity == .error })
+    }
+
+    @Test("bare ordinary keys are rejected")
+    func bareKey() {
+        let binding = HotkeyBinding(
+            keyCode: 0,
+            requiredFlags: 0,
+            side: nil,
+            gesture: .hold,
+            consumption: .suppress,
+            label: "A"
+        )
+
+        #expect(HotkeyBindingValidator.issues(for: binding).contains {
+            $0.code == .bareKey && $0.severity == .error
+        })
+    }
+
+    @Test("reserved macOS shortcuts are rejected")
+    func reserved() {
+        let quit = HotkeyBinding(
+            keyCode: 12,
+            requiredFlags: HotkeyModifier.command.rawValue,
+            side: nil,
+            gesture: .hold,
+            consumption: .suppress,
+            label: "⌘Q"
+        )
+
+        #expect(HotkeyBindingValidator.issues(for: quit).contains {
+            $0.code == .systemReserved && $0.severity == .error
+        })
+    }
+
+    @Test("Right Option exposes the international-layout risk")
+    func rightOptionWarning() {
+        let issues = HotkeyBindingValidator.issues(
+            for: PushToTalkKey.rightOption.binding(gesture: .hold)
+        )
+        #expect(issues.contains { $0.code == .internationalLayout && $0.severity == .warning })
+    }
+}
+
+@Suite("Hotkey gesture policy")
+struct HotkeyGesturePolicyTests {
+    @Test("hold follows press and release edges")
+    func hold() {
+        var policy = HotkeyGesturePolicy(gesture: .hold)
+        #expect(policy.handle(.pressed(at: 1)) == .start)
+        #expect(policy.handle(.pressed(at: 1.1)) == .ignore)
+        #expect(policy.handle(.released(at: 2)) == .finish)
+    }
+
+    @Test("toggle ignores release and finishes on the next press")
+    func toggle() {
+        var policy = HotkeyGesturePolicy(gesture: .toggle)
+        #expect(policy.handle(.pressed(at: 1)) == .start)
+        #expect(policy.handle(.released(at: 1.1)) == .ignore)
+        #expect(policy.handle(.pressed(at: 2)) == .finish)
+    }
+
+    @Test("double tap and hold starts only on a timely second press")
+    func doubleTapHold() {
+        var policy = HotkeyGesturePolicy(gesture: .doubleTapHold, doubleTapWindow: 0.4)
+        #expect(policy.handle(.pressed(at: 1)) == .ignore)
+        #expect(policy.handle(.released(at: 1.05)) == .ignore)
+        #expect(policy.handle(.pressed(at: 1.3)) == .start)
+        #expect(policy.handle(.released(at: 2)) == .finish)
+    }
+
+    @Test("a late second tap starts a new waiting window")
+    func lateSecondTap() {
+        var policy = HotkeyGesturePolicy(gesture: .doubleTapHold, doubleTapWindow: 0.4)
+        #expect(policy.handle(.pressed(at: 1)) == .ignore)
+        #expect(policy.handle(.released(at: 1.05)) == .ignore)
+        #expect(policy.handle(.pressed(at: 2)) == .ignore)
+        #expect(policy.handle(.released(at: 2.05)) == .ignore)
+        #expect(policy.handle(.pressed(at: 2.3)) == .start)
+    }
+
+    @Test("session reset makes the next toggle press start again")
+    func reset() {
+        var policy = HotkeyGesturePolicy(gesture: .toggle)
+        #expect(policy.handle(.pressed(at: 1)) == .start)
+        policy.reset()
+        #expect(policy.handle(.pressed(at: 2)) == .start)
+    }
+}

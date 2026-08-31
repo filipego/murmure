@@ -44,6 +44,17 @@ enum PushToTalkKey: String, CaseIterable, Sendable {
     /// Swallowing `fn` would break fn+arrow, fn+delete and the emoji picker, so we let it
     /// through. Dedicated right-hand modifiers are safe to consume.
     var shouldConsumeEvent: Bool { self != .fn }
+
+    func binding(gesture: HotkeyGesture) -> HotkeyBinding {
+        HotkeyBinding(
+            keyCode: keyCode,
+            requiredFlags: flag.rawValue,
+            side: self == .fn ? nil : .right,
+            gesture: gesture,
+            consumption: shouldConsumeEvent ? .suppress : .observe,
+            label: displayName
+        )
+    }
 }
 
 /// Watches for a held modifier key using a `CGEventTap`.
