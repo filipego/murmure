@@ -13,6 +13,25 @@ struct TranscriptionLanguageTests {
         #expect(TranscriptionLanguageOption.systemDefault.selection == .systemDefault)
     }
 
+    @Test("automatic plus the verified Parakeet set are all available")
+    func verifiedLanguageSet() {
+        let codes = Set(TranscriptionLanguageOption.allCases.compactMap(\.languageCode))
+        #expect(codes == Set([
+            "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu",
+            "it", "lv", "lt", "mt", "pl", "pt", "ro", "sk", "sl", "es", "sv", "ru", "uk",
+        ]))
+        #expect(TranscriptionLanguageOption.allCases.count == 26)
+    }
+
+    @Test("automatic recognition always uses the multilingual engine")
+    func automaticEngine() {
+        #expect(resolvedEngineChoice(preferred: .apple, language: .systemDefault) == .parakeet)
+        #expect(resolvedEngineChoice(
+            preferred: .apple,
+            language: .locale(identifier: "fr")
+        ) == .apple)
+    }
+
     @Test("system default resolves to an equivalent supported locale")
     func systemDefaultResolution() {
         let resolved = LanguageResolutionPolicy.resolve(
@@ -116,6 +135,14 @@ struct MultilingualCleanupTests {
             "  um merhaba   dünya  "
         )
         #expect(output == "um merhaba dünya")
+    }
+
+    @Test("automatic recognition never applies English cleanup assumptions")
+    func automaticCleanup() async {
+        let output = await RuleBasedFormatter(
+            profile: TranscriptionLanguageOption.systemDefault.cleanupProfile
+        ).format("  um bonjour   le monde  ")
+        #expect(output == "um bonjour le monde")
     }
 
     @Test("cleanup returns composed Unicode")

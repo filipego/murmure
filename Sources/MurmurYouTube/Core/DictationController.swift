@@ -27,10 +27,18 @@ func makeTranscriptionEngine(
     choice: SpeechEngineChoice,
     language: TranscriptionLanguageSelection
 ) -> any TranscriptionEngine {
-    switch choice {
+    switch resolvedEngineChoice(preferred: choice, language: language) {
     case .apple: AppleSpeechEngine(language: language)
     case .parakeet: ParakeetEngine(language: language)
     }
+}
+
+func resolvedEngineChoice(
+    preferred: SpeechEngineChoice,
+    language: TranscriptionLanguageSelection
+) -> SpeechEngineChoice {
+    if case .systemDefault = language { return .parakeet }
+    return preferred
 }
 
 private struct LiveTranscriptionConfiguration {
@@ -234,7 +242,10 @@ final class DictationController {
         activeSessionID = nil
         recorded.removeAll(keepingCapacity: true)
         let configuration = LiveTranscriptionConfiguration(
-            engine: Settings.shared.engine,
+            engine: resolvedEngineChoice(
+                preferred: Settings.shared.engine,
+                language: Settings.shared.transcriptionLanguage.selection
+            ),
             language: Settings.shared.transcriptionLanguage,
             cleanupEnabled: Settings.shared.cleanupEnabled,
             smartCleanup: Settings.shared.smartCleanup

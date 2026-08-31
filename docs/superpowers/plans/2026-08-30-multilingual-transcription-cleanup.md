@@ -1,21 +1,22 @@
 # Multilingual Transcription and Cleanup Implementation Plan
 
-**Goal:** Make Murmure's language choice explicit and durable, support English, Spanish,
-and French end to end on both local speech engines, and never silently substitute English.
+**Goal:** Make Murmure's language choice explicit and durable, support Parakeet v3's full
+verified 25-language set, provide real automatic language recognition, and never silently
+substitute English.
 
 ## Product contract
 
-- `System default` resolves to the closest locale supported by the selected engine.
-- Explicit English, Spanish, and French choices are passed to Apple Speech and used as
-  Parakeet v3 language hints.
+- `Automatic` uses Parakeet v3's built-in language recognition across its verified set.
+- Explicit language choices are passed to Apple Speech and used as Parakeet v3 language
+  hints. Apple Speech remains explicit-locale because its API needs a locale before capture.
 - An unsupported Apple locale stops before capture with a clear error. It never falls back
   to `en-US`.
 - Apple's speech asset state is shown as installed or requiring a one-time system-managed
   download. The asset is installed by the existing Speech framework request when dictation
   begins.
 - Parakeet continues to use its one downloaded multilingual v3 model. The selected language
-  is a decoder hint; `System default` leaves Parakeet in automatic multilingual mode.
-- Deterministic cleanup has English, Spanish, and French profiles. Every other language uses
+  is a decoder hint; `Automatic` leaves Parakeet in multilingual recognition mode.
+- Deterministic cleanup has English, Spanish, and French profiles. Automatic and every other language use
   language-neutral Unicode normalization and whitespace cleanup only.
 - Smart cleanup is enabled only when the on-device Foundation Model reports that it supports
   the selected locale. Otherwise Settings explains that deterministic cleanup will be used.
@@ -78,4 +79,3 @@ and French end to end on both local speech engines, and never silently substitut
    any physical-accent or model-download case that cannot be exercised honestly.
 5. Confirm the TextEdit sentinel remains exactly unchanged and capture evidence under
    `.impeccable/review/multilingual/`.
-

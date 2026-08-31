@@ -154,15 +154,20 @@ final class Settings {
         } else {
             microphoneSelection = .systemDefault
         }
-        transcriptionLanguage = snapshot?.resolvedTranscriptionLanguage
+        let requestedLanguage = snapshot?.resolvedTranscriptionLanguage
             ?? TranscriptionLanguageOption(
                 rawValue: defaults.string(forKey: Keys.transcriptionLanguage) ?? ""
             )
             ?? .systemDefault
+        transcriptionLanguage = requestedLanguage
         // Apple by default: no download, no dependency, live text while speaking.
-        engine = snapshot?.engine
+        let requestedEngine = snapshot?.engine
             ?? SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "")
             ?? .apple
+        engine = resolvedEngineChoice(
+            preferred: requestedEngine,
+            language: requestedLanguage.selection
+        )
         cleanupEnabled = snapshot?.cleanupEnabled
             ?? (defaults.object(forKey: Keys.cleanupEnabled) as? Bool ?? true)
         smartCleanup = snapshot?.smartCleanup
@@ -231,7 +236,10 @@ final class Settings {
                 settings.handsFreeEnabled = snapshot.resolvedHandsFreeEnabled
                 settings.microphoneSelection = snapshot.resolvedMicrophoneSelection
                 settings.transcriptionLanguage = snapshot.resolvedTranscriptionLanguage
-                settings.engine = snapshot.engine
+                settings.engine = resolvedEngineChoice(
+                    preferred: snapshot.engine,
+                    language: settings.transcriptionLanguage.selection
+                )
                 settings.compareMode = snapshot.compareMode
                 settings.cleanupEnabled = snapshot.cleanupEnabled
                 settings.smartCleanup = snapshot.smartCleanup

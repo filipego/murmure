@@ -75,14 +75,14 @@ struct SettingsWindow: View {
                 settingsCard(title: "Transcription", detail: settings.engine == .apple
                     ? "Apple transcribes on-device and streams text while you speak."
                     : "Parakeet transcribes on-device when you release the key.") {
-                    Picker("Engine", selection: $settings.engine) {
+                    Picker("Engine", selection: engineBinding) {
                         ForEach(SpeechEngineChoice.allCases, id: \.self) { choice in
                             Text(choice.displayName).tag(choice)
                         }
                     }
                     .pickerStyle(.segmented)
 
-                    Picker("Language", selection: $settings.transcriptionLanguage) {
+                    Picker("Language", selection: languageBinding) {
                         ForEach(TranscriptionLanguageOption.allCases, id: \.self) { option in
                             Text(option.displayName).tag(option)
                         }
@@ -207,7 +207,7 @@ struct SettingsWindow: View {
     private var transcriptionLanguageStatus: String {
         if settings.engine == .parakeet {
             return settings.transcriptionLanguage == .systemDefault
-                ? "Parakeet automatically detects among its multilingual v3 languages."
+                ? "Parakeet automatically recognizes 25 European languages on-device."
                 : "Parakeet uses \(settings.transcriptionLanguage.displayName) as an on-device decoder hint."
         }
 
@@ -221,6 +221,30 @@ struct SettingsWindow: View {
         return status.isInstalled
             ? "Apple Speech · \(name) · On-device model installed."
             : "Apple Speech · \(name) · The system downloads its on-device model once when first used."
+    }
+
+    private var engineBinding: Binding<SpeechEngineChoice> {
+        Binding(
+            get: { settings.engine },
+            set: { choice in
+                if choice == .apple, settings.transcriptionLanguage == .systemDefault {
+                    settings.transcriptionLanguage = .explicitSystemLanguage()
+                }
+                settings.engine = choice
+            }
+        )
+    }
+
+    private var languageBinding: Binding<TranscriptionLanguageOption> {
+        Binding(
+            get: { settings.transcriptionLanguage },
+            set: { language in
+                settings.transcriptionLanguage = language
+                if language == .systemDefault {
+                    settings.engine = .parakeet
+                }
+            }
+        )
     }
 
     private var transcriptionLanguageIsError: Bool {
