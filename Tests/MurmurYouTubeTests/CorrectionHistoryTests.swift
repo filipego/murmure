@@ -104,6 +104,60 @@ struct CorrectionHistoryTests {
         #expect(restored.last == laterRun)
     }
 
+    @Test("failed durable append removes only its attempted run")
+    func failedAppendRollbackPreservesConcurrentRuns() {
+        let attempted = sampleRun()
+        let laterRun = DictationRun(
+            date: Date(timeIntervalSince1970: 200),
+            engine: "Parakeet",
+            audioSeconds: 1,
+            processSeconds: 1,
+            text: "Later dictation"
+        )
+
+        #expect(
+            RunLogAppendRollback.restore(attempted: attempted, in: [attempted, laterRun])
+                == [laterRun]
+        )
+    }
+
+    @Test("append rollback does nothing after the attempted run was superseded")
+    func rollbackDoesNotOverwriteNewerMutation() {
+        let attempted = sampleRun()
+        var supersedingRun = attempted
+        supersedingRun.text = "Newer corrected text"
+
+        #expect(
+            RunLogAppendRollback.restore(attempted: attempted, in: [supersedingRun])
+                == [supersedingRun]
+        )
+    }
+
+    @Test("durable append reports success only after persistence")
+    @MainActor
+    func durableAppendAwaitsPersistence() async {
+        let run = sampleRun()
+        let successfulState = RunCacheState()
+        let successful = DurableRunAppendTransaction(
+            persist: { _ in Task { true } },
+            load: { successfulState.runs },
+            store: { successfulState.runs = $0 }
+        )
+
+        #expect(await successful.record(run))
+        #expect(successfulState.runs == [run])
+
+        let failedState = RunCacheState()
+        let failed = DurableRunAppendTransaction(
+            persist: { _ in Task { false } },
+            load: { failedState.runs },
+            store: { failedState.runs = $0 }
+        )
+
+        #expect(!(await failed.record(run)))
+        #expect(failedState.runs.isEmpty)
+    }
+
     @Test("a pending rule survives a history JSON round trip for later reconciliation")
     func pendingRuleJournalRoundTrip() throws {
         let suggestion = CorrectionRuleSuggestion(hear: "a lie", write: "a line")
@@ -312,6 +366,11 @@ struct CorrectionHistoryTests {
             audioFile: "Recordings/original.caf"
         )
     }
+}
+
+@MainActor
+private final class RunCacheState {
+    var runs: [DictationRun] = []
 }
 
 private actor PersistenceRecorder {

@@ -71,6 +71,41 @@ enum RunLogCorrectionRollback {
     }
 }
 
+enum RunLogAppendRollback {
+    /// Removes only the failed append when that exact run is still present. A correction or
+    /// other mutation with the same ID supersedes the attempted value and must be preserved.
+    static func restore(attempted: DictationRun, in runs: [DictationRun]) -> [DictationRun] {
+        guard let index = runs.firstIndex(where: { $0.id == attempted.id }),
+              runs[index] == attempted else {
+            return runs
+        }
+        var restored = runs
+        restored.remove(at: index)
+        return restored
+    }
+}
+
+@MainActor
+struct DurableRunAppendTransaction {
+    let persist: (DictationRun) -> Task<Bool, Never>
+    let load: () -> [DictationRun]
+    let store: ([DictationRun]) -> Void
+
+    func record(_ run: DictationRun) async -> Bool {
+        var appended = load()
+        appended.append(run)
+        store(appended)
+
+        guard await persist(run).value else {
+            let current = load()
+            let rolledBack = RunLogAppendRollback.restore(attempted: run, in: current)
+            if rolledBack != current { store(rolledBack) }
+            return false
+        }
+        return true
+    }
+}
+
 enum CorrectionSaveResult: Equatable, Sendable {
     case saved
     case historyFailed
@@ -205,6 +240,19 @@ enum RunLog {
         runs.forEach { _ = enqueueAppend($0) }
         regenerate()
         RunStore.shared.reload()
+    }
+
+    static func recordDurably(_ run: DictationRun) async -> Bool {
+        let transaction = DurableRunAppendTransaction(
+            persist: { enqueueAppend($0) },
+            load: { cachedRuns },
+            store: { runs in
+                cachedRuns = runs
+                regenerate()
+                RunStore.shared.reload()
+            }
+        )
+        return await transaction.record(run)
     }
 
     static func saveCorrection(
