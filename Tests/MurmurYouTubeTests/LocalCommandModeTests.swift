@@ -3,6 +3,25 @@ import Testing
 
 @Suite("Local selected-text Command Mode")
 struct LocalCommandModeTests {
+    @Test("model availability is queried only once per settings lifetime")
+    @MainActor
+    func availabilityLoadsOnce() {
+        let availability = LocalCommandAvailabilityStore()
+        var queryCount = 0
+
+        availability.loadIfNeeded {
+            queryCount += 1
+            return nil
+        }
+        availability.loadIfNeeded {
+            queryCount += 1
+            return "unexpected second query"
+        }
+
+        #expect(queryCount == 1)
+        #expect(availability.state == .available)
+    }
+
     @Test("the request contains only the selected text, instruction, and source app")
     func requestContract() {
         let request = LocalCommandRequest(

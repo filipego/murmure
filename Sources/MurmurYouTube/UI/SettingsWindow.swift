@@ -15,6 +15,7 @@ struct SettingsWindow: View {
     @State private var speechLanguages = SpeechLanguageCatalog.shared
     @State private var snippets = SnippetStore.shared
     @State private var microphoneTest = MicrophoneTestCoordinator()
+    @State private var commandModeAvailability = LocalCommandAvailabilityStore()
     @State private var permissionRefresh = 0
     @State private var hotkeyCaptureTarget: HotkeyCaptureTarget?
     @State private var pendingRiskyHotkey: PendingHotkey?
@@ -305,6 +306,7 @@ struct SettingsWindow: View {
         }
         .background(DS.Color.canvas)
         .task {
+            commandModeAvailability.loadIfNeeded()
             audioInputs.refresh()
             await speechLanguages.refresh()
             updates?.refreshStagedUpdate()
@@ -508,14 +510,18 @@ struct SettingsWindow: View {
     }
 
     private var commandModeIsAvailable: Bool {
-        FoundationLocalCommandTransformer.unavailableReason == nil
+        commandModeAvailability.state == .available
     }
 
     private var commandModeAvailabilityText: String {
-        if let reason = FoundationLocalCommandTransformer.unavailableReason {
+        switch commandModeAvailability.state {
+        case .checking:
+            return "Checking Apple's on-device model availability…"
+        case .available:
+            return "Apple's on-device model is ready. Selected text and instructions are never stored or sent to a server."
+        case let .unavailable(reason):
             return "Local transformation unavailable: \(reason) There is no network fallback."
         }
-        return "Apple's on-device model is ready. Selected text and instructions are never stored or sent to a server."
     }
 
     private var transcriptionLanguageStatus: String {
