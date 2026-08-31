@@ -13,7 +13,7 @@ enum LocalCommandReviewState: Equatable {
     case idle
     case recordingInstruction
     case processing
-    case review(original: String, proposed: String)
+    case review(original: String, proposed: String, notice: String? = nil)
     case failed(String)
 }
 
@@ -57,6 +57,26 @@ enum LocalCommandPolicy {
             && !request.instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && request.selectedText.count <= maximumSelectedCharacters
             && request.instruction.count <= maximumInstructionCharacters
+    }
+
+    static func reviewState(
+        after result: SelectedTextReplacementResult,
+        original: String,
+        proposed: String
+    ) -> LocalCommandReviewState {
+        let notice: String? = switch result {
+        case .replaced:
+            nil
+        case .refusedSelectionChanged:
+            "The original selection changed, so Murmure refused to replace it. Copy the proposal instead."
+        case .refusedSelectionUnavailable:
+            "The original selection is no longer available. Copy the proposal instead."
+        case .refusedTargetNotWritable:
+            "That app does not allow direct selected-text replacement. Copy the proposal instead."
+        case .failed:
+            "The selected text could not be replaced. Copy the proposal instead."
+        }
+        return .review(original: original, proposed: proposed, notice: notice)
     }
 }
 

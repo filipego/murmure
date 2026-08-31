@@ -71,6 +71,7 @@ final class DictationController {
     private(set) var transcript = ""
     /// Smoothed 0…1 mic level for the waveform.
     private(set) var level: Float = 0
+    let commandMode = LocalCommandController()
 
     private let hotkey = HotkeyMonitor()
     private let capture = AudioCapture()
@@ -144,6 +145,9 @@ final class DictationController {
         hotkey.handsFreeBinding = Settings.shared.handsFreeEnabled
             ? Settings.shared.handsFreeBinding
             : nil
+        hotkey.commandModeBinding = Settings.shared.commandModeEnabled
+            ? Settings.shared.commandModeBinding
+            : nil
         primaryGesturePolicy = HotkeyGesturePolicy(gesture: primaryBinding.gesture)
         hotkey.onPress = { [weak self] in
             self?.handlePrimaryBinding(.pressed(at: Date.timeIntervalSinceReferenceDate))
@@ -161,6 +165,13 @@ final class DictationController {
         hotkey.onHandsFreeCancel = { [weak self] in
             self?.handleHandsFree(.escapePressed)
         }
+        hotkey.onCommandModePress = { [weak self] in
+            guard let self, self.state == .idle else { return }
+            self.commandMode.begin()
+        }
+        hotkey.onCommandModeRelease = { [weak self] in
+            self?.commandMode.finish()
+        }
         return hotkey.start()
     }
 
@@ -168,6 +179,7 @@ final class DictationController {
         wantsHotkeyActive = false
         hotkey.stop()
         cancelDictation()
+        commandMode.cancel()
     }
 
     /// Re-arms the tap after the user picks a different push-to-talk key.
@@ -247,7 +259,7 @@ final class DictationController {
     // MARK: - Dictation
 
     private func beginDictation(trigger: RecordingTrigger) {
-        guard case .idle = state else { return }
+        guard case .idle = state, !commandMode.isBusy else { return }
         state = .starting
         activeTrigger = trigger
         transcript = ""

@@ -27,6 +27,11 @@ struct MurmurYouTubeApp: App {
         }
         .windowResizability(.contentSize)
 
+        Window("Command Mode", id: "command-mode") {
+            CommandModeWindow(controller: delegate.controller.commandMode)
+        }
+        .windowResizability(.contentSize)
+
         // Fully qualified: this app has its own `Settings` type, which otherwise shadows
         // SwiftUI's settings scene.
         SwiftUI.Settings {

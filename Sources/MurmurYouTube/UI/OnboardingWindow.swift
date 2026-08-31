@@ -14,6 +14,15 @@ struct MainSceneRoot: View {
                     openWindow(id: "onboarding")
                 }
             }
+            .onChange(of: controller.commandMode.state) { _, state in
+                switch state {
+                case .recordingInstruction, .processing, .review, .failed:
+                    openWindow(id: "command-mode")
+                    NSApp.activate(ignoringOtherApps: true)
+                case .idle:
+                    break
+                }
+            }
     }
 }
 

@@ -107,6 +107,8 @@ enum DS {
         static let onboardingHeight: CGFloat = 560
         static let diagnosticsWidth: CGFloat = 680
         static let diagnosticsHeight: CGFloat = 520
+        static let commandModeWidth: CGFloat = 760
+        static let commandModeHeight: CGFloat = 560
     }
 
     enum Shadow {

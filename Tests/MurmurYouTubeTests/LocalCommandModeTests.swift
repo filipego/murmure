@@ -51,4 +51,19 @@ struct LocalCommandModeTests {
             String(repeating: "x", count: LocalCommandPolicy.maximumProposalCharacters + 1)
         ) == nil)
     }
+
+    @Test("a refused replacement keeps the editable proposal available for copying")
+    func refusedReplacementReview() {
+        let state = LocalCommandPolicy.reviewState(
+            after: .refusedSelectionChanged,
+            original: "Original",
+            proposed: "Proposal"
+        )
+
+        #expect(state == .review(
+            original: "Original",
+            proposed: "Proposal",
+            notice: "The original selection changed, so Murmure refused to replace it. Copy the proposal instead."
+        ))
+    }
 }

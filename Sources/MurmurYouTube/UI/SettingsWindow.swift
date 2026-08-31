@@ -93,6 +93,38 @@ struct SettingsWindow: View {
                     .buttonStyle(.link)
                 }
 
+                settingsCard(
+                    title: "Command Mode",
+                    detail: "Select text in another app, hold the shortcut, speak an editing instruction, then review the local proposal before anything is replaced."
+                ) {
+                    Toggle("Enable local Command Mode", isOn: Binding(
+                        get: { settings.commandModeEnabled },
+                        set: { enabled in
+                            settings.commandModeEnabled = enabled
+                            controller.reloadHotkey()
+                        }
+                    ))
+
+                    HStack(spacing: DS.Space.snug) {
+                        Text("Command Mode shortcut")
+                            .font(DS.Font.body)
+                            .foregroundStyle(DS.Color.ink)
+                        Spacer()
+                        Button(settings.commandModeBinding.label) {
+                            beginHotkeyCapture(.commandMode)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .disabled(!settings.commandModeEnabled)
+
+                    Text(commandModeAvailabilityText)
+                        .font(DS.Font.caption)
+                        .foregroundStyle(commandModeIsAvailable
+                            ? DS.Color.inkSecondary
+                            : DS.Color.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
                 settingsCard(title: "Transcription", detail: settings.engine == .apple
                     ? "Apple transcribes on-device and streams text while you speak."
                     : "Parakeet transcribes on-device when you release the key.") {
@@ -289,12 +321,8 @@ struct SettingsWindow: View {
             controller.resumeHotkeyAfterModalInput()
         }) { target in
             ShortcutRecorderSheet(
-                title: target == .pushToTalk
-                    ? "Record dictation shortcut"
-                    : "Record hands-free shortcut",
-                gesture: target == .pushToTalk
-                    ? settings.pushToTalkBinding.gesture
-                    : .toggle,
+                title: hotkeyRecorderTitle(target),
+                gesture: hotkeyRecorderGesture(target),
                 onCapture: { binding in
                     hotkeyCaptureTarget = nil
                     handleCapturedHotkey(binding, target: target)
@@ -432,9 +460,11 @@ struct SettingsWindow: View {
     ) {
         let primary = target == .pushToTalk ? binding : settings.pushToTalkBinding
         let handsFree = target == .handsFree ? binding : settings.handsFreeBinding
+        let commandMode = target == .commandMode ? binding : settings.commandModeBinding
         let issues = HotkeyBindingValidator.validate(
             primary: primary,
-            handsFree: target == .handsFree || settings.handsFreeEnabled ? handsFree : nil
+            handsFree: target == .handsFree || settings.handsFreeEnabled ? handsFree : nil,
+            commandMode: target == .commandMode || settings.commandModeEnabled ? commandMode : nil
         )
         if let error = issues.first(where: { $0.severity == .error }) {
             hotkeyMessage = error.message
@@ -455,9 +485,37 @@ struct SettingsWindow: View {
         let applied = switch target {
         case .pushToTalk: settings.selectPushToTalkBinding(binding)
         case .handsFree: settings.selectHandsFreeBinding(binding)
+        case .commandMode: settings.selectCommandModeBinding(binding)
         }
         hotkeyMessage = applied ? nil : "That shortcut conflicts with another Murmure action."
         if applied { controller.reloadHotkey() }
+    }
+
+    private func hotkeyRecorderTitle(_ target: HotkeyCaptureTarget) -> String {
+        switch target {
+        case .pushToTalk: "Record dictation shortcut"
+        case .handsFree: "Record hands-free shortcut"
+        case .commandMode: "Record Command Mode shortcut"
+        }
+    }
+
+    private func hotkeyRecorderGesture(_ target: HotkeyCaptureTarget) -> HotkeyGesture {
+        switch target {
+        case .pushToTalk: settings.pushToTalkBinding.gesture
+        case .handsFree: .toggle
+        case .commandMode: .hold
+        }
+    }
+
+    private var commandModeIsAvailable: Bool {
+        FoundationLocalCommandTransformer.unavailableReason == nil
+    }
+
+    private var commandModeAvailabilityText: String {
+        if let reason = FoundationLocalCommandTransformer.unavailableReason {
+            return "Local transformation unavailable: \(reason) There is no network fallback."
+        }
+        return "Apple's on-device model is ready. Selected text and instructions are never stored or sent to a server."
     }
 
     private var transcriptionLanguageStatus: String {
@@ -796,6 +854,7 @@ private struct DiagnosticsPreviewSheet: View {
 private enum HotkeyCaptureTarget: String, Identifiable {
     case pushToTalk
     case handsFree
+    case commandMode
 
     var id: String { rawValue }
 }
