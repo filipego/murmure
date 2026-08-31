@@ -2,7 +2,7 @@ import Foundation
 
 /// The cleanup pass between raw transcription and injection.
 ///
-/// This is where Wispr Flow actually earns its keep — raw STT output is full of filler
+/// Raw speech-to-text output is full of filler
 /// words, missing punctuation, and spoken corrections. Swapping in an LLM-backed
 /// formatter (Apple Foundation Models on-device, or Claude for the high-quality tier)
 /// is the point of keeping this behind a protocol.

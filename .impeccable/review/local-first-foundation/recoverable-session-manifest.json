@@ -1,0 +1,26 @@
+{
+  "audioFile" : "audio.caf",
+  "engine" : "apple",
+  "id" : "E46730CA-27E7-4CB7-87EB-39482D53B351",
+  "language" : {
+    "systemDefault" : {
+
+    }
+  },
+  "releasedAt" : "2026-08-31T02:14:16Z",
+  "schemaVersion" : 1,
+  "startedAt" : "2026-08-31T02:14:10Z",
+  "status" : {
+    "failed" : {
+      "_0" : {
+        "message" : "The speech engine returned no text.",
+        "stage" : "transcription"
+      }
+    }
+  },
+  "trigger" : {
+    "holdToTalk" : {
+      "bindingID" : "fn"
+    }
+  }
+}

@@ -44,3 +44,14 @@ Captured from the currently installed application before production changes.
 ## Visual-change gate
 
 The existing shell remains locked. Approved work may add the explicitly requested controls and recovery states, but must reuse the design-system tokens and must not restyle unrelated layout, spacing, color, typography, imagery, or animation.
+
+## Durable-foundation result
+
+Installed verification evidence is recorded in `local-first-foundation/verification.md`.
+
+| Surface | Baseline | Installed result | Visible delta |
+| --- | --- | --- | --- |
+| Main window and history | `local-first-baseline/main-window-dark.jpeg` | `local-first-foundation/main-window-dark.jpeg` | None observed |
+| Settings | `local-first-baseline/settings-dark.jpeg` | `local-first-foundation/settings-dark.jpeg` | None observed |
+| Engine comparison | Baseline capture was pending | `local-first-foundation/comparison-dark.jpeg` | Approved copy only: Record both; Apple and Parakeet share one local recording |
+| Recoverable failure | Not available before implementation | `local-first-foundation/relaunch-no-insertion.jpeg` plus manifest fixture | New non-visual durability behavior; no TextEdit insertion |
