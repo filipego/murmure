@@ -93,6 +93,9 @@ struct DurableRunAppendTransaction {
 
     func record(_ run: DictationRun) async -> Bool {
         var appended = load()
+        if let existing = appended.first(where: { $0.id == run.id }) {
+            return existing == run
+        }
         appended.append(run)
         store(appended)
 

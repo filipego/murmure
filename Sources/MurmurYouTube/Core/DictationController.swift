@@ -3,6 +3,7 @@ import AVFoundation
 import AppKit
 import Foundation
 import Observation
+import MurmurSessionCore
 
 /// Builds the engine named by the current setting.
 ///
@@ -48,6 +49,7 @@ final class DictationController {
     private let hotkey = HotkeyMonitor()
     private let capture = AudioCapture()
     private let makeEngine: @Sendable () -> any TranscriptionEngine
+    private let sessionCoordinator: RecordingSessionCoordinator
     private var wantsHotkeyActive = false
     private var isHotkeySuspendedForModalInput = false
 
@@ -83,13 +85,16 @@ final class DictationController {
     /// The just-finished recording, kept until its CAF archive and comparison pass are done.
     private var recorded: [AudioChunk] = []
     private var isComparing = false
+    private var activeSessionID: UUID?
 
     init(
         formatter: (any TextFormatter)? = nil,
-        makeEngine: @escaping @Sendable () -> any TranscriptionEngine = engineForCurrentSetting
+        makeEngine: @escaping @Sendable () -> any TranscriptionEngine = engineForCurrentSetting,
+        sessionCoordinator: RecordingSessionCoordinator = RecordingSessionRuntime.coordinator
     ) {
         self.formatter = formatter
         self.makeEngine = makeEngine
+        self.sessionCoordinator = sessionCoordinator
     }
 
     // MARK: - Lifecycle
@@ -104,7 +109,12 @@ final class DictationController {
 
     private func armHotkey() -> Bool {
         hotkey.key = Settings.shared.pushToTalkKey
-        hotkey.onPress = { [weak self] in self?.beginDictation() }
+        hotkey.onPress = { [weak self] in
+            guard let self else { return }
+            self.beginDictation(
+                trigger: .holdToTalk(bindingID: Settings.shared.pushToTalkKey.rawValue)
+            )
+        }
         hotkey.onRelease = { [weak self] in self?.endDictation() }
         return hotkey.start()
     }
@@ -142,7 +152,7 @@ final class DictationController {
     /// Starts a recording from a Record button rather than the hotkey.
     func startButtonRecording() {
         guard canStartButtonRecording else { return }
-        beginDictation()
+        beginDictation(trigger: .mainButton)
     }
 
     func stopButtonRecording() {
@@ -151,12 +161,13 @@ final class DictationController {
 
     // MARK: - Dictation
 
-    private func beginDictation() {
+    private func beginDictation(trigger: RecordingTrigger) {
         guard case .idle = state else { return }
         state = .starting
         transcript = ""
         holdStarted = Date()
         isComparing = Settings.shared.compareMode
+        activeSessionID = nil
         recorded.removeAll(keepingCapacity: true)
         engineName = isComparing ? "Comparing…" : Settings.shared.engine.displayName
 
@@ -165,6 +176,17 @@ final class DictationController {
                 guard await Permissions.requestMicrophone() else {
                     fail("Microphone access is off. Enable it in System Settings ▸ Privacy & Security ▸ Microphone.")
                     return
+                }
+
+                if !isComparing {
+                    let engineID: SessionEngineID = Settings.shared.engine == .apple ? .apple : .parakeet
+                    let session = try await sessionCoordinator.begin(
+                        startedAt: holdStarted ?? Date(),
+                        trigger: trigger,
+                        engine: engineID,
+                        language: .systemDefault
+                    )
+                    activeSessionID = session.id
                 }
 
                 let engine = makeEngine()
@@ -272,14 +294,32 @@ final class DictationController {
                 return
             }
 
+            guard let sessionID = activeSessionID, let releasedAt else {
+                fail("The recording session could not be recovered.")
+                return
+            }
+
+            do {
+                _ = try await sessionCoordinator.stageReleasedAudio(
+                    sessionID: sessionID,
+                    chunks: recorded,
+                    releasedAt: releasedAt
+                )
+            } catch {
+                activeSessionID = nil
+                fail("The recording was retained locally, but audio staging failed: \(error.localizedDescription)")
+                return
+            }
+
             let raw = transcript
-            let runID = UUID()
-            // Keep the microphone history even when the recognizer returns no words (for
-            // example, a short test capture or a quiet room). The archive is useful for
-            // diagnosis and is written through the same explicit PCM boundary as every
-            // non-empty dictation.
-            let audioFile = AudioHistoryStore.save(recorded, id: runID)
             guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                _ = try? await sessionCoordinator.persistProcessedText(
+                    sessionID: sessionID,
+                    finalText: raw
+                )
+                activeSessionID = nil
+                holdStarted = nil
+                self.releasedAt = nil
                 state = .idle
                 transcript = ""
                 return
@@ -297,10 +337,39 @@ final class DictationController {
                 Log.speech.info("dictionary · \(corrections.count, privacy: .public) correction(s) applied")
             }
 
-            recordRun(id: runID, text: output, corrections: corrections, audioFile: audioFile)
-            TextInjector.insert(output)
+            do {
+                _ = try await sessionCoordinator.persistProcessedText(
+                    sessionID: sessionID,
+                    finalText: output
+                )
+            } catch {
+                fail("The transcript could not be made durable: \(error.localizedDescription)")
+                return
+            }
+
+            let run = DictationRun(
+                id: sessionID,
+                date: releasedAt,
+                engine: engineName,
+                audioSeconds: releasedAt.timeIntervalSince(holdStarted ?? releasedAt),
+                processSeconds: Date().timeIntervalSince(releasedAt),
+                text: output,
+                corrections: corrections.isEmpty ? nil : corrections
+            )
+            let completed = await sessionCoordinator.completeLiveSession(
+                sessionID: sessionID,
+                run: run,
+                insert: { text in TextInjector.insert(text) }
+            )
+            activeSessionID = nil
+            guard completed else {
+                fail("The transcript is safe locally and will be retried from history recovery.")
+                return
+            }
             if Settings.shared.soundEnabled { NSSound(named: "Pop")?.play() }
 
+            holdStarted = nil
+            self.releasedAt = nil
             state = .idle
             transcript = ""
         }
@@ -319,6 +388,11 @@ final class DictationController {
         self.engine = nil
         Task { await engine?.finish() }
 
+        if let sessionID = activeSessionID {
+            activeSessionID = nil
+            Task { await sessionCoordinator.cancel(sessionID: sessionID) }
+        }
+
         state = .idle
         transcript = ""
         level = 0
@@ -334,6 +408,10 @@ final class DictationController {
         engine = nil
         consumeTask?.cancel()
         consumeTask = nil
+        if let sessionID = activeSessionID {
+            activeSessionID = nil
+            await sessionCoordinator.cancel(sessionID: sessionID)
+        }
         state = .idle
     }
 
@@ -392,34 +470,6 @@ final class DictationController {
         if Settings.shared.soundEnabled { NSSound(named: "Glass")?.play() }
     }
 
-    /// Files the finished utterance for the dashboard.
-    ///
-    /// `processSeconds` is measured from key release, not from capture start — that's the
-    /// wait the user actually experiences, and it's the only number on which a streaming
-    /// engine and a batch engine can be compared honestly.
-    private func recordRun(
-        id: UUID = UUID(),
-        text: String,
-        corrections: [AppliedCorrection] = [],
-        audioFile: String? = nil
-    ) {
-        guard let holdStarted, let releasedAt else { return }
-        RunLog.record(
-            DictationRun(
-                id: id,
-                date: releasedAt,
-                engine: engineName,
-                audioSeconds: releasedAt.timeIntervalSince(holdStarted),
-                processSeconds: Date().timeIntervalSince(releasedAt),
-                text: text,
-                corrections: corrections.isEmpty ? nil : corrections,
-                audioFile: audioFile
-            )
-        )
-        self.holdStarted = nil
-        self.releasedAt = nil
-    }
-
     /// Light smoothing so the waveform glides instead of strobing at buffer rate.
     private func updateLevel(_ new: Float) {
         level += (new - level) * 0.35
@@ -435,6 +485,11 @@ final class DictationController {
         engine = nil
         consumeTask?.cancel()
         consumeTask = nil
+        if let sessionID = activeSessionID {
+            activeSessionID = nil
+            let failure = RecordingFailure(stage: .transcription, message: message)
+            Task { await sessionCoordinator.fail(sessionID: sessionID, failure: failure) }
+        }
         state = .error(message)
         level = 0
 

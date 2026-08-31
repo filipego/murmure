@@ -35,6 +35,18 @@ public actor RecordingSessionStore {
     }
 
     @discardableResult
+    public func release(
+        id: UUID,
+        at date: Date,
+        audioFile: String
+    ) throws -> RecordingSessionManifest {
+        var manifest = try load(id: id)
+        try manifest.release(at: date, audioFile: audioFile)
+        try persist(manifest)
+        return manifest
+    }
+
+    @discardableResult
     public func transition(
         id: UUID,
         to status: RecordingSessionStatus

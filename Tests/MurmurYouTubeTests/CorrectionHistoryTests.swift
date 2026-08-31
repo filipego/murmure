@@ -158,6 +158,42 @@ struct CorrectionHistoryTests {
         #expect(failedState.runs.isEmpty)
     }
 
+    @Test("durable append is idempotent for the same run id and value")
+    @MainActor
+    func durableAppendIsIdempotent() async {
+        let run = sampleRun()
+        let state = RunCacheState()
+        let transaction = DurableRunAppendTransaction(
+            persist: { _ in
+                state.persistCalls += 1
+                return Task { true }
+            },
+            load: { state.runs },
+            store: { state.runs = $0 }
+        )
+
+        #expect(await transaction.record(run))
+        #expect(await transaction.record(run))
+        #expect(state.runs == [run])
+        #expect(state.persistCalls == 1)
+
+        let conflictingState = RunCacheState()
+        var conflicting = run
+        conflicting.text = "Different value for the same ID"
+        conflictingState.runs = [conflicting]
+        let conflictTransaction = DurableRunAppendTransaction(
+            persist: { _ in
+                conflictingState.persistCalls += 1
+                return Task { true }
+            },
+            load: { conflictingState.runs },
+            store: { conflictingState.runs = $0 }
+        )
+        #expect(!(await conflictTransaction.record(run)))
+        #expect(conflictingState.runs == [conflicting])
+        #expect(conflictingState.persistCalls == 0)
+    }
+
     @Test("a pending rule survives a history JSON round trip for later reconciliation")
     func pendingRuleJournalRoundTrip() throws {
         let suggestion = CorrectionRuleSuggestion(hear: "a lie", write: "a line")
@@ -371,6 +407,7 @@ struct CorrectionHistoryTests {
 @MainActor
 private final class RunCacheState {
     var runs: [DictationRun] = []
+    var persistCalls = 0
 }
 
 private actor PersistenceRecorder {
