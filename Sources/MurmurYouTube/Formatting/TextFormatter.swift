@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Raw speech-to-text output is full of filler
 /// words, missing punctuation, and spoken corrections. Swapping in an LLM-backed
-/// formatter (Apple Foundation Models on-device, or Claude for the high-quality tier)
+/// formatter (Apple Foundation Models on-device for the optional smart-cleanup tier)
 /// is the point of keeping this behind a protocol.
 protocol TextFormatter: Sendable {
     func format(_ raw: String) async -> String

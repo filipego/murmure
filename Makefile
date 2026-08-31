@@ -176,10 +176,14 @@ share: app
 		echo '5. Hold the configured push-to-talk key in any app, speak, then finish the gesture.'; \
 		echo '6. Later, use Settings → Updates → Check for updates → Install and relaunch.'; \
 		echo '7. To correct a saved dictation, use the pencil Correct action on its history row.'; \
-		echo '   Review “Murmure heard” and edit “I meant”; Play original is optional, and Dictate'; \
+		echo '   Review "Murmure heard" and edit "I meant"; Play original is optional, and Dictate'; \
 		echo '   only fills the draft. Remember is on by default, and Save correction is the only'; \
 		echo '   action that persists history or a safe contextual local dictionary rule. An'; \
 		echo '   interrupted rule stays pending in history and retries safely on the next launch.'; \
+		echo '8. Command Mode edits selected text with Apple\047s on-device model. Select editable'; \
+		echo '   text in another app, hold Control-Option-Command-D, speak the change, then release.'; \
+		echo '   Review the proposal before replacing the selection, or copy it instead. Settings'; \
+		echo '   explains if Apple Intelligence is unavailable. There is no network fallback.'; \
 		echo; \
 		echo 'Snippets replace an exact whole spoken phrase with reusable local text. Automatic'; \
 		echo 'recognition, deterministic cleanup, snippets, dictionary corrections, history, and audio'; \
@@ -193,7 +197,7 @@ share: app
 		echo; \
 		echo 'Use Settings → Setup and diagnostics to rerun setup or preview/copy/export a sanitized'; \
 		echo 'report. Diagnostics contain app, Mac, engine, language, model, permission, microphone,'; \
-		echo 'and storage status only—never dictated text, history, audio, snippets, dictionary data,'; \
+		echo 'and storage status only. They never include dictated text, history, audio, snippets, dictionary data,'; \
 		echo 'or local file paths.'; \
 		echo; \
 		echo 'The archive uses a stable Developer ID or local signing identity when available.'; \

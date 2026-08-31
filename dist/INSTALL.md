@@ -16,10 +16,14 @@ Download the latest release: https://github.com/filipego/murmure/releases/latest
 5. Hold the configured push-to-talk key in any app, speak, then finish the gesture.
 6. Later, use Settings → Updates → Check for updates → Install and relaunch.
 7. To correct a saved dictation, use the pencil Correct action on its history row.
-   Review “Murmure heard” and edit “I meant”; Play original is optional, and Dictate
+   Review "Murmure heard" and edit "I meant"; Play original is optional, and Dictate
    only fills the draft. Remember is on by default, and Save correction is the only
    action that persists history or a safe contextual local dictionary rule. An
    interrupted rule stays pending in history and retries safely on the next launch.
+8. Command Mode edits selected text with Apple's on-device model. Select editable
+   text in another app, hold Control-Option-Command-D, speak the change, then release.
+   Review the proposal before replacing the selection, or copy it instead. Settings
+   explains if Apple Intelligence is unavailable. There is no network fallback.
 
 Snippets replace an exact whole spoken phrase with reusable local text. Automatic
 recognition, deterministic cleanup, snippets, dictionary corrections, history, and audio
@@ -33,7 +37,7 @@ and Murmure never removes unrelated drive files.
 
 Use Settings → Setup and diagnostics to rerun setup or preview/copy/export a sanitized
 report. Diagnostics contain app, Mac, engine, language, model, permission, microphone,
-and storage status only—never dictated text, history, audio, snippets, dictionary data,
+and storage status only. They never include dictated text, history, audio, snippets, dictionary data,
 or local file paths.
 
 The archive uses a stable Developer ID or local signing identity when available.
