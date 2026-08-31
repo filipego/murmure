@@ -129,6 +129,11 @@ struct RetranscriptionSheet: View {
                     RoundedRectangle(cornerRadius: DS.Radius.control)
                         .strokeBorder(DS.Color.seam, lineWidth: DS.Border.hairline)
                 }
+            if let snippet = preview.appliedSnippet {
+                Text("Snippet applied: \(snippet.trigger)")
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.inkSecondary)
+            }
         }
     }
 

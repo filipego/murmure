@@ -12,11 +12,15 @@ struct SettingsWindow: View {
     @State private var settings = Settings.shared
     @State private var audioInputs = AudioInputStore.shared
     @State private var speechLanguages = SpeechLanguageCatalog.shared
+    @State private var snippets = SnippetStore.shared
     @State private var microphoneTest = MicrophoneTestCoordinator()
     @State private var permissionRefresh = 0
     @State private var hotkeyCaptureTarget: HotkeyCaptureTarget?
     @State private var pendingRiskyHotkey: PendingHotkey?
     @State private var hotkeyMessage: String?
+    @State private var snippetDraft: SnippetEntry?
+    @State private var pendingSnippetDeletion: SnippetEntry?
+    @State private var snippetMessage: String?
 
     init(controller: DictationController, updates: AppUpdateCoordinator? = nil) {
         self.controller = controller
@@ -175,6 +179,41 @@ struct SettingsWindow: View {
                     }
                 }
 
+                settingsCard(
+                    title: "Snippets",
+                    detail: "Say a complete phrase and replace it with reusable local text. Snippets run before dictionary corrections."
+                ) {
+                    HStack(spacing: DS.Space.snug) {
+                        Text("\(snippets.entries.filter(\.isEnabled).count) enabled · \(snippets.entries.count) total")
+                            .font(DS.Font.label)
+                            .foregroundStyle(DS.Color.inkSecondary)
+                        Spacer()
+                        Button("Add snippet") {
+                            snippetMessage = nil
+                            snippetDraft = SnippetEntry(trigger: "", replacement: "")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+
+                    if snippets.entries.isEmpty {
+                        Text("No snippets yet. Try “my address,” “email signature,” or any phrase you would say by itself.")
+                            .font(DS.Font.body)
+                            .foregroundStyle(DS.Color.inkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        ForEach(snippets.entries) { entry in
+                            snippetRow(entry)
+                        }
+                    }
+
+                    if let snippetMessage {
+                        Text(snippetMessage)
+                            .font(DS.Font.caption)
+                            .foregroundStyle(DS.Color.warning)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
                 settingsCard(title: "Permissions", detail: "Murmure needs Microphone to listen and Accessibility to detect the global key and insert text into the focused app.") {
                     permissionRow(
                         title: "Microphone",
@@ -231,6 +270,9 @@ struct SettingsWindow: View {
                 onCancel: { hotkeyCaptureTarget = nil }
             )
         }
+        .sheet(item: $snippetDraft) { entry in
+            SnippetEditorSheet(entry: entry)
+        }
         .alert("Use this shortcut?", isPresented: Binding(
             get: { pendingRiskyHotkey != nil },
             set: { if !$0 { pendingRiskyHotkey = nil } }
@@ -245,6 +287,73 @@ struct SettingsWindow: View {
         } message: {
             Text(pendingRiskyHotkey?.message ?? "")
         }
+        .alert("Delete this snippet?", isPresented: Binding(
+            get: { pendingSnippetDeletion != nil },
+            set: { if !$0 { pendingSnippetDeletion = nil } }
+        )) {
+            Button("Delete", role: .destructive) {
+                guard let entry = pendingSnippetDeletion else { return }
+                pendingSnippetDeletion = nil
+                Task {
+                    if !(await snippets.delete(id: entry.id)) {
+                        snippetMessage = "The snippet could not be deleted. Check that your data drive is available."
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingSnippetDeletion = nil }
+        } message: {
+            Text(pendingSnippetDeletion?.trigger ?? "")
+        }
+    }
+
+    private func snippetRow(_ entry: SnippetEntry) -> some View {
+        HStack(alignment: .top, spacing: DS.Space.snug) {
+            Toggle("", isOn: Binding(
+                get: { entry.isEnabled },
+                set: { enabled in
+                    Task {
+                        if !(await snippets.setEnabled(enabled, id: entry.id)) {
+                            snippetMessage = "The snippet could not be updated. Check that your data drive is available."
+                        }
+                    }
+                }
+            ))
+            .labelsHidden()
+            .accessibilityLabel("Enable \(entry.trigger)")
+
+            VStack(alignment: .leading, spacing: DS.Space.tight) {
+                Text(entry.trigger)
+                    .font(DS.Font.bodyEmphasis)
+                    .foregroundStyle(DS.Color.ink)
+                Text(entry.replacement.replacingOccurrences(of: "\n", with: " ↵ "))
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.inkSecondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+            Button {
+                snippetMessage = nil
+                snippetDraft = entry
+            } label: {
+                Image(systemName: "pencil")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(DS.Color.inkSecondary)
+            .help("Edit snippet")
+            .accessibilityLabel("Edit \(entry.trigger)")
+
+            Button {
+                pendingSnippetDeletion = entry
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(DS.Color.inkSecondary)
+            .help("Delete snippet")
+            .accessibilityLabel("Delete \(entry.trigger)")
+        }
+        .padding(DS.Space.base)
+        .background(DS.Color.well, in: .rect(cornerRadius: DS.Radius.control))
     }
 
     @ViewBuilder

@@ -436,6 +436,15 @@ private struct HistoryRow: View {
                     .foregroundStyle(DS.Color.warning)
                 }
 
+                if let snippet = run.appliedSnippet {
+                    HStack(spacing: DS.Space.tight) {
+                        Image(systemName: "text.badge.checkmark")
+                        Text("Snippet · \(snippet.trigger)")
+                    }
+                    .font(DS.Font.caption)
+                    .foregroundStyle(DS.Color.inkSecondary)
+                }
+
                 if let correction = run.correction {
                     HStack(spacing: DS.Space.tight) {
                         Image(systemName: "checkmark.circle")
