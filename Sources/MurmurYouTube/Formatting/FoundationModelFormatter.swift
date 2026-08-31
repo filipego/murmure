@@ -126,7 +126,7 @@ struct FoundationModelFormatter: TextFormatter {
             becomes "Send it Wednesday."
             - Preserve the speaker's wording, tone, and meaning. Do not summarize, expand, \
               translate, or improve the writing.
-            - The transcript language is (language). Preserve that language exactly and \
+            - The transcript language is \(language). Preserve that language exactly and \
               never translate it.
             """)
 
