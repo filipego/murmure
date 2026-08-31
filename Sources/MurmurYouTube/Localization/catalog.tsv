@@ -332,3 +332,34 @@ Apple's on-device model is ready. Selected text and instructions are never store
 Parakeet automatically recognizes 25 European languages on-device.	Parakeet reconnaît automatiquement 25 langues européennes sur l’appareil.	Parakeet reconoce automáticamente 25 idiomas europeos en el dispositivo.
 Checking Apple's on-device language assets…	Vérification des ressources linguistiques Apple sur l’appareil…	Comprobando los recursos de idioma de Apple en el dispositivo…
 Apple Speech does not support this language on this Mac. Nothing will fall back to English.	La reconnaissance Apple ne prend pas en charge cette langue sur ce Mac. Aucun retour à l’anglais ne sera effectué.	El reconocimiento de Apple no admite este idioma en este Mac. No se usará el inglés como alternativa.
+Murmure needs Microphone to listen and Accessibility to detect the global key and insert text into the focused app.	Murmure a besoin du Microphone pour écouter et de l’Accessibilité pour détecter le raccourci global et insérer le texte dans l’app active.	Murmure necesita acceso al Micrófono para escuchar y a Accesibilidad para detectar el atajo global e insertar texto en la app activa.
+External storage ready	Stockage externe prêt	Almacenamiento externo listo
+Reconnect external drive	Reconnectez le disque externe	Vuelve a conectar la unidad externa
+Local emergency storage	Stockage local d’urgence	Almacenamiento local de emergencia
+Audio, history, dictionary, and settings save to %@.	L’audio, l’historique, le dictionnaire et les réglages sont enregistrés dans %@.	El audio, el historial, el diccionario y los ajustes se guardan en %@.
+Murmure cannot reach %@. Reconnect it before recording new audio.	Murmure ne peut pas accéder à %@. Reconnectez-le avant d’enregistrer un nouvel audio.	Murmure no puede acceder a %@. Vuelve a conectarla antes de grabar audio nuevo.
+The external drive was unavailable at launch, so new data is temporarily in %@.	Le disque externe était indisponible au lancement ; les nouvelles données sont temporairement stockées dans %@.	La unidad externa no estaba disponible al iniciar, por lo que los datos nuevos están temporalmente en %@.
+Legacy migration runs in the background after launch.	La migration des anciennes données s’exécute en arrière-plan après le lancement.	La migración de datos antiguos se ejecuta en segundo plano después de iniciar.
+External drive unavailable; no legacy files were moved.	Disque externe indisponible ; aucun ancien fichier n’a été déplacé.	Unidad externa no disponible; no se movió ningún archivo antiguo.
+Using %@ · %@	Utilisation de %@ · %@	Usando %@ · %@
+%@ is unavailable. Using %@ for now; your selection is preserved.	%@ est indisponible. %@ est utilisé pour l’instant ; votre sélection est conservée.	%@ no está disponible. Se usará %@ por ahora; tu selección se conserva.
+%@ is unavailable. Connect a microphone and try again.	%@ est indisponible. Connectez un microphone et réessayez.	%@ no está disponible. Conecta un micrófono e inténtalo de nuevo.
+Built-in	Intégré	Integrado
+Aggregate	Agrégé	Agregado
+Virtual	Virtuel	Virtual
+Continuity	Continuité	Continuidad
+Other	Autre	Otro
+Audio and history stay on the external drive	L’audio et l’historique restent sur le disque externe	El audio y el historial permanecen en la unidad externa
+External drive unavailable; using local fallback	Disque externe indisponible ; stockage local de secours utilisé	Unidad externa no disponible; usando almacenamiento local alternativo
+The speech engine returned no text.	Le moteur de reconnaissance n’a renvoyé aucun texte.	El motor de reconocimiento no devolvió texto.
+Stop audio recording	Arrêter l’enregistrement audio	Detener grabación de audio
+Cleanup	Nettoyage	Limpieza
+Right ⌘	⌘ droite	⌘ derecha
+Left ⌘	⌘ gauche	⌘ izquierda
+Right ⌥	⌥ droite	⌥ derecha
+Left ⌥	⌥ gauche	⌥ izquierda
+Right ⌃	⌃ droite	⌃ derecha
+Left ⌃	⌃ gauche	⌃ izquierda
+Right ⇧	⇧ droite	⇧ derecha
+Left ⇧	⇧ gauche	⇧ izquierda
+Transcription	Transcription	Transcripción

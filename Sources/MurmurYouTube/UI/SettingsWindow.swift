@@ -47,6 +47,7 @@ struct SettingsWindow: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .id(appLanguage.language)
                 }
 
                 settingsCard(title: "Push to talk", detail: "Use this shortcut anywhere to dictate. The Record button works regardless of what is focused.") {
@@ -69,6 +70,7 @@ struct SettingsWindow: View {
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: 300, alignment: .leading)
+                    .id(appLanguage.language)
 
                     Divider()
 
@@ -124,7 +126,7 @@ struct SettingsWindow: View {
                             .font(DS.Font.body)
                             .foregroundStyle(DS.Color.ink)
                         Spacer()
-                        Button(settings.commandModeBinding.label) {
+                        Button(L10n.text(settings.commandModeBinding.label)) {
                             beginHotkeyCapture(.commandMode)
                         }
                         .buttonStyle(.bordered)
@@ -148,6 +150,7 @@ struct SettingsWindow: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    .id(appLanguage.language)
 
                     Picker(L10n.text("Language"), selection: languageBinding) {
                         ForEach(TranscriptionLanguageOption.allCases, id: \.self) { option in
@@ -156,6 +159,7 @@ struct SettingsWindow: View {
                     }
                     .pickerStyle(.menu)
                     .frame(maxWidth: 260, alignment: .leading)
+                    .id(appLanguage.language)
 
                     Text(L10n.text(transcriptionLanguageStatus))
                         .font(DS.Font.caption)
@@ -451,7 +455,7 @@ struct SettingsWindow: View {
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.ink)
             Spacer()
-            Button(binding.label) { beginHotkeyCapture(target) }
+            Button(L10n.text(binding.label)) { beginHotkeyCapture(target) }
                 .buttonStyle(.bordered)
             Menu(L10n.text("Presets")) {
                 ForEach(PushToTalkKey.allCases, id: \.self) { preset in
@@ -714,7 +718,23 @@ struct SettingsWindow: View {
         switch microphoneTest.state {
         case .idle:
             if let error = audioInputs.errorMessage { return error }
-            return audioInputs.resolution(for: settings.microphoneSelection).statusText
+            switch audioInputs.resolution(for: settings.microphoneSelection) {
+            case let .selected(device):
+                return L10n.format(
+                    "Using %@ · %@",
+                    arguments: [device.displayName, L10n.text(device.transport.displayName)]
+                )
+            case let .fallback(requested, device):
+                return L10n.format(
+                    "%@ is unavailable. Using %@ for now; your selection is preserved.",
+                    arguments: [requested.displayName, device.displayName]
+                )
+            case let .unavailable(requested):
+                return L10n.format(
+                    "%@ is unavailable. Connect a microphone and try again.",
+                    arguments: [requested.displayName]
+                )
+            }
         case .starting:
             return "Opening the selected microphone…"
         case let .testing(name):
@@ -915,11 +935,11 @@ private struct StorageCard: View {
     }
 
     var body: some View {
-        settingsCard(title: "Data storage", detail: MurmureDataStore.statusDetail) {
+        settingsCard(title: "Data storage", detail: localizedStatusDetail) {
             HStack(spacing: DS.Space.snug) {
                 Image(systemName: isReady ? "externaldrive.fill.badge.checkmark" : "externaldrive.badge.exclamationmark")
                     .foregroundStyle(statusColor)
-                Text(L10n.text(MurmureDataStore.statusTitle))
+                Text(localizedStatusTitle)
                     .font(DS.Font.bodyEmphasis)
                     .foregroundStyle(DS.Color.ink)
                 Spacer()
@@ -930,11 +950,38 @@ private struct StorageCard: View {
                 .accessibilityLabel(L10n.text("Reveal Murmure data folder"))
             }
 
-            Text(L10n.format("Migration: %@", arguments: [L10n.text(MurmureDataStore.migrationDetail)]))
+            Text(L10n.format("Migration: %@", arguments: [localizedMigrationDetail]))
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var localizedStatusTitle: String {
+        L10n.text(MurmureDataStore.statusTitle)
+    }
+
+    private var localizedStatusDetail: String {
+        if MurmureDataStore.usesExternalStorage && MurmureDataStore.externalDriveConnected {
+            return L10n.format(
+                "Audio, history, dictionary, and settings save to %@.",
+                arguments: [MurmureDataStore.externalRootURL.path]
+            )
+        }
+        if MurmureDataStore.usesExternalStorage {
+            return L10n.format(
+                "Murmure cannot reach %@. Reconnect it before recording new audio.",
+                arguments: [MurmureDataStore.preferredVolumeURL.path]
+            )
+        }
+        return L10n.format(
+            "The external drive was unavailable at launch, so new data is temporarily in %@.",
+            arguments: [MurmureDataStore.rootURL.path]
+        )
+    }
+
+    private var localizedMigrationDetail: String {
+        L10n.text(MurmureDataStore.migrationDetail)
     }
 
     @ViewBuilder

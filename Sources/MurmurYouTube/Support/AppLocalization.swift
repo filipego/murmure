@@ -60,7 +60,9 @@ struct AppLanguageRoot<Content: View>: View {
     }
 
     var body: some View {
-        content.environment(\.locale, appLanguage.language.locale)
+        content
+            .environment(\.locale, appLanguage.language.locale)
+            .id(appLanguage.language)
     }
 }
 

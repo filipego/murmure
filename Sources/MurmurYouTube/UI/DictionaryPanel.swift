@@ -121,7 +121,7 @@ private struct DictionaryRow: View {
                         .font(DS.Font.bodyEmphasis)
                         .foregroundStyle(DS.Color.ink)
                 }
-                Text(entry.kind == .correction ? "Correction" : "Term")
+                Text(L10n.text(entry.kind == .correction ? "Correction" : "Term"))
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.inkSecondary)
             }
@@ -149,12 +149,12 @@ private struct DictionaryRow: View {
     private func rowButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .accessibilityLabel(title)
+                .accessibilityLabel(L10n.text(title))
                 .frame(width: DS.Space.roomy, height: DS.Space.roomy)
         }
         .buttonStyle(.plain)
         .foregroundStyle(DS.Color.inkSecondary)
-        .help(title)
+        .help(L10n.text(title))
     }
 }
 
@@ -190,7 +190,7 @@ private struct DictionaryEditor: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.roomy) {
-            Text(entry == nil ? "Add dictionary entry" : "Edit dictionary entry")
+            Text(L10n.text(entry == nil ? "Add dictionary entry" : "Edit dictionary entry"))
                 .font(DS.Font.title)
                 .foregroundStyle(DS.Color.ink)
 
@@ -210,7 +210,7 @@ private struct DictionaryEditor: View {
             )
 
             ForEach(warnings) { warning in
-                Label(warning.message, systemImage: "exclamationmark.triangle")
+                Label(L10n.text(warning.message), systemImage: "exclamationmark.triangle")
                     .font(DS.Font.label)
                     .foregroundStyle(DS.Color.warning)
                     .fixedSize(horizontal: false, vertical: true)
@@ -236,11 +236,11 @@ private struct DictionaryEditor: View {
 
     private func editorField(label: String, placeholder: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: DS.Space.tight) {
-            Text(label.uppercased())
+            Text(L10n.text(label).uppercased())
                 .font(DS.Font.eyebrow)
                 .tracking(DS.Font.silkscreenTracking)
                 .foregroundStyle(DS.Color.inkSecondary)
-            TextField(placeholder, text: text)
+            TextField(L10n.text(placeholder), text: text)
                 .textFieldStyle(.roundedBorder)
                 .font(DS.Font.body)
         }

@@ -50,6 +50,12 @@ struct AppLocalizationTests {
         #expect(L10n.text("Home", language: .spanish) == "Inicio")
         #expect(L10n.text("App language", language: .french) == "Langue de l’app")
         #expect(L10n.text("App language", language: .spanish) == "Idioma de la app")
+        #expect(L10n.text("Settings", language: .french) == "Réglages")
+        #expect(L10n.text("Settings", language: .spanish) == "Ajustes")
+        #expect(L10n.text("Automatic", language: .french) == "Automatique")
+        #expect(L10n.text("Automatic", language: .spanish) == "Automático")
+        #expect(L10n.text("External storage ready", language: .french) == "Stockage externe prêt")
+        #expect(L10n.text("External storage ready", language: .spanish) == "Almacenamiento externo listo")
         let issues = try L10n.catalogIssues()
         #expect(issues.isEmpty, Comment(rawValue: issues.joined(separator: "\n")))
     }

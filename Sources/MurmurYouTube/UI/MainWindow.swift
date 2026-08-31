@@ -49,7 +49,7 @@ struct MainWindow: View {
                         HStack(spacing: DS.Space.snug) {
                             Image(systemName: candidate.systemImage)
                                 .frame(width: 18)
-                            Text(candidate.title)
+                            Text(L10n.text(candidate.title))
                                 .font(DS.Font.bodyEmphasis)
                             Spacer(minLength: 0)
                         }
@@ -62,7 +62,7 @@ struct MainWindow: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(candidate.title)
+                    .accessibilityLabel(L10n.text(candidate.title))
                     .accessibilityAddTraits(section == candidate ? .isSelected : [])
                 }
             }
@@ -74,13 +74,13 @@ struct MainWindow: View {
                     Circle()
                         .fill(controller.state.isActive ? DS.Color.record : DS.Color.success)
                         .frame(width: DS.Space.tight, height: DS.Space.tight)
-                    Text(controller.state.isActive ? "Recording" : "Ready")
+                    Text(L10n.text(controller.state.isActive ? "Recording" : "Ready"))
                         .font(DS.Font.label)
                         .foregroundStyle(DS.Color.railInk)
                 }
-                Text(MurmureDataStore.usesExternalStorage
+                Text(L10n.text(MurmureDataStore.usesExternalStorage
                     ? "Audio and history stay on the external drive"
-                    : "External drive unavailable; using local fallback")
+                    : "External drive unavailable; using local fallback"))
                     .font(DS.Font.caption)
                     .foregroundStyle(DS.Color.railInkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -117,10 +117,10 @@ struct MainWindow: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline, spacing: DS.Space.base) {
             VStack(alignment: .leading, spacing: DS.Space.tight) {
-                Text(section.title)
+                Text(L10n.text(section.title))
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.ink)
-                Text(section == .home ? "A clear place for the words you just spoke." : sectionSubtitle)
+                Text(L10n.text(section == .home ? "A clear place for the words you just spoke." : sectionSubtitle))
                     .font(DS.Font.label)
                     .foregroundStyle(DS.Color.inkSecondary)
             }
@@ -158,8 +158,8 @@ struct MainWindow: View {
         }
         .keyboardShortcut(.space, modifiers: [])
         .disabled(isFinishing || (!isListening && !controller.canStartButtonRecording))
-        .accessibilityLabel(isListening ? "Stop recording" : (isFinishing ? "Transcribing" : "Start recording"))
-        .accessibilityValue(recordingAccessibilityValue)
+        .accessibilityLabel(L10n.text(isListening ? "Stop recording" : (isFinishing ? "Transcribing" : "Start recording")))
+        .accessibilityValue(L10n.text(recordingAccessibilityValue))
     }
 
     private var recordingAccessibilityValue: String {
@@ -202,6 +202,7 @@ struct PrimaryActionButton: View {
 
 private struct HomePanel: View {
     @Bindable var controller: DictationController
+    @State private var appLanguage = AppLanguageStore.shared
     @State private var store = RunStore.shared
     @State private var recoverableStore = RecoverableRecordingStore.shared
     @State private var audioPlayer = HistoryAudioPlayer()
@@ -260,7 +261,10 @@ private struct HomePanel: View {
                     LazyVStack(alignment: .leading, spacing: DS.Space.roomy) {
                         ForEach(groupedRuns, id: \.0) { date, runs in
                             VStack(alignment: .leading, spacing: DS.Space.snug) {
-                                Text(date.formatted(date: .abbreviated, time: .omitted))
+                                Text(date.formatted(
+                                    Date.FormatStyle(date: .abbreviated, time: .omitted)
+                                        .locale(appLanguage.language.locale)
+                                ))
                                     .font(DS.Font.eyebrow)
                                     .tracking(DS.Font.silkscreenTracking)
                                     .foregroundStyle(DS.Color.inkSecondary)
@@ -372,7 +376,7 @@ private struct LocalStat: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DS.Space.tight) {
-            Text(label.uppercased())
+            Text(L10n.text(label).uppercased())
                 .font(DS.Font.eyebrow)
                 .tracking(DS.Font.silkscreenTracking)
                 .foregroundStyle(DS.Color.inkSecondary)
@@ -409,7 +413,7 @@ private struct HistoryRow: View {
         HStack(alignment: .top, spacing: DS.Space.base) {
             VStack(alignment: .leading, spacing: DS.Space.tight) {
                 HStack(spacing: DS.Space.snug) {
-                    Text(run.engine)
+                    Text(L10n.text(run.engine))
                         .font(DS.Font.eyebrow)
                         .foregroundStyle(DS.Color.inkSecondary)
                     Text(run.date, style: .time)
@@ -452,7 +456,7 @@ private struct HistoryRow: View {
                 if let correction = run.correction {
                     HStack(spacing: DS.Space.tight) {
                         Image(systemName: "checkmark.circle")
-                        Text(HistoryRowStatus.correction(correction))
+                        Text(L10n.text(HistoryRowStatus.correction(correction)))
                     }
                     .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.inkSecondary)
@@ -475,8 +479,8 @@ private struct HistoryRow: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(DS.Color.inkSecondary)
                     .disabled(correctionDisabled)
-                    .help(isPlaying ? "Stop audio recording" : "Play audio recording")
-                    .accessibilityLabel(isPlaying ? "Stop audio recording" : "Play audio recording")
+                    .help(L10n.text(isPlaying ? "Stop audio recording" : "Play audio recording"))
+                    .accessibilityLabel(L10n.text(isPlaying ? "Stop audio recording" : "Play audio recording"))
                     .accessibilityHint(L10n.text("Plays the saved recording inside Murmure"))
 
                     Button(action: onRetranscribe) {
@@ -486,7 +490,7 @@ private struct HistoryRow: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(DS.Color.inkSecondary)
                     .disabled(correctionDisabled)
-                    .help(correctionDisabled ? "Finish the current dictation before retrying history" : "Retranscribe recording")
+                    .help(L10n.text(correctionDisabled ? "Finish the current dictation before retrying history" : "Retranscribe recording"))
                     .accessibilityLabel(L10n.text("Retranscribe recording"))
                     .accessibilityHint(L10n.text("Runs this saved audio through a local speech engine and shows a preview"))
                 }
@@ -498,7 +502,7 @@ private struct HistoryRow: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .disabled(correctionDisabled)
-                .help(correctionDisabled ? "Finish the current dictation before correcting history" : "Correct dictation")
+                .help(L10n.text(correctionDisabled ? "Finish the current dictation before correcting history" : "Correct dictation"))
                 .accessibilityLabel(L10n.text("Correct dictation"))
                 .accessibilityHint(L10n.text("Opens an editor for this saved dictation"))
 
@@ -513,8 +517,8 @@ private struct HistoryRow: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(DS.Color.inkSecondary)
-                .help(didCopy ? "Copied" : "Copy transcription")
-                .accessibilityLabel(didCopy ? "Copied transcription" : "Copy transcription")
+                .help(L10n.text(didCopy ? "Copied" : "Copy transcription"))
+                .accessibilityLabel(L10n.text(didCopy ? "Copied transcription" : "Copy transcription"))
                 .accessibilityHint(L10n.text("Copies this dictation to the clipboard"))
 
                 Button(action: onDelete) {
@@ -570,7 +574,7 @@ private struct RecoverableHistoryRow: View {
                         .font(DS.Font.caption)
                         .foregroundStyle(DS.Color.inkSecondary)
                 }
-                Text(recording.failure?.message ?? "This recording is ready to retranscribe.")
+                Text(L10n.text(recording.failure?.message ?? "This recording is ready to retranscribe."))
                     .font(DS.Font.body)
                     .foregroundStyle(DS.Color.ink)
                     .fixedSize(horizontal: false, vertical: true)
@@ -597,8 +601,8 @@ private struct RecoverableHistoryRow: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .disabled(actionsDisabled)
-                .help(isPlaying ? "Stop recoverable recording" : "Play recoverable recording")
-                .accessibilityLabel(isPlaying ? "Stop recoverable recording" : "Play recoverable recording")
+                .help(L10n.text(isPlaying ? "Stop recoverable recording" : "Play recoverable recording"))
+                .accessibilityLabel(L10n.text(isPlaying ? "Stop recoverable recording" : "Play recoverable recording"))
 
                 Button(action: onRetranscribe) {
                     Image(systemName: "arrow.clockwise")
@@ -607,7 +611,7 @@ private struct RecoverableHistoryRow: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .disabled(actionsDisabled)
-                .help(actionsDisabled ? "Finish the current dictation before recovery" : "Retranscribe recoverable recording")
+                .help(L10n.text(actionsDisabled ? "Finish the current dictation before recovery" : "Retranscribe recoverable recording"))
                 .accessibilityLabel(L10n.text("Retranscribe recoverable recording"))
             }
             .opacity(isHovering ? 1 : 0.55)
@@ -655,7 +659,7 @@ struct SearchField: View {
         HStack(spacing: DS.Space.snug) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(DS.Color.inkSecondary)
-            TextField(placeholder, text: $text)
+            TextField(L10n.text(placeholder), text: $text)
                 .textFieldStyle(.plain)
                 .font(DS.Font.body)
                 .foregroundStyle(DS.Color.ink)

@@ -124,6 +124,7 @@ struct OnboardingWindow: View {
                         Text(language.nativeName).tag(language)
                     }
                 }
+                .id(appLanguage.language)
             case .privacy:
                 explanation(
                     "Everything you dictate is processed on this Mac. Audio, history, snippets, and your dictionary stay in Murmure's local data folder. Only model downloads and update checks use the network."
@@ -162,6 +163,7 @@ struct OnboardingWindow: View {
                 )) {
                     ForEach(HotkeyGesture.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
+                .id(appLanguage.language)
             case .microphoneTest:
                 explanation("Pick an input, start the meter, speak briefly, then stop the test.")
                 Picker(L10n.text("Input"), selection: $settings.microphoneSelection) {
@@ -184,9 +186,11 @@ struct OnboardingWindow: View {
                 Picker(L10n.text("Engine"), selection: onboardingEngineBinding) {
                     ForEach(SpeechEngineChoice.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
+                .id(appLanguage.language)
                 Picker(L10n.text("Language"), selection: onboardingLanguageBinding) {
                     ForEach(TranscriptionLanguageOption.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
+                .id(appLanguage.language)
             case .testDictation:
                 explanation("Record one short sentence. It will be saved to local history; this setup window does not contain a text field to paste into.")
                 Button(testDictationButtonTitle) {
