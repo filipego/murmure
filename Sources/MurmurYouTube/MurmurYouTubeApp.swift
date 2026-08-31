@@ -57,7 +57,9 @@ struct MurmurYouTubeApp: App {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let controller = DictationController()
     let updateCoordinator = AppUpdateCoordinator()
-    private var hud: HUDPanel?
+    private lazy var hudLifecycle = HUDLifecycle {
+        HUDPanel(controller: self.controller)
+    }
     private var stateObservation: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -78,8 +80,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // non-activating panel, so dictating into another app never steals its focus — that
         // property belongs to the panel, not to the activation policy.
         NSApp.setActivationPolicy(.regular)
-
-        hud = HUDPanel(controller: controller)
 
         if !controller.activate() {
             Permissions.promptForAccessibility()
@@ -167,11 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } onChange: { [weak self] in
             Task { @MainActor in
                 guard let self else { return }
-                if self.controller.state.isActive {
-                    self.hud?.present()
-                } else {
-                    self.hud?.dismiss()
-                }
+                self.hudLifecycle.setActive(self.controller.state.isActive)
                 self.observeState()
             }
         }
