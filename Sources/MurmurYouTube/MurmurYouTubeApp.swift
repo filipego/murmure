@@ -77,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         RunLog.beginDeferredPendingRuleRecovery()
         Task {
             await RecordingSessionRuntime.coordinator.recoverPendingSessions()
+            await RecoverableRecordingStore.shared.refresh()
         }
 
         // Parakeet's models take ~20s to load from disk, and that cost lands on whichever

@@ -8,6 +8,18 @@ struct RecordingSessionDependencies: Sendable {
     let appendHistory: @MainActor @Sendable (DictationRun) async -> Bool
 }
 
+struct RecoverableRecording: Identifiable, Equatable, Sendable {
+    let id: UUID
+    let startedAt: Date
+    let releasedAt: Date?
+    let trigger: RecordingTrigger
+    let engine: SessionEngineID
+    let language: TranscriptionLanguageSelection
+    let status: RecordingSessionStatus
+    let audioURL: URL
+    let failure: RecordingFailure?
+}
+
 enum RecordingSessionCoordinatorError: Error, Sendable {
     case audioStaging(String)
     case invalidCompletionState
@@ -112,6 +124,16 @@ actor RecordingSessionCoordinator {
         }
     }
 
+    /// Completes a user-confirmed recovery without exposing any text-insertion capability.
+    func completeRecoveredSession(sessionID: UUID, run: DictationRun) async -> Bool {
+        switch await complete(sessionID: sessionID, run: run) {
+        case .completed, .alreadyCompleted:
+            return true
+        case .failed:
+            return false
+        }
+    }
+
     @discardableResult
     func fail(sessionID: UUID, failure: RecordingFailure) async -> RecordingSessionManifest? {
         try? await store.transition(id: sessionID, to: .failed(failure))
@@ -136,6 +158,49 @@ actor RecordingSessionCoordinator {
                 text: finalText
             )
             _ = await complete(sessionID: session.id, run: run)
+        }
+    }
+
+    func recoverableRecordings() async -> [RecoverableRecording] {
+        guard let sessions = try? await store.recoverableSessions() else { return [] }
+        var recordings: [RecoverableRecording] = []
+        for session in sessions {
+            switch session.status {
+            case .readyForTranscription, .processing, .processed, .failed:
+                break
+            case .recording, .completed, .cancelled:
+                continue
+            }
+
+            let audioURL = await store.stagedAudioURL(for: session.id)
+            guard let values = try? audioURL.resourceValues(
+                forKeys: [.fileSizeKey, .isRegularFileKey]
+            ), values.isRegularFile == true, (values.fileSize ?? 0) > 0 else {
+                continue
+            }
+            let failure: RecordingFailure?
+            if case let .failed(recordingFailure) = session.status {
+                failure = recordingFailure
+            } else {
+                failure = nil
+            }
+            recordings.append(RecoverableRecording(
+                id: session.id,
+                startedAt: session.startedAt,
+                releasedAt: session.releasedAt,
+                trigger: session.trigger,
+                engine: session.engine,
+                language: session.language,
+                status: session.status,
+                audioURL: audioURL,
+                failure: failure
+            ))
+        }
+        return recordings.sorted {
+            if $0.startedAt == $1.startedAt {
+                return $0.id.uuidString > $1.id.uuidString
+            }
+            return $0.startedAt > $1.startedAt
         }
     }
 
