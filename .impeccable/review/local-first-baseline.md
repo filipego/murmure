@@ -32,6 +32,15 @@ Captured from the currently installed application before production changes.
 - Start and finish sounds: on
 - Push-to-talk key: `fn`
 
+## Automated baseline
+
+- Command: `make test`
+- Result: passed on 2026-08-30
+- XCTest: 9 tests passed
+- Swift Testing: 92 tests across 9 suites passed
+- Existing skip: stable signed-fixture validation was unavailable
+- Dictionary contract: the shared correction-vector suite passed unchanged
+
 ## Visual-change gate
 
 The existing shell remains locked. Approved work may add the explicitly requested controls and recovery states, but must reuse the design-system tokens and must not restyle unrelated layout, spacing, color, typography, imagery, or animation.
