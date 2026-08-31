@@ -1,4 +1,5 @@
 import AVFoundation
+import CryptoKit
 import Foundation
 import MurmurAudioCore
 
@@ -260,6 +261,68 @@ enum MurmureDataStore {
 /// The relative filename is stored in `DictationRun`, so the audio remains associated with its
 /// transcript without embedding a machine-specific absolute path in the history file.
 enum AudioHistoryStore {
+    static func promoteStagedAudio(from source: URL, id: UUID) async -> AudioPromotionResult {
+        await promoteStagedAudio(from: source, id: id, destinationRoot: MurmureDataStore.rootURL)
+    }
+
+    static func promoteStagedAudio(
+        from source: URL,
+        id: UUID,
+        destinationRoot: URL
+    ) async -> AudioPromotionResult {
+        await Task.detached(priority: .utility) {
+            do {
+                let fileManager = FileManager.default
+                let root = destinationRoot.standardizedFileURL
+                let recordings = root.appendingPathComponent("Recordings", isDirectory: true)
+                let filename = "\(id.uuidString.lowercased()).caf"
+                let destination = recordings.appendingPathComponent(filename, isDirectory: false)
+                guard let relativePath = relativePath(for: destination, under: root) else {
+                    return .failed("The recording destination escaped the data root.")
+                }
+
+                guard fileManager.fileExists(atPath: source.path) else {
+                    return .failed("Staged audio is missing.")
+                }
+                try fileManager.createDirectory(at: recordings, withIntermediateDirectories: true)
+
+                if fileManager.fileExists(atPath: destination.path) {
+                    return try matchingAudio(source, destination)
+                        ? .alreadyPromoted(relativePath: relativePath)
+                        : .failed("A different recording already exists at the destination.")
+                }
+
+                let temporary = recordings.appendingPathComponent(
+                    ".\(filename).promoting-\(UUID().uuidString.lowercased())",
+                    isDirectory: false
+                )
+                defer { try? fileManager.removeItem(at: temporary) }
+                try fileManager.copyItem(at: source, to: temporary)
+                guard try matchingAudio(source, temporary) else {
+                    return .failed("The promoted audio did not match its staged source.")
+                }
+
+                do {
+                    try fileManager.moveItem(at: temporary, to: destination)
+                } catch {
+                    if fileManager.fileExists(atPath: destination.path) {
+                        return try matchingAudio(source, destination)
+                            ? .alreadyPromoted(relativePath: relativePath)
+                            : .failed("A different recording won the destination race.")
+                    }
+                    throw error
+                }
+
+                guard try matchingAudio(source, destination) else {
+                    return .failed("The final audio did not match its staged source.")
+                }
+                return .promoted(relativePath: relativePath)
+            } catch {
+                return .failed(error.localizedDescription)
+            }
+        }.value
+    }
+
     static func save(_ chunks: [AudioChunk], id: UUID) -> String? {
         guard chunks.contains(where: { $0.buffer.frameLength > 0 }) else { return nil }
 
@@ -294,4 +357,41 @@ enum AudioHistoryStore {
         MurmureDataStore.url(forRelativePath: relativePath)
     }
 
+    private static func matchingAudio(_ lhs: URL, _ rhs: URL) throws -> Bool {
+        try fingerprint(lhs) == fingerprint(rhs)
+    }
+
+    private static func relativePath(for url: URL, under rootURL: URL) -> String? {
+        let root = rootURL.standardizedFileURL.path
+        let candidate = url.standardizedFileURL.path
+        guard candidate.hasPrefix(root + "/") else { return nil }
+        return String(candidate.dropFirst(root.count + 1))
+    }
+
+    private static func fingerprint(_ url: URL) throws -> AudioFingerprint {
+        let values = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
+        guard values.isRegularFile == true, let size = values.fileSize else {
+            throw CocoaError(.fileReadUnsupportedScheme)
+        }
+
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let data = try handle.read(upToCount: 1_048_576), !data.isEmpty {
+            hasher.update(data: data)
+        }
+        return AudioFingerprint(size: size, digest: Data(hasher.finalize()))
+    }
+
+}
+
+enum AudioPromotionResult: Equatable, Sendable {
+    case promoted(relativePath: String)
+    case alreadyPromoted(relativePath: String)
+    case failed(String)
+}
+
+private struct AudioFingerprint: Equatable {
+    let size: Int
+    let digest: Data
 }
