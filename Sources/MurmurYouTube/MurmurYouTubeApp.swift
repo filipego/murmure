@@ -56,6 +56,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var stateObservation: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let issue = RuntimeCompatibilityPolicy.currentIssue {
+            NSApp.setActivationPolicy(.regular)
+            let alert = NSAlert()
+            alert.alertStyle = .critical
+            alert.messageText = "This Murmure build is not compatible with this Mac"
+            alert.informativeText = issue.message
+            alert.addButton(withTitle: "Quit Murmure")
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+            NSApp.terminate(nil)
+            return
+        }
+
         // A regular app now: dock icon, app menu, standard windows. The HUD is still a
         // non-activating panel, so dictating into another app never steals its focus — that
         // property belongs to the panel, not to the activation policy.
