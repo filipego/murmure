@@ -56,10 +56,16 @@ final class HotkeyMonitor {
     private var tap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var isPressed = false
+    private var isHandsFreePressed = false
 
     var key: PushToTalkKey = .rightOption
+    var handsFreeKey: PushToTalkKey?
     var onPress: (() -> Void)?
     var onRelease: (() -> Void)?
+    var isHandsFreeActive: (() -> Bool)?
+    var onHandsFreeToggle: (() -> Void)?
+    var onHandsFreeFinish: (() -> Void)?
+    var onHandsFreeCancel: (() -> Void)?
 
     /// - Returns: `false` if the tap couldn't be created — almost always missing Accessibility permission.
     @discardableResult
@@ -67,6 +73,7 @@ final class HotkeyMonitor {
         stop()
 
         let mask = (1 << CGEventType.flagsChanged.rawValue)
+            | (1 << CGEventType.keyDown.rawValue)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
@@ -114,6 +121,7 @@ final class HotkeyMonitor {
         tap = nil
         runLoopSource = nil
         isPressed = false
+        isHandsFreePressed = false
     }
 
     // MARK: - Tap callback
@@ -126,7 +134,35 @@ final class HotkeyMonitor {
             return false
         }
 
-        guard type == .flagsChanged, keyCode == key.keyCode else { return false }
+        if type == .keyDown,
+           let action = HandsFreeControlKey.action(
+               keyCode: keyCode,
+               isHandsFreeActive: isHandsFreeActive?() ?? false
+           ) {
+            switch action {
+            case .finish:
+                onHandsFreeFinish?()
+            case .cancel:
+                onHandsFreeCancel?()
+            }
+            // Return must not also add a newline, and Escape must not dismiss a target-app
+            // surface, when that key has just controlled Murmure's active recording.
+            return true
+        }
+
+        guard type == .flagsChanged else { return false }
+
+        if let handsFreeKey, keyCode == handsFreeKey.keyCode {
+            let nowPressed = flags.contains(handsFreeKey.flag)
+            guard nowPressed != isHandsFreePressed else { return false }
+            isHandsFreePressed = nowPressed
+
+            // Toggle on the down edge only. Modifier release is deliberately not a finish.
+            if nowPressed { onHandsFreeToggle?() }
+            return handsFreeKey.shouldConsumeEvent
+        }
+
+        guard keyCode == key.keyCode else { return false }
 
         let nowPressed = flags.contains(key.flag)
         guard nowPressed != isPressed else { return false }

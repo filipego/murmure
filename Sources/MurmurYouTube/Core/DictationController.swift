@@ -52,6 +52,8 @@ final class DictationController {
     private let sessionCoordinator: RecordingSessionCoordinator
     private var wantsHotkeyActive = false
     private var isHotkeySuspendedForModalInput = false
+    private var handsFreePolicy = HandsFreeGesturePolicy()
+    private var activeTrigger: RecordingTrigger?
 
     var canStartButtonRecording: Bool {
         guard !isHotkeySuspendedForModalInput else { return false }
@@ -109,13 +111,28 @@ final class DictationController {
 
     private func armHotkey() -> Bool {
         hotkey.key = Settings.shared.pushToTalkKey
+        hotkey.handsFreeKey = Settings.shared.handsFreeEnabled
+            ? Settings.shared.handsFreeKey
+            : nil
         hotkey.onPress = { [weak self] in
             guard let self else { return }
             self.beginDictation(
                 trigger: .holdToTalk(bindingID: Settings.shared.pushToTalkKey.rawValue)
             )
         }
-        hotkey.onRelease = { [weak self] in self?.endDictation() }
+        hotkey.onRelease = { [weak self] in self?.endHoldToTalkDictation() }
+        hotkey.isHandsFreeActive = { [weak self] in
+            self?.handsFreePolicy.isActive ?? false
+        }
+        hotkey.onHandsFreeToggle = { [weak self] in
+            self?.handleHandsFree(.bindingPressed)
+        }
+        hotkey.onHandsFreeFinish = { [weak self] in
+            self?.handleHandsFree(.enterPressed)
+        }
+        hotkey.onHandsFreeCancel = { [weak self] in
+            self?.handleHandsFree(.escapePressed)
+        }
         return hotkey.start()
     }
 
@@ -159,11 +176,38 @@ final class DictationController {
         endDictation()
     }
 
+    private func endHoldToTalkDictation() {
+        guard case .holdToTalk = activeTrigger else { return }
+        endDictation()
+    }
+
+    private func handleHandsFree(_ event: HandsFreeGesturePolicy.Event) {
+        if event == .bindingPressed,
+           !handsFreePolicy.isActive,
+           state != .idle {
+            return
+        }
+
+        switch handsFreePolicy.handle(event) {
+        case .start:
+            beginDictation(
+                trigger: .handsFree(bindingID: Settings.shared.handsFreeKey.rawValue)
+            )
+        case .finish:
+            endDictation()
+        case .cancel:
+            cancelDictation()
+        case .ignore:
+            break
+        }
+    }
+
     // MARK: - Dictation
 
     private func beginDictation(trigger: RecordingTrigger) {
         guard case .idle = state else { return }
         state = .starting
+        activeTrigger = trigger
         transcript = ""
         holdStarted = Date()
         isComparing = Settings.shared.compareMode
@@ -266,6 +310,11 @@ final class DictationController {
     }
 
     private func endDictation() {
+        if handsFreePolicy.isActive,
+           case .handsFree = activeTrigger {
+            _ = handsFreePolicy.handle(.enterPressed)
+        }
+
         // `.finishing` is "active", so without this a second press during processing would
         // run the whole tail again — re-reading `transcript` before the first pass cleared
         // it and pasting the same utterance twice. The window is wide: Parakeet transcribes
@@ -320,6 +369,7 @@ final class DictationController {
                 activeSessionID = nil
                 holdStarted = nil
                 self.releasedAt = nil
+                resetTriggerLifecycle()
                 state = .idle
                 transcript = ""
                 return
@@ -370,6 +420,7 @@ final class DictationController {
 
             holdStarted = nil
             self.releasedAt = nil
+            resetTriggerLifecycle()
             state = .idle
             transcript = ""
         }
@@ -396,6 +447,7 @@ final class DictationController {
         state = .idle
         transcript = ""
         level = 0
+        resetTriggerLifecycle()
     }
 
     private func teardown() async {
@@ -412,6 +464,7 @@ final class DictationController {
             activeSessionID = nil
             await sessionCoordinator.cancel(sessionID: sessionID)
         }
+        resetTriggerLifecycle()
         state = .idle
     }
 
@@ -426,6 +479,7 @@ final class DictationController {
         recorded.removeAll(keepingCapacity: false)
 
         guard !chunks.isEmpty, let holdStarted, let releasedAt else {
+            resetTriggerLifecycle()
             state = .idle
             transcript = ""
             return
@@ -464,6 +518,7 @@ final class DictationController {
         self.holdStarted = nil
         self.releasedAt = nil
         isComparing = false
+        resetTriggerLifecycle()
         state = .idle
         transcript = ""
 
@@ -473,6 +528,11 @@ final class DictationController {
     /// Light smoothing so the waveform glides instead of strobing at buffer rate.
     private func updateLevel(_ new: Float) {
         level += (new - level) * 0.35
+    }
+
+    private func resetTriggerLifecycle() {
+        activeTrigger = nil
+        _ = handsFreePolicy.handle(.sessionEnded)
     }
 
     private func fail(_ message: String) {
@@ -490,6 +550,7 @@ final class DictationController {
             let failure = RecordingFailure(stage: .transcription, message: message)
             Task { await sessionCoordinator.fail(sessionID: sessionID, failure: failure) }
         }
+        resetTriggerLifecycle()
         state = .error(message)
         level = 0
 
