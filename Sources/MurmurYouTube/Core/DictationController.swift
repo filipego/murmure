@@ -249,6 +249,12 @@ final class DictationController {
                 guard let format = await formatOwner.preferredInputFormat() else {
                     throw TranscriptionError.noAudioFormat
                 }
+                let liveInput = try LiveAudioInputResolver.resolve(
+                    Settings.shared.microphoneSelection
+                )
+                if case .fallback = liveInput.resolution {
+                    Log.audio.error("\(liveInput.resolution.statusText, privacy: .public)")
+                }
 
                 // Audio must reach the engine in capture order. A stream plus a single
                 // draining task guarantees that; spawning a Task per buffer would not. Keep
@@ -276,12 +282,18 @@ final class DictationController {
                 }
 
                 try capture.start(
+                    deviceID: liveInput.objectID,
                     outputFormat: format,
                     onBuffer: { chunk in
                         audioContinuation.yield(chunk)
                     },
                     onLevel: { [weak self] level in
                         Task { @MainActor in self?.updateLevel(level) }
+                    },
+                    onDeviceChange: { [weak self] in
+                        Task { @MainActor in
+                            self?.handleAudioInputChange(liveInput.device.displayName)
+                        }
                     }
                 )
 
@@ -528,6 +540,11 @@ final class DictationController {
     /// Light smoothing so the waveform glides instead of strobing at buffer rate.
     private func updateLevel(_ new: Float) {
         level += (new - level) * 0.35
+    }
+
+    private func handleAudioInputChange(_ deviceName: String) {
+        guard state == .starting || state == .listening else { return }
+        fail("\(deviceName) changed or disconnected. This recording stopped safely; try again to re-resolve the microphone.")
     }
 
     private func resetTriggerLifecycle() {

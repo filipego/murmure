@@ -71,6 +71,9 @@ final class CorrectionVoiceController {
                 guard let format = await engine.preferredInputFormat() else {
                     throw TranscriptionError.noAudioFormat
                 }
+                let liveInput = try LiveAudioInputResolver.resolve(
+                    Settings.shared.microphoneSelection
+                )
                 guard sessionID == id, state == .starting else {
                     await engine.finish()
                     return
@@ -87,9 +90,18 @@ final class CorrectionVoiceController {
                 }
 
                 try capture.start(
+                    deviceID: liveInput.objectID,
                     outputFormat: format,
                     onBuffer: { continuation.yield($0) },
-                    onLevel: { _ in }
+                    onLevel: { _ in },
+                    onDeviceChange: { [weak self] in
+                        Task { @MainActor in
+                            self?.fail(
+                                "\(liveInput.device.displayName) changed or disconnected.",
+                                sessionID: id
+                            )
+                        }
+                    }
                 )
                 guard sessionID == id, state == .starting else {
                     finish(.cancelled, sessionID: id)

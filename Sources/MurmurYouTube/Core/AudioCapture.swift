@@ -1,5 +1,21 @@
 import AVFoundation
+import AudioToolbox
+import CoreAudio
 import Foundation
+
+enum AudioCaptureError: LocalizedError {
+    case inputUnitUnavailable
+    case deviceConfigurationFailed(OSStatus)
+
+    var errorDescription: String? {
+        switch self {
+        case .inputUnitUnavailable:
+            "The selected microphone could not be opened."
+        case let .deviceConfigurationFailed(status):
+            "The selected microphone could not be configured (CoreAudio \(status))."
+        }
+    }
+}
 
 /// Microphone capture with on-the-fly conversion to whatever format the speech engine wants.
 ///
@@ -10,6 +26,8 @@ final class AudioCapture: @unchecked Sendable {
     private nonisolated(unsafe) var converter: AVAudioConverter?
     private nonisolated(unsafe) var outputFormat: AVAudioFormat?
     private var isRunning = false
+    private var hasInputTap = false
+    private var configurationObserver: NSObjectProtocol?
 
     /// Called on the audio thread with each converted buffer.
     private nonisolated(unsafe) var onBuffer: (@Sendable (AudioChunk) -> Void)?
@@ -17,9 +35,11 @@ final class AudioCapture: @unchecked Sendable {
     private nonisolated(unsafe) var onLevel: (@Sendable (Float) -> Void)?
 
     func start(
+        deviceID: AudioDeviceID,
         outputFormat: AVAudioFormat,
         onBuffer: @escaping @Sendable (AudioChunk) -> Void,
-        onLevel: @escaping @Sendable (Float) -> Void
+        onLevel: @escaping @Sendable (Float) -> Void,
+        onDeviceChange: @escaping @Sendable () -> Void
     ) throws {
         guard !isRunning else { return }
 
@@ -28,6 +48,23 @@ final class AudioCapture: @unchecked Sendable {
         self.outputFormat = outputFormat
 
         let input = engine.inputNode
+        guard let audioUnit = input.audioUnit else {
+            cleanup()
+            throw AudioCaptureError.inputUnitUnavailable
+        }
+        var selectedDeviceID = deviceID
+        let deviceStatus = AudioUnitSetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &selectedDeviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+        guard deviceStatus == noErr else {
+            cleanup()
+            throw AudioCaptureError.deviceConfigurationFailed(deviceStatus)
+        }
         let nativeFormat = input.outputFormat(forBus: 0)
 
         converter = nativeFormat == outputFormat
@@ -38,22 +75,48 @@ final class AudioCapture: @unchecked Sendable {
         input.installTap(onBus: 0, bufferSize: 2048, format: nativeFormat) { [weak self] buffer, _ in
             self?.handle(buffer)
         }
+        hasInputTap = true
 
         engine.prepare()
-        try engine.start()
+        do {
+            try engine.start()
+        } catch {
+            cleanup()
+            throw error
+        }
         isRunning = true
+        configurationObserver = NotificationCenter.default.addObserver(
+            forName: .AVAudioEngineConfigurationChange,
+            object: engine,
+            queue: .main
+        ) { [weak self] _ in
+            guard self?.isRunning == true else { return }
+            onDeviceChange()
+        }
         Log.audio.info("capture started — native \(nativeFormat.sampleRate)Hz → engine \(outputFormat.sampleRate)Hz")
     }
 
     func stop() {
-        guard isRunning else { return }
-        engine.inputNode.removeTap(onBus: 0)
+        guard isRunning || hasInputTap || configurationObserver != nil else { return }
+        cleanup()
+        Log.audio.info("capture stopped")
+    }
+
+    private func cleanup() {
+        if hasInputTap {
+            engine.inputNode.removeTap(onBus: 0)
+            hasInputTap = false
+        }
         engine.stop()
         isRunning = false
+        if let configurationObserver {
+            NotificationCenter.default.removeObserver(configurationObserver)
+            self.configurationObserver = nil
+        }
         converter = nil
+        outputFormat = nil
         onBuffer = nil
         onLevel = nil
-        Log.audio.info("capture stopped")
     }
 
     // MARK: - Audio thread
