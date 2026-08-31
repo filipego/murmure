@@ -132,13 +132,14 @@ enum RecordingSessionStatus: Codable, Sendable, Equatable {
     case recording
     case readyForTranscription
     case processing
+    case processed(finalText: String)
     case failed(RecordingFailure)
     case completed(runID: UUID)
     case cancelled
 }
 ```
 
-The persisted manifest is a transaction journal. Audio is staged in local Application Support first. Promotion to preferred storage and completed history is idempotent. A completed manifest can be cleaned only after its history row and audio destination are confirmed.
+The persisted manifest is a transaction journal. Audio is staged in local Application Support first. The processed state makes final text durable before insertion or history promotion. Recovery never inserts processed text automatically, preventing duplicate paste after a crash. Promotion to preferred storage and completed history is idempotent. A completed manifest can be cleaned only after its history row and audio destination are confirmed.
 
 ### Recording trigger
 
@@ -347,9 +348,10 @@ The controller obtains selected text through the existing Accessibility seam, re
 4. Ordered audio reaches both the engine and local staging.
 5. Release finalizes staged audio before the session can be considered ready.
 6. The pipeline finishes transcription, language-aware cleanup, snippets, and dictionary correction.
-7. The session store promotes audio and history idempotently.
-8. Only the live controller path inserts the confirmed final text.
-9. The manifest becomes completed and is eligible for cleanup.
+7. The pipeline persists the processed final text in the session manifest.
+8. Only the live controller path inserts that text. Relaunch recovery never inserts it.
+9. The session store promotes audio and history idempotently.
+10. The manifest becomes completed and is eligible for cleanup.
 
 ### Hands-free
 
