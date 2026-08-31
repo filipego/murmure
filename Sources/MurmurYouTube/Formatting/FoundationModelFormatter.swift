@@ -1,5 +1,53 @@
 import Foundation
 import FoundationModels
+import Observation
+
+enum FoundationModelAvailabilityState: Equatable {
+    case checking
+    case available(supportedCleanupLanguages: Set<String>)
+    case unavailable(String)
+}
+
+@MainActor
+@Observable
+final class FoundationModelAvailabilityStore {
+    private(set) var state: FoundationModelAvailabilityState = .checking
+
+    var isAvailable: Bool {
+        if case .available = state { return true }
+        return false
+    }
+
+    var unavailableReason: String? {
+        if case let .unavailable(reason) = state { return reason }
+        return nil
+    }
+
+    func supports(_ profile: CleanupProfile) -> Bool {
+        guard case let .available(supportedLanguages) = state,
+              let language = profile.locale?.language.languageCode?.identifier
+        else { return false }
+        return supportedLanguages.contains(language)
+    }
+
+    func loadIfNeeded(
+        reasonQuery: () -> String? = { FoundationModelFormatter.unavailableReason },
+        supportsQuery: (CleanupProfile) -> Bool = { FoundationModelFormatter.supports($0) }
+    ) {
+        guard state == .checking else { return }
+        if let reason = reasonQuery() {
+            state = .unavailable(reason)
+            return
+        }
+
+        let profiles: [CleanupProfile] = [.english, .spanish, .french]
+        let supportedLanguages = Set<String>(profiles.compactMap { profile in
+            guard supportsQuery(profile) else { return nil }
+            return profile.locale?.language.languageCode?.identifier
+        })
+        state = .available(supportedCleanupLanguages: supportedLanguages)
+    }
+}
 
 /// Cleanup via Apple's on-device LLM (macOS 26 Foundation Models).
 ///

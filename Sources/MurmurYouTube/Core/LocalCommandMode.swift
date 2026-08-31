@@ -2,7 +2,6 @@ import AppKit
 import ApplicationServices
 import Foundation
 import FoundationModels
-import Observation
 
 struct LocalCommandRequest: Sendable, Equatable {
     let selectedText: String
@@ -16,29 +15,6 @@ enum LocalCommandReviewState: Equatable {
     case processing
     case review(original: String, proposed: String, notice: String? = nil)
     case failed(String)
-}
-
-enum LocalCommandAvailabilityState: Equatable {
-    case checking
-    case available
-    case unavailable(String)
-}
-
-@MainActor
-@Observable
-final class LocalCommandAvailabilityStore {
-    private(set) var state: LocalCommandAvailabilityState = .checking
-
-    func loadIfNeeded(
-        query: () -> String? = { FoundationLocalCommandTransformer.unavailableReason }
-    ) {
-        guard state == .checking else { return }
-        if let reason = query() {
-            state = .unavailable(reason)
-        } else {
-            state = .available
-        }
-    }
 }
 
 enum LocalCommandReplacementDecision: Equatable, Sendable {

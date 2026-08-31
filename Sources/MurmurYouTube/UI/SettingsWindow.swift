@@ -15,7 +15,7 @@ struct SettingsWindow: View {
     @State private var speechLanguages = SpeechLanguageCatalog.shared
     @State private var snippets = SnippetStore.shared
     @State private var microphoneTest = MicrophoneTestCoordinator()
-    @State private var commandModeAvailability = LocalCommandAvailabilityStore()
+    @State private var foundationModelAvailability = FoundationModelAvailabilityStore()
     @State private var permissionRefresh = 0
     @State private var hotkeyCaptureTarget: HotkeyCaptureTarget?
     @State private var pendingRiskyHotkey: PendingHotkey?
@@ -306,7 +306,7 @@ struct SettingsWindow: View {
         }
         .background(DS.Color.canvas)
         .task {
-            commandModeAvailability.loadIfNeeded()
+            foundationModelAvailability.loadIfNeeded()
             audioInputs.refresh()
             await speechLanguages.refresh()
             updates?.refreshStagedUpdate()
@@ -510,11 +510,11 @@ struct SettingsWindow: View {
     }
 
     private var commandModeIsAvailable: Bool {
-        commandModeAvailability.state == .available
+        foundationModelAvailability.isAvailable
     }
 
     private var commandModeAvailabilityText: String {
-        switch commandModeAvailability.state {
+        switch foundationModelAvailability.state {
         case .checking:
             return "Checking Apple's on-device model availability…"
         case .available:
@@ -652,7 +652,7 @@ struct SettingsWindow: View {
     }
 
     private var smartCleanupSupported: Bool {
-        FoundationModelFormatter.supports(settings.transcriptionLanguage.cleanupProfile)
+        foundationModelAvailability.supports(settings.transcriptionLanguage.cleanupProfile)
     }
 
     private var smartCleanupBinding: Binding<Bool> {
@@ -664,7 +664,10 @@ struct SettingsWindow: View {
 
     private var smartCleanupUnavailableReason: String? {
         guard settings.cleanupEnabled else { return nil }
-        if let reason = FoundationModelFormatter.unavailableReason { return reason }
+        if let reason = foundationModelAvailability.unavailableReason { return reason }
+        if foundationModelAvailability.state == .checking {
+            return "Checking Apple's on-device model availability…"
+        }
         guard smartCleanupSupported else {
             return "Smart cleanup does not support \(settings.transcriptionLanguage.displayName); deterministic local cleanup will be used."
         }
