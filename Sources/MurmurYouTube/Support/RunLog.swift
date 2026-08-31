@@ -85,6 +85,24 @@ enum RunLogAppendRollback {
     }
 }
 
+enum RunLogReplacementRollback {
+    /// Restores only the exact failed replacement. If the same run was corrected or replaced
+    /// again while persistence was pending, that newer value wins and remains untouched.
+    static func restore(
+        attempted: DictationRun,
+        original: DictationRun,
+        in runs: [DictationRun]
+    ) -> [DictationRun] {
+        guard let index = runs.firstIndex(where: { $0.id == attempted.id }),
+              runs[index] == attempted else {
+            return runs
+        }
+        var restored = runs
+        restored[index] = original
+        return restored
+    }
+}
+
 @MainActor
 struct DurableRunAppendTransaction {
     let persist: (DictationRun) -> Task<Bool, Never>
@@ -102,6 +120,38 @@ struct DurableRunAppendTransaction {
         guard await persist(run).value else {
             let current = load()
             let rolledBack = RunLogAppendRollback.restore(attempted: run, in: current)
+            if rolledBack != current { store(rolledBack) }
+            return false
+        }
+        return true
+    }
+}
+
+@MainActor
+struct DurableRunReplacementTransaction {
+    let persist: ([DictationRun]) -> Task<Bool, Never>
+    let load: () -> [DictationRun]
+    let store: ([DictationRun]) -> Void
+
+    func replace(id: UUID, with replacement: DictationRun) async -> Bool {
+        guard replacement.id == id else { return false }
+        let originalRuns = load()
+        guard let index = originalRuns.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+
+        let original = originalRuns[index]
+        var attemptedRuns = originalRuns
+        attemptedRuns[index] = replacement
+        store(attemptedRuns)
+
+        guard await persist(attemptedRuns).value else {
+            let current = load()
+            let rolledBack = RunLogReplacementRollback.restore(
+                attempted: replacement,
+                original: original,
+                in: current
+            )
             if rolledBack != current { store(rolledBack) }
             return false
         }
@@ -256,6 +306,20 @@ enum RunLog {
             }
         )
         return await transaction.record(run)
+    }
+
+    static func replaceDurably(id: UUID, with replacement: DictationRun) async -> Bool {
+        await ensureHistoryHydrated()
+        let transaction = DurableRunReplacementTransaction(
+            persist: { enqueueRewrite($0) },
+            load: { cachedRuns },
+            store: { runs in
+                cachedRuns = runs
+                regenerate()
+                RunStore.shared.reload()
+            }
+        )
+        return await transaction.replace(id: id, with: replacement)
     }
 
     static func saveCorrection(

@@ -194,6 +194,106 @@ struct CorrectionHistoryTests {
         #expect(conflictingState.persistCalls == 0)
     }
 
+    @Test("durable replacement changes exactly one stable history id")
+    @MainActor
+    func durableReplacementChangesOneRun() async {
+        let original = sampleRun()
+        let unrelated = DictationRun(
+            date: Date(timeIntervalSince1970: 200),
+            engine: "Parakeet",
+            audioSeconds: 2,
+            processSeconds: 0.2,
+            text: "Unrelated"
+        )
+        var replacement = original
+        replacement.text = "Retranscribed"
+        let state = RunCacheState(runs: [original, unrelated])
+        let transaction = DurableRunReplacementTransaction(
+            persist: { snapshot in
+                state.persistedSnapshots.append(snapshot)
+                return Task { true }
+            },
+            load: { state.runs },
+            store: { state.runs = $0 }
+        )
+
+        #expect(await transaction.replace(id: original.id, with: replacement))
+        #expect(state.runs == [replacement, unrelated])
+        #expect(state.persistedSnapshots == [[replacement, unrelated]])
+    }
+
+    @Test("replacement rejects missing and mismatched ids without persistence")
+    @MainActor
+    func durableReplacementRejectsInvalidIdentity() async {
+        let original = sampleRun()
+        var replacement = original
+        replacement.text = "Retranscribed"
+        let state = RunCacheState(runs: [original])
+        let transaction = DurableRunReplacementTransaction(
+            persist: { _ in
+                state.persistCalls += 1
+                return Task { true }
+            },
+            load: { state.runs },
+            store: { state.runs = $0 }
+        )
+
+        #expect(!(await transaction.replace(id: UUID(), with: replacement)))
+        replacement.id = UUID()
+        #expect(!(await transaction.replace(id: original.id, with: replacement)))
+        #expect(state.runs == [original])
+        #expect(state.persistCalls == 0)
+    }
+
+    @Test("failed replacement restores its row while retaining a concurrent append")
+    @MainActor
+    func failedReplacementPreservesConcurrentAppend() async {
+        let original = sampleRun()
+        var replacement = original
+        replacement.text = "Retranscribed"
+        let later = DictationRun(
+            date: Date(timeIntervalSince1970: 300),
+            engine: "Apple",
+            audioSeconds: 1,
+            processSeconds: 0.1,
+            text: "Arrived during persistence"
+        )
+        let state = RunCacheState(runs: [original])
+        let transaction = DurableRunReplacementTransaction(
+            persist: { _ in
+                state.runs.append(later)
+                return Task { false }
+            },
+            load: { state.runs },
+            store: { state.runs = $0 }
+        )
+
+        #expect(!(await transaction.replace(id: original.id, with: replacement)))
+        #expect(state.runs == [original, later])
+    }
+
+    @Test("failed replacement never overwrites a newer mutation of the same id")
+    @MainActor
+    func failedReplacementPreservesSupersedingMutation() async {
+        let original = sampleRun()
+        var replacement = original
+        replacement.text = "Retranscribed"
+        var superseding = replacement
+        superseding.text = "Corrected while persistence was pending"
+        let state = RunCacheState(runs: [original])
+        let transaction = DurableRunReplacementTransaction(
+            persist: { _ in
+                state.runs = [superseding]
+                return Task { false }
+            },
+            load: { state.runs },
+            store: { state.runs = $0 }
+        )
+
+        #expect(!(await transaction.replace(id: original.id, with: replacement)))
+        #expect(state.runs == [superseding])
+    }
+
     @Test("a pending rule survives a history JSON round trip for later reconciliation")
     func pendingRuleJournalRoundTrip() throws {
         let suggestion = CorrectionRuleSuggestion(hear: "a lie", write: "a line")
@@ -406,8 +506,13 @@ struct CorrectionHistoryTests {
 
 @MainActor
 private final class RunCacheState {
-    var runs: [DictationRun] = []
+    var runs: [DictationRun]
     var persistCalls = 0
+    var persistedSnapshots: [[DictationRun]] = []
+
+    init(runs: [DictationRun] = []) {
+        self.runs = runs
+    }
 }
 
 private actor PersistenceRecorder {
