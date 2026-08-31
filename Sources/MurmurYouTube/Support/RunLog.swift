@@ -5,6 +5,7 @@ struct TranscriptCorrectionRecord: Codable, Equatable, Sendable {
     enum InputMethod: String, Codable, Equatable, Sendable {
         case typed
         case voiceAssisted
+        case retranscription
     }
 
     let heardText: String
