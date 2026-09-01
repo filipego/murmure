@@ -183,7 +183,7 @@
   <section class="page dark" data-document-role="page" data-label="Cover">
     <p class="kicker"><span class="record-dot"></span>Complete user guide</p>
     <h1>Murmure.<br>Your local<br>voice desk.</h1>
-    <p class="lead">Everything you need to install, configure, dictate, edit, personalize, recover, and troubleshoot Murmure 0.1.14.</p>
+    <p class="lead">Everything you need to install, configure, dictate, edit, personalize, recover, and troubleshoot Murmure 0.1.15.</p>
     <div class="cover-deck"><div class="cover-face"><small>MURMURE / INPUT LEVEL</small><div class="meter"><i style="height:25%"></i><i style="height:39%"></i><i style="height:62%"></i><i style="height:83%"></i><i style="height:57%"></i><i style="height:73%"></i><i style="height:91%"></i><i style="height:69%"></i><i style="height:48%"></i><i style="height:80%"></i><i style="height:92%"></i><i style="height:100%"></i></div><div class="knobs"><span class="knob"></span><span class="knob"></span><span class="knob"></span><span class="record-dot" style="width:56px;height:56px;margin-left:auto"></span></div></div></div>
     <div class="footer"><span class="brand">MURMURE</span><span>Apple Silicon / macOS 26+</span></div>
   </section>
@@ -200,7 +200,7 @@
         <div class="toc-row"><b>04</b><span>Everyday dictation</span></div>
         <div class="toc-row"><b>05</b><span>Gestures and hands-free</span></div>
         <div class="toc-row"><b>06</b><span>Speech engines</span></div>
-        <div class="toc-row"><b>07</b><span>Languages</span></div>
+        <div class="toc-row"><b>07</b><span>Display and spoken languages</span></div>
         <div class="toc-row"><b>08</b><span>Microphone and sound</span></div>
       </div>
       <div>
@@ -240,15 +240,16 @@
 
   <section class="page" data-document-role="page" data-label="First Launch Setup">
     <p class="kicker">02 / First launch</p>
-    <h2>Complete all seven setup steps.</h2>
+    <h2>Complete all eight setup steps.</h2>
     <p class="lead">The Continue button stays unavailable until the required proof for that step is complete.</p>
     <ol class="step-list" style="margin-top:26px">
+      <li><strong>Display language.</strong> Choose English, Français, or Español for Murmure's menus, buttons, and instructions.</li>
       <li><strong>Private by design.</strong> Review where data lives and the two network exceptions.</li>
       <li><strong>Microphone.</strong> Request access so Murmure can hear recordings.</li>
       <li><strong>Accessibility.</strong> Open macOS settings and grant access so the global shortcut and text insertion work.</li>
       <li><strong>Shortcut.</strong> Choose a physical key and one of the three gestures.</li>
       <li><strong>Microphone test.</strong> Choose an input, start the meter, speak, and stop the test.</li>
-      <li><strong>Language behavior.</strong> Choose Automatic or an explicit language and confirm the engine.</li>
+      <li><strong>Language you speak.</strong> Keep Automatic for multilingual recognition or choose an explicit language hint.</li>
       <li><strong>Test dictation.</strong> Record a short sentence, finish it, then acknowledge the completed test.</li>
     </ol>
     <div class="grid-2" style="margin-top:20px">
@@ -261,18 +262,18 @@
 
   <section class="page" data-document-role="page" data-label="App Map">
     <p class="kicker">03 / App map</p>
-    <h2>Three destinations. One local workflow.</h2>
+    <h2>Four destinations. One local workflow.</h2>
     <div class="app-map">
-      <div class="nav"><div class="active">Home</div><div>Dictionary</div><div>Settings</div></div>
+      <div class="nav"><div class="active">Home</div><div>Dictionary</div><div>Snippets</div><div>Settings</div></div>
       <div class="surface">
         <h3>Home</h3><p>Shows readiness, session totals, recoverable recordings, and searchable local history.</p>
         <div class="history-row"><b>Recent dictation</b><p class="small">Apple (streaming) / time / processing duration</p><div class="icons"><span class="icon">Play</span><span class="icon">Retry</span><span class="icon">Edit</span><span class="icon">Copy</span><span class="icon">Trash</span></div></div>
-        <div class="grid-2"><div class="note"><h3>Dictionary</h3><p>Manage terms and hear-to-write corrections.</p></div><div class="note"><h3>Settings</h3><p>Control shortcuts, engines, language, microphone, cleanup, snippets, storage, and updates.</p></div></div>
+        <div class="grid-2"><div class="note"><h3>Dictionary</h3><p>Manage terms and hear-to-write corrections.</p></div><div class="note"><h3>Snippets</h3><p>Create reusable text for complete phrases you say often.</p></div></div>
       </div>
     </div>
-    <h3 style="margin-top:30px">The large Record control</h3>
-    <p>The Home record button works regardless of which app currently has focus. It is useful during setup or when testing Murmure itself. For daily work, the global shortcut is faster.</p>
-    <div class="callout"><p><strong>Ready status.</strong> The top status line tells you whether Murmure is ready and whether audio and history are using local or external storage.</p></div>
+    <h3 style="margin-top:26px">Settings is grouped by task</h3>
+    <div class="grid-2"><div class="note"><p><strong>Dictation / Shortcuts / Microphone &amp; sounds</strong><br>Configure how speech starts, what engine listens, and which input is used.</p></div><div class="note"><p><strong>Appearance / Privacy &amp; storage / Advanced &amp; updates</strong><br>Choose the display language, review local data, run diagnostics, or update Murmure.</p></div></div>
+    <div class="callout" style="margin-top:18px"><p><strong>One category at a time.</strong> Settings keeps its category list visible and shows only the selected category's controls. Home still provides the large Record control for setup and testing.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>05 / 20</span></div>
   </section>
 
@@ -300,7 +301,7 @@
       <div class="gesture"><h3>Press to start/stop</h3><p>Press once to begin and press again to finish. Useful when holding a key is uncomfortable.</p></div>
     </div>
     <h3 style="margin-top:34px">Hands-free dictation</h3>
-    <p>Enable hands-free in Settings and choose a shortcut that is different from push-to-talk and Command Mode.</p>
+    <p>Open <strong>Settings &gt; Shortcuts</strong>, enable hands-free, and choose a shortcut that is different from push-to-talk and Command Mode.</p>
     <div class="flow"><span class="flow-box">Press hands-free key</span><span class="flow-arrow">&gt;</span><span class="flow-box">Speak without holding</span><span class="flow-arrow">&gt;</span><span class="flow-box">Same key or Enter finishes</span></div>
     <div class="grid-2">
       <div class="note"><h3>Finish</h3><p>Press the same hands-free key or press Enter.</p></div>
@@ -326,18 +327,18 @@
 
   <section class="page" data-document-role="page" data-label="Languages">
     <p class="kicker">07 / Languages</p>
-    <h2>Automatic for switching. Explicit for control.</h2>
+    <h2>What you see and what you speak are separate.</h2>
     <div class="grid-2">
-      <div class="card"><h3>Automatic</h3><p>Selecting Automatic selects Parakeet. Speak any supported European language without changing the picker first.</p></div>
-      <div class="card"><h3>Explicit language</h3><p>Choose one language when you want a decoder hint. Apple can use the matching installed system speech asset.</p></div>
+      <div class="card"><h3>Language you speak</h3><p>In <strong>Settings &gt; Dictation</strong>, Automatic selects Parakeet and recognizes supported languages as you speak. Choose an explicit language only when you want a decoder hint.</p></div>
+      <div class="card"><h3>Display language</h3><p>In <strong>Settings &gt; Appearance</strong>, choose English, Français, or Español for menus, buttons, and instructions. This never changes the language you dictate.</p></div>
     </div>
     <h3 style="margin-top:30px">Automatic supports these 25 languages</h3>
     <div class="language-grid">
       <span>Bulgarian</span><span>Croatian</span><span>Czech</span><span>Danish</span><span>Dutch</span><span>English</span><span>Estonian</span><span>Finnish</span><span>French</span><span>German</span><span>Greek</span><span>Hungarian</span><span>Italian</span><span>Latvian</span><span>Lithuanian</span><span>Maltese</span><span>Polish</span><span>Portuguese</span><span>Romanian</span><span>Russian</span><span>Slovak</span><span>Slovenian</span><span>Spanish</span><span>Swedish</span><span>Ukrainian</span>
     </div>
     <h3 style="margin-top:28px">Cleanup behavior</h3>
-    <p>English, Spanish, and French have language-specific deterministic cleanup. Other explicit languages use neutral cleanup. Automatic also uses neutral cleanup so English assumptions are never applied to a language Murmure detected automatically.</p>
-    <div class="callout"><p><strong>Smart cleanup limitation.</strong> Apple's on-device AI cleanup is unavailable while Language is Automatic. Choose explicit English, Spanish, or French if you want that optional feature.</p></div>
+    <p>English, Spanish, and French have language-specific deterministic cleanup. Other explicit languages and Automatic use neutral cleanup, so English assumptions are never applied to another language.</p>
+    <div class="callout"><p><strong>Smart cleanup limitation.</strong> Apple's on-device AI cleanup is unavailable while <strong>Language you speak</strong> is Automatic. Choose explicit English, Spanish, or French if you want that optional feature.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>09 / 20</span></div>
   </section>
 
@@ -358,7 +359,7 @@
       <div class="note"><h3>Bluetooth</h3><p>Connection quality and microphone mode can affect clarity and latency.</p></div>
       <div class="note"><h3>Test first</h3><p>Watch the meter while speaking. Stop the test before starting normal dictation.</p></div>
     </div>
-    <p class="small" style="margin-top:18px">Play start and finish sounds is independent of the selected microphone.</p>
+    <p class="small" style="margin-top:18px">Both the input selector and Play start and finish sounds live in <strong>Settings &gt; Microphone &amp; sounds</strong>.</p>
     <div class="footer"><span class="brand">MURMURE</span><span>10 / 20</span></div>
   </section>
 
@@ -408,7 +409,7 @@
       <div class="window"><div class="window-bar"><span>ADD SNIPPET</span><span>Local</span></div><div class="form-row" style="margin-top:18px"><label>When I say</label><div class="field">email signature</div></div><div class="form-row"><label>Write</label><div class="field tall">Best,<br>Filipe<br>Studio in the Box</div></div><div class="status"><span class="lamp"></span><b>Enabled</b></div></div>
       <div><h3>Exact whole utterance</h3><p>Say only the trigger phrase. Murmure never replaces the same words when they appear inside ordinary prose.</p><h3>Multiline replacements</h3><p>Line breaks are preserved in the inserted text.</p><h3>Before dictionary rules</h3><p>Snippet expansion happens before dictionary correction.</p></div>
     </div>
-    <h3 style="margin-top:30px">Manage snippets in Settings</h3>
+    <h3 style="margin-top:30px">Manage snippets from the main Snippets destination</h3>
     <ul>
       <li><strong>Add</strong> creates a trigger, replacement, and enabled state.</li>
       <li><strong>Toggle</strong> temporarily disables a snippet without deleting it.</li>
@@ -512,7 +513,7 @@
       <div class="card"><h3>Network exceptions</h3><p>Only one-time local model downloads and optional update checks use the network. There is no cloud transcription or Command Mode fallback.</p></div>
     </div>
     <h3 style="margin-top:26px">Data storage card</h3>
-    <p>Settings shows the exact active storage location and whether it is ready. Most Macs use Application Support automatically. A specially configured operator Mac may use its named external drive. Use Reveal Murmure data folder to inspect the active location.</p>
+    <p><strong>Settings &gt; Privacy &amp; storage</strong> shows the exact active storage location and whether it is ready. Most Macs use Application Support automatically. A specially configured operator Mac may use its named external drive. Use Reveal Murmure data folder to inspect the active location.</p>
     <div class="note"><p><strong>Diagnostics are sanitized.</strong> Preview, copy, or export configuration and permission facts. Reports exclude dictated text, history, audio, snippets, dictionary data, and local paths.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>18 / 20</span></div>
   </section>
@@ -522,7 +523,7 @@
     <h2>Update safely. Diagnose without exposing your words.</h2>
     <h3>Check for updates</h3>
     <ol class="step-list">
-      <li>Open Settings and find Updates near the bottom.</li>
+      <li>Open <strong>Settings &gt; Advanced &amp; updates</strong>.</li>
       <li>Choose Check for updates. Murmure checks GitHub Releases and stages a verified archive locally.</li>
       <li>When a newer version is ready and no recording is active, choose Install and relaunch.</li>
       <li>After relaunch, confirm the version number shown in Settings.</li>
@@ -549,7 +550,7 @@
         <div class="check-row"><span class="lamp"></span><p>Microphone Granted</p></div>
         <div class="check-row"><span class="lamp"></span><p>Accessibility Granted</p></div>
         <div class="check-row"><span class="lamp"></span><p>Storage Ready</p></div>
-        <div class="check-row"><span class="lamp"></span><p>Correct engine and language</p></div>
+        <div class="check-row"><span class="lamp"></span><p>Correct engine and Language you speak</p></div>
         <h3 style="margin-top:27px">Default controls</h3>
         <div class="check-row"><span class="keycap">fn</span><p>Hold to dictate</p></div>
         <div class="check-row"><span class="keycap">⌃⌥⌘D</span><p>Hold for Command Mode</p></div>
@@ -560,11 +561,11 @@
         <h3>Where to find it</h3>
         <div class="check-row"><span class="tag">Home</span><p>History, recovery, replay, retry, correct, copy, delete</p></div>
         <div class="check-row"><span class="tag">Dictionary</span><p>Terms and hear-to-write corrections</p></div>
-        <div class="check-row"><span class="tag">Settings</span><p>Shortcuts, engines, language, microphone, cleanup, snippets, permissions, storage, diagnostics, updates</p></div>
+        <div class="check-row"><span class="tag">Snippets</span><p>Reusable text triggered by a complete spoken phrase</p></div>
+        <div class="check-row"><span class="tag">Settings</span><p>Six focused categories: Dictation, Shortcuts, Microphone &amp; sounds, Appearance, Privacy &amp; storage, Advanced &amp; updates</p></div>
         <h3 style="margin-top:27px">Remember</h3>
-        <div class="note"><p>Automatic uses Parakeet.</p></div>
-        <div class="note" style="margin-top:9px"><p>Compare Mode does not type.</p></div>
-        <div class="note" style="margin-top:9px"><p>Snippets match a whole utterance.</p></div>
+        <div class="note"><p>Display language never changes Language you speak.</p></div>
+        <div class="note" style="margin-top:9px"><p>Compare Mode does not type. Snippets match a whole utterance.</p></div>
         <div class="note" style="margin-top:9px"><p>Corrections save only after confirmation.</p></div>
         <div class="note" style="margin-top:9px"><p>Command Mode always asks you to review.</p></div>
       </div>
