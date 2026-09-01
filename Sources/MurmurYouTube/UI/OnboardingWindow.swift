@@ -118,8 +118,8 @@ struct OnboardingWindow: View {
 
             switch onboarding.step {
             case .appLanguage:
-                explanation("Choose the language Murmure uses for buttons, options, and instructions. You can change it later in Settings.")
-                Picker(L10n.text("App language"), selection: $appLanguage.language) {
+                explanation("Changes Murmure’s menus, buttons, and instructions. It does not change the language you dictate.")
+                Picker(L10n.text("Display language"), selection: $appLanguage.language) {
                     ForEach(AppLanguage.allCases, id: \.self) { language in
                         Text(language.nativeName).tag(language)
                     }
@@ -182,12 +182,12 @@ struct OnboardingWindow: View {
                 }
                 readinessRow("Microphone test", ready: microphoneTested)
             case .language:
-                explanation("Automatic recognizes any of Parakeet's 25 supported European languages. Choose one language when you want an explicit decoder hint.")
+                explanation("Automatic recognizes supported languages while you speak. Choose a language only when you want to give the speech engine a specific hint.")
                 Picker(L10n.text("Engine"), selection: onboardingEngineBinding) {
                     ForEach(SpeechEngineChoice.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
                 .id(appLanguage.language)
-                Picker(L10n.text("Language"), selection: onboardingLanguageBinding) {
+                Picker(L10n.text("Language you speak"), selection: onboardingLanguageBinding) {
                     ForEach(TranscriptionLanguageOption.allCases, id: \.self) { Text(L10n.text($0.displayName)).tag($0) }
                 }
                 .id(appLanguage.language)
@@ -263,7 +263,7 @@ struct OnboardingWindow: View {
 
     private var stepTitle: String {
         switch onboarding.step {
-        case .appLanguage: L10n.text("Choose app language")
+        case .appLanguage: L10n.text("Choose display language")
         case .privacy: L10n.text("Private by design")
         case .microphonePermission: L10n.text("Allow microphone access")
         case .accessibilityPermission: L10n.text("Allow the global shortcut")

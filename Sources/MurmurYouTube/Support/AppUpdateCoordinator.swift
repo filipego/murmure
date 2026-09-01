@@ -12,6 +12,7 @@ typealias HostedUpdateStager = @Sendable (
 enum HubSection: String, CaseIterable, Identifiable {
     case home
     case dictionary
+    case snippets
     case settings
 
     var id: String { rawValue }
@@ -20,6 +21,7 @@ enum HubSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: "Home"
         case .dictionary: "Dictionary"
+        case .snippets: "Snippets"
         case .settings: "Settings"
         }
     }
@@ -28,6 +30,7 @@ enum HubSection: String, CaseIterable, Identifiable {
         switch self {
         case .home: "house"
         case .dictionary: "text.book.closed"
+        case .snippets: "text.quote"
         case .settings: "slider.horizontal.3"
         }
     }

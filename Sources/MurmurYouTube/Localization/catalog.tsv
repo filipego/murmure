@@ -3,6 +3,28 @@ Murmure	Murmure	Murmure
 Home	Accueil	Inicio
 Dictionary	Dictionnaire	Diccionario
 Settings	Réglages	Ajustes
+Dictation	Dictée	Dictado
+Shortcuts	Raccourcis	Atajos
+Microphone & sounds	Microphone et sons	Micrófono y sonidos
+Appearance	Apparence	Apariencia
+Privacy & storage	Confidentialité et stockage	Privacidad y almacenamiento
+Advanced & updates	Options avancées et mises à jour	Opciones avanzadas y actualizaciones
+Display language	Langue d’affichage	Idioma de la interfaz
+Choose display language	Choisir la langue d’affichage	Elegir el idioma de la interfaz
+Changes Murmure’s menus, buttons, and instructions. It does not change the language you dictate.	Modifie les menus, les boutons et les instructions de Murmure. Cela ne change pas la langue que vous dictez.	Cambia los menús, botones e instrucciones de Murmure. No cambia el idioma que dictas.
+Language you speak	Langue que vous parlez	Idioma que hablas
+Automatic recognizes supported languages while you speak. Choose a language only when you want to give the speech engine a specific hint.	Le mode Automatique reconnaît les langues prises en charge pendant que vous parlez. Choisissez une langue uniquement pour donner une indication précise au moteur vocal.	Automático reconoce los idiomas compatibles mientras hablas. Elige un idioma solo cuando quieras dar una indicación específica al motor de voz.
+Sounds	Sons	Sonidos
+Choose whether Murmure plays a cue when dictation starts and finishes.	Choisissez si Murmure émet un son au début et à la fin de la dictée.	Elige si Murmure reproduce un sonido al iniciar y finalizar el dictado.
+Private diagnostics	Diagnostic privé	Diagnóstico privado
+Create a private diagnostic report. Reports include configuration and permission states, never dictated text, history, snippets, dictionary entries, or file paths.	Créez un rapport de diagnostic privé. Les rapports incluent la configuration et l’état des autorisations, jamais le texte dicté, l’historique, les extraits, les entrées du dictionnaire ni les chemins de fichiers.	Crea un informe de diagnóstico privado. Los informes incluyen la configuración y el estado de los permisos, pero nunca el texto dictado, el historial, los fragmentos, las entradas del diccionario ni las rutas de archivos.
+Guided setup	Configuration guidée	Configuración guiada
+Run the guided setup again to review permissions, shortcuts, microphone, and language behavior.	Relancez la configuration guidée pour vérifier les autorisations, les raccourcis, le microphone et le comportement linguistique.	Vuelve a ejecutar la configuración guiada para revisar los permisos, los atajos, el micrófono y el comportamiento del idioma.
+Reusable phrases	Phrases réutilisables	Frases reutilizables
+Create reusable text for phrases you say often.	Créez du texte réutilisable pour les phrases que vous prononcez souvent.	Crea texto reutilizable para las frases que dices a menudo.
+Enable %@	Activer %@	Activar %@
+Edit %@	Modifier %@	Editar %@
+Delete %@	Supprimer %@	Eliminar %@
 App language	Langue de l’app	Idioma de la app
 English	Anglais	Inglés
 French	Français	Francés

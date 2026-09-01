@@ -105,6 +105,8 @@ struct MainWindow: View {
                     HomePanel(controller: controller)
                 case .dictionary:
                     DictionaryPanel()
+                case .snippets:
+                    SnippetPanel()
                 case .settings:
                     SettingsWindow(controller: controller, updates: updates)
                 }
@@ -137,6 +139,7 @@ struct MainWindow: View {
         switch section {
         case .home: ""
         case .dictionary: "Teach Murmure the words that matter to you."
+        case .snippets: "Create reusable text for phrases you say often."
         case .settings: "Keep the local workflow tuned to your desk."
         }
     }

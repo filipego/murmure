@@ -96,6 +96,8 @@ enum DS {
     }
 
     enum Size {
+        static let settingsCategoryRailWidth: CGFloat = 214
+        static let settingsCategoryIconWidth: CGFloat = 18
         static let correctionSheetWidth: CGFloat = 560
         static let correctionSheetMinHeight: CGFloat = 520
         static let correctionTextEditorHeight: CGFloat = 112

@@ -4,6 +4,21 @@ import Testing
 
 @Suite("App localization")
 struct AppLocalizationTests {
+    @Test("settings and hub navigation keep their approved order")
+    func navigationOrder() {
+        #expect(SettingsCategory.allCases == [
+            .dictation,
+            .shortcuts,
+            .microphoneAndSounds,
+            .appearance,
+            .privacyAndStorage,
+            .advancedAndUpdates,
+        ])
+        #expect(HubSection.allCases == [.home, .dictionary, .snippets, .settings])
+        #expect(SettingsCategory.dictation.systemImage == "waveform")
+        #expect(HubSection.snippets.systemImage == "text.quote")
+    }
+
     @Test("interface languages use stable identifiers and native names")
     func stableLanguages() {
         #expect(AppLanguage.english.rawValue == "en")
@@ -50,6 +65,14 @@ struct AppLocalizationTests {
         #expect(L10n.text("Home", language: .spanish) == "Inicio")
         #expect(L10n.text("App language", language: .french) == "Langue de l’app")
         #expect(L10n.text("App language", language: .spanish) == "Idioma de la app")
+        #expect(L10n.text("Display language", language: .french) == "Langue d’affichage")
+        #expect(L10n.text("Display language", language: .spanish) == "Idioma de la interfaz")
+        #expect(L10n.text("Choose display language", language: .french) == "Choisir la langue d’affichage")
+        #expect(L10n.text("Choose display language", language: .spanish) == "Elegir el idioma de la interfaz")
+        #expect(L10n.text("Language you speak", language: .french) == "Langue que vous parlez")
+        #expect(L10n.text("Language you speak", language: .spanish) == "Idioma que hablas")
+        #expect(L10n.text("Display language", language: .french) != L10n.text("Language you speak", language: .french))
+        #expect(L10n.text("Display language", language: .spanish) != L10n.text("Language you speak", language: .spanish))
         #expect(L10n.text("Settings", language: .french) == "Réglages")
         #expect(L10n.text("Settings", language: .spanish) == "Ajustes")
         #expect(L10n.text("Automatic", language: .french) == "Automatique")
