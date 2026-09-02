@@ -257,11 +257,15 @@ final class LiveTextInsertionSession {
         defer { endMutation() }
 
         let ownership: Ownership?
+        let abandonedDisposition: LiveTextFinalization?
         switch state {
         case .active(let activeOwnership),
-             .abandoned(let activeOwnership, _),
              .finalized(let activeOwnership?, _):
             ownership = activeOwnership
+            abandonedDisposition = nil
+        case .abandoned(let activeOwnership, let disposition):
+            ownership = activeOwnership
+            abandonedDisposition = disposition
         case .unavailable, .finalized(nil, _):
             state = .cancelled
             return .noLiveText
@@ -270,7 +274,13 @@ final class LiveTextInsertionSession {
         }
 
         if let ownership {
-            let cancellation = await rollback(ownership)
+            let cancellation: LiveTextCancellation
+            if abandonedDisposition == .retainedInHistoryOnly,
+               !ownership.hasVerifiedMutation {
+                cancellation = .retainedInHistoryOnly
+            } else {
+                cancellation = await rollback(ownership)
+            }
             state = .cancelled
             return cancellation
         }

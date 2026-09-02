@@ -337,6 +337,18 @@ struct LiveTextInsertionSessionTests {
         #expect(target.replacements.map(\.replacement) == ["maybe landed"])
     }
 
+    @Test("cancelling an uncertain first mutation keeps the recording recoverable")
+    func uncertainFirstMutationCancellationIsRecoverable() async {
+        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        target.nextOutcome = .uncertainAfterMutation
+        let session = LiveTextInsertionSession(capturer: target)
+
+        await session.render("maybe landed")
+
+        #expect(await session.cancel() == .retainedInHistoryOnly)
+        #expect(target.documentText == "maybe landed")
+    }
+
     @Test("a posted paste with an unchanged observation remains uncertain")
     func postedPasteUnchangedNeverFallsBackCleanly() async {
         let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
@@ -348,6 +360,18 @@ struct LiveTextInsertionSessionTests {
         #expect(await session.finalize("Final text") == .retainedInHistoryOnly)
         #expect(target.documentText.isEmpty)
         #expect(target.replacements.map(\.replacement) == ["possibly delayed"])
+    }
+
+    @Test("cancelling an unobserved posted paste keeps the recording recoverable")
+    func postedPasteCancellationIsRecoverable() async {
+        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        target.nextOutcome = .postedPasteUnchanged
+        let session = LiveTextInsertionSession(capturer: target)
+
+        await session.render("possibly delayed")
+
+        #expect(await session.cancel() == .retainedInHistoryOnly)
+        #expect(target.documentText.isEmpty)
     }
 
     @Test("rapid snapshots coalesce to the latest pending text before finalization")
