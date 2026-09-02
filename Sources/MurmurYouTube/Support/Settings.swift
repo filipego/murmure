@@ -18,6 +18,11 @@ enum SpeechEngineChoice: String, CaseIterable, Sendable, Codable {
     var showsLiveText: Bool { self == .apple }
 }
 
+enum TextInsertionTiming: String, CaseIterable, Codable, Sendable {
+    case afterSpeaking
+    case whileSpeaking
+}
+
 struct HotkeyBindingSelection: Equatable {
     let pushToTalk: PushToTalkKey
     let handsFree: PushToTalkKey
@@ -106,6 +111,7 @@ struct SettingsSnapshot: Codable {
     let handsFreeKey: String?
     let microphoneSelection: MicrophoneSelection?
     let transcriptionLanguage: TranscriptionLanguageOption?
+    let textInsertionTiming: TextInsertionTiming?
     let pushToTalkBinding: HotkeyBinding?
     let handsFreeBinding: HotkeyBinding?
     let commandModeEnabled: Bool?
@@ -120,6 +126,9 @@ struct SettingsSnapshot: Codable {
     }
     var resolvedTranscriptionLanguage: TranscriptionLanguageOption {
         transcriptionLanguage ?? .systemDefault
+    }
+    var resolvedTextInsertionTiming: TextInsertionTiming {
+        textInsertionTiming ?? .afterSpeaking
     }
     var resolvedPushToTalkBinding: HotkeyBinding {
         pushToTalkBinding
@@ -163,6 +172,10 @@ final class Settings {
         didSet { persist() }
     }
 
+    var textInsertionTiming: TextInsertionTiming {
+        didSet { persist() }
+    }
+
     var engine: SpeechEngineChoice {
         didSet { persist() }
     }
@@ -201,6 +214,7 @@ final class Settings {
         static let commandModeBinding = "commandModeBinding"
         static let microphoneSelection = "microphoneSelection"
         static let transcriptionLanguage = "transcriptionLanguage"
+        static let textInsertionTiming = "textInsertionTiming"
         static let cleanupEnabled = "cleanupEnabled"
         static let soundEnabled = "soundEnabled"
         static let engine = "engine"
@@ -257,6 +271,9 @@ final class Settings {
             )
             ?? .systemDefault
         transcriptionLanguage = requestedLanguage
+        textInsertionTiming = snapshot?.resolvedTextInsertionTiming
+            ?? TextInsertionTiming(rawValue: defaults.string(forKey: Keys.textInsertionTiming) ?? "")
+            ?? .afterSpeaking
         // Apple by default: no download, no dependency, live text while speaking.
         let requestedEngine = snapshot?.engine
             ?? SpeechEngineChoice(rawValue: defaults.string(forKey: Keys.engine) ?? "")
@@ -291,6 +308,7 @@ final class Settings {
             Keys.commandModeBinding,
             Keys.microphoneSelection,
             Keys.transcriptionLanguage,
+            Keys.textInsertionTiming,
             Keys.cleanupEnabled,
             Keys.soundEnabled,
             Keys.engine,
@@ -312,6 +330,9 @@ final class Settings {
                 .flatMap { try? JSONDecoder().decode(MicrophoneSelection.self, from: $0) },
             transcriptionLanguage: TranscriptionLanguageOption(
                 rawValue: defaults.string(forKey: Keys.transcriptionLanguage) ?? ""
+            ),
+            textInsertionTiming: TextInsertionTiming(
+                rawValue: defaults.string(forKey: Keys.textInsertionTiming) ?? ""
             ),
             pushToTalkBinding: defaults.data(forKey: Keys.pushToTalkBinding)
                 .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) },
@@ -353,6 +374,7 @@ final class Settings {
                 settings.commandModeEnabled = snapshot.resolvedCommandModeEnabled
                 settings.microphoneSelection = snapshot.resolvedMicrophoneSelection
                 settings.transcriptionLanguage = snapshot.resolvedTranscriptionLanguage
+                settings.textInsertionTiming = snapshot.resolvedTextInsertionTiming
                 settings.engine = resolvedEngineChoice(
                     preferred: snapshot.engine,
                     language: settings.transcriptionLanguage.selection
@@ -376,6 +398,10 @@ final class Settings {
                 settings.defaults.set(
                     settings.transcriptionLanguage.rawValue,
                     forKey: Keys.transcriptionLanguage
+                )
+                settings.defaults.set(
+                    settings.textInsertionTiming.rawValue,
+                    forKey: Keys.textInsertionTiming
                 )
                 settings.defaults.set(settings.engine.rawValue, forKey: Keys.engine)
                 settings.defaults.set(settings.compareMode, forKey: Keys.compareMode)
@@ -481,6 +507,7 @@ final class Settings {
             handsFreeKey: handsFreeKey.rawValue,
             microphoneSelection: microphoneSelection,
             transcriptionLanguage: transcriptionLanguage,
+            textInsertionTiming: textInsertionTiming,
             pushToTalkBinding: pushToTalkBinding,
             handsFreeBinding: handsFreeBinding,
             commandModeEnabled: commandModeEnabled,
@@ -496,6 +523,7 @@ final class Settings {
             defaults.set(microphoneData, forKey: Keys.microphoneSelection)
         }
         defaults.set(snapshot.resolvedTranscriptionLanguage.rawValue, forKey: Keys.transcriptionLanguage)
+        defaults.set(snapshot.resolvedTextInsertionTiming.rawValue, forKey: Keys.textInsertionTiming)
         defaults.set(snapshot.engine.rawValue, forKey: Keys.engine)
         defaults.set(snapshot.compareMode, forKey: Keys.compareMode)
         defaults.set(snapshot.cleanupEnabled, forKey: Keys.cleanupEnabled)

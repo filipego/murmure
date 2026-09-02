@@ -5,6 +5,12 @@ import Testing
 
 @Suite("Transcription languages")
 struct TranscriptionLanguageTests {
+    private let legacySettingsJSONString = #"{"pushToTalkKey":"fn","engine":"apple","compareMode":false,"cleanupEnabled":true,"smartCleanup":false,"soundEnabled":true}"#
+
+    private var legacySettingsJSON: Data {
+        Data(legacySettingsJSONString.utf8)
+    }
+
     @Test("the three explicit choices use stable language identifiers")
     func stableSelections() {
         #expect(TranscriptionLanguageOption.english.selection == .locale(identifier: "en"))
@@ -64,6 +70,23 @@ struct TranscriptionLanguageTests {
         let snapshot = try JSONDecoder().decode(SettingsSnapshot.self, from: data)
 
         #expect(snapshot.resolvedTranscriptionLanguage == .systemDefault)
+    }
+
+    @Test("legacy settings type only after speaking")
+    func legacyInsertionTiming() throws {
+        let snapshot = try JSONDecoder().decode(SettingsSnapshot.self, from: legacySettingsJSON)
+        #expect(snapshot.resolvedTextInsertionTiming == .afterSpeaking)
+    }
+
+    @Test("live insertion timing round trips")
+    func liveInsertionTimingRoundTrips() throws {
+        let data = Data(legacySettingsJSONString
+            .dropLast()
+            .appending(#","textInsertionTiming":"whileSpeaking"}"#).utf8)
+        let snapshot = try JSONDecoder().decode(SettingsSnapshot.self, from: data)
+        #expect(snapshot.resolvedTextInsertionTiming == .whileSpeaking)
+        let encoded = try JSONEncoder().encode(snapshot)
+        #expect(String(decoding: encoded, as: UTF8.self).contains("whileSpeaking"))
     }
 
     @Test("an explicit language survives settings decoding")
