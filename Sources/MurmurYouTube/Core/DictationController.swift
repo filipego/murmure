@@ -51,12 +51,51 @@ enum LiveTypingPolicy {
     }
 }
 
+enum LiveTypingCompletionPolicy {
+    static func shouldUseOneShotInsertion(
+        disposition: LiveTextFinalization,
+        operationIsCurrent: Bool
+    ) -> Bool {
+        operationIsCurrent && disposition == .useOneShotInsertion
+    }
+}
+
+struct DictationOperationToken: Equatable, Sendable {
+    fileprivate let id: UUID
+}
+
+struct DictationOperationLifecycle: Sendable {
+    private var current: DictationOperationToken?
+
+    var currentToken: DictationOperationToken? { current }
+
+    mutating func begin() -> DictationOperationToken {
+        let token = DictationOperationToken(id: UUID())
+        current = token
+        return token
+    }
+
+    mutating func invalidate() {
+        current = nil
+    }
+
+    func isCurrent(_ token: DictationOperationToken) -> Bool {
+        current == token
+    }
+}
+
 private struct LiveTranscriptionConfiguration {
     let engine: SpeechEngineChoice
     let language: TranscriptionLanguageOption
     let insertionTiming: TextInsertionTiming
     let cleanupEnabled: Bool
     let smartCleanup: Bool
+}
+
+private struct StoppedDictationResources {
+    let engine: (any TranscriptionEngine)?
+    let liveInsertion: LiveTextInsertionSession?
+    let sessionID: UUID?
 }
 
 @MainActor
@@ -112,6 +151,8 @@ final class DictationController {
     }
 
     private var engine: (any TranscriptionEngine)?
+    private var startupTask: Task<Void, Never>?
+    private var finishingTask: Task<Void, Never>?
     private var consumeTask: Task<Void, Never>?
     /// Returns the ordered recording when the session finishes. The same buffers are fed to
     /// the selected engine and retained briefly so Murmure can archive the local audio once
@@ -130,6 +171,7 @@ final class DictationController {
     private var activeSessionID: UUID?
     private var activeConfiguration: LiveTranscriptionConfiguration?
     private var liveInsertion: LiveTextInsertionSession?
+    private var operationLifecycle = DictationOperationLifecycle()
 
     init(
         formatter: (any TextFormatter)? = nil,
@@ -275,11 +317,14 @@ final class DictationController {
               !commandMode.isBusy,
               liveInsertion == nil
         else { return }
+        let operation = operationLifecycle.begin()
         state = .starting
         activeTrigger = trigger
         transcript = ""
-        holdStarted = Date()
-        isComparing = Settings.shared.compareMode
+        let startedAt = Date()
+        holdStarted = startedAt
+        let compareMode = Settings.shared.compareMode
+        isComparing = compareMode
         activeSessionID = nil
         recorded.removeAll(keepingCapacity: true)
         let configuration = LiveTranscriptionConfiguration(
@@ -293,30 +338,59 @@ final class DictationController {
             smartCleanup: Settings.shared.smartCleanup
         )
         activeConfiguration = configuration
-        engineName = isComparing ? "Comparing…" : configuration.engine.displayName
-        if LiveTypingPolicy.isEnabled(
+        engineName = compareMode ? "Comparing…" : configuration.engine.displayName
+        let liveInsertion = LiveTypingPolicy.isEnabled(
             timing: configuration.insertionTiming,
             engine: configuration.engine,
-            compareMode: isComparing
-        ) {
-            liveInsertion = LiveTextInsertionSession()
-        }
+            compareMode: compareMode
+        ) ? LiveTextInsertionSession() : nil
+        self.liveInsertion = liveInsertion
+        let microphoneSelection = Settings.shared.microphoneSelection
+        let soundEnabled = Settings.shared.soundEnabled
 
-        Task { @MainActor in
+        startupTask = Task { @MainActor [weak self] in
+            guard let self else {
+                await liveInsertion?.cancel()
+                return
+            }
+            var startedEngine: (any TranscriptionEngine)?
+            var begunSessionID: UUID?
             do {
-                guard await Permissions.requestMicrophone() else {
-                    fail("Microphone access is off. Enable it in System Settings ▸ Privacy & Security ▸ Microphone.")
+                let hasMicrophonePermission = await Permissions.requestMicrophone()
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    await self.abandonStaleStartup(
+                        liveInsertion: liveInsertion,
+                        engine: startedEngine,
+                        sessionID: begunSessionID
+                    )
+                    return
+                }
+                guard hasMicrophonePermission else {
+                    self.fail(
+                        "Microphone access is off. Enable it in System Settings ▸ Privacy & Security ▸ Microphone.",
+                        operation: operation,
+                        liveInsertion: liveInsertion
+                    )
                     return
                 }
 
-                if !isComparing {
+                if !compareMode {
                     let engineID: SessionEngineID = configuration.engine == .apple ? .apple : .parakeet
                     let session = try await sessionCoordinator.begin(
-                        startedAt: holdStarted ?? Date(),
+                        startedAt: startedAt,
                         trigger: trigger,
                         engine: engineID,
                         language: configuration.language.selection
                     )
+                    begunSessionID = session.id
+                    guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                        await self.abandonStaleStartup(
+                            liveInsertion: liveInsertion,
+                            engine: startedEngine,
+                            sessionID: begunSessionID
+                        )
+                        return
+                    }
                     activeSessionID = session.id
                 }
 
@@ -324,9 +398,18 @@ final class DictationController {
                         choice: configuration.engine,
                         language: configuration.language.selection
                     )
+                startedEngine = engine
                 self.engine = engine
 
                 let chunks = try await engine.start()
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    await self.abandonStaleStartup(
+                        liveInsertion: liveInsertion,
+                        engine: startedEngine,
+                        sessionID: begunSessionID
+                    )
+                    return
+                }
 
                 // Compare mode captures in *Apple's* format, not a format of our choosing.
                 //
@@ -335,14 +418,23 @@ final class DictationController {
                 // kills the process. Parakeet is the flexible one (its `feed` converts
                 // int16/int32/float32), so the strict engine picks the format and the
                 // tolerant engine adapts. Both still replay the identical buffers.
-                let formatOwner: any TranscriptionEngine = isComparing
+                let formatOwner: any TranscriptionEngine = compareMode
                     ? AppleSpeechEngine(language: configuration.language.selection)
                     : engine
-                guard let format = await formatOwner.preferredInputFormat() else {
+                let preferredFormat = await formatOwner.preferredInputFormat()
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    await self.abandonStaleStartup(
+                        liveInsertion: liveInsertion,
+                        engine: startedEngine,
+                        sessionID: begunSessionID
+                    )
+                    return
+                }
+                guard let format = preferredFormat else {
                     throw TranscriptionError.noAudioFormat
                 }
                 let liveInput = try LiveAudioInputResolver.resolve(
-                    Settings.shared.microphoneSelection
+                    microphoneSelection
                 )
                 if case .fallback = liveInput.resolution {
                     Log.audio.error("\(liveInput.resolution.statusText, privacy: .public)")
@@ -380,36 +472,76 @@ final class DictationController {
                         audioContinuation.yield(chunk)
                     },
                     onLevel: { [weak self] level in
-                        Task { @MainActor in self?.updateLevel(level) }
+                        Task { @MainActor in
+                            guard let self,
+                                  self.operationLifecycle.isCurrent(operation)
+                            else { return }
+                            self.updateLevel(level)
+                        }
                     },
                     onDeviceChange: { [weak self] in
                         Task { @MainActor in
-                            self?.handleAudioInputChange(liveInput.device.displayName)
+                            self?.handleAudioInputChange(
+                                liveInput.device.displayName,
+                                operation: operation,
+                                liveInsertion: liveInsertion
+                            )
                         }
                     }
                 )
 
                 // Bail out if the user already let go while we were spinning up.
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    await self.abandonStaleStartup(
+                        liveInsertion: liveInsertion,
+                        engine: startedEngine,
+                        sessionID: begunSessionID
+                    )
+                    return
+                }
                 guard case .starting = self.state else {
-                    await self.teardown()
+                    self.cancelDictation()
                     return
                 }
 
                 self.state = .listening
-                if Settings.shared.soundEnabled { NSSound(named: "Tink")?.play() }
+                if soundEnabled { NSSound(named: "Tink")?.play() }
 
                 self.consumeTask = Task { @MainActor in
                     do {
                         for try await chunk in chunks {
+                            guard self.operationLifecycle.isCurrent(operation),
+                                  !Task.isCancelled
+                            else { return }
                             self.transcript = chunk.text
-                            await self.liveInsertion?.render(chunk.text)
+                            await liveInsertion?.render(chunk.text)
                         }
                     } catch {
-                        self.fail(error.localizedDescription)
+                        guard self.operationLifecycle.isCurrent(operation),
+                              !Task.isCancelled
+                        else { return }
+                        self.fail(
+                            error.localizedDescription,
+                            operation: operation,
+                            liveInsertion: liveInsertion
+                        )
                     }
                 }
+                self.startupTask = nil
             } catch {
-                self.fail(error.localizedDescription)
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    await self.abandonStaleStartup(
+                        liveInsertion: liveInsertion,
+                        engine: startedEngine,
+                        sessionID: begunSessionID
+                    )
+                    return
+                }
+                self.fail(
+                    error.localizedDescription,
+                    operation: operation,
+                    liveInsertion: liveInsertion
+                )
             }
         }
     }
@@ -426,69 +558,129 @@ final class DictationController {
         // it and pasting the same utterance twice. The window is wide: Parakeet transcribes
         // inside `finish()`, and smart cleanup adds up to 4s on top.
         guard state.isActive, state != .finishing else { return }
+        guard state != .starting else {
+            cancelDictation()
+            return
+        }
+        guard let operation = operationLifecycle.currentToken else { return }
         state = .finishing
         capture.stop()
         level = 0
-        releasedAt = Date()
+        let releasedAt = Date()
+        self.releasedAt = releasedAt
 
-        Task { @MainActor in
+        audioContinuation?.finish()
+        audioContinuation = nil
+        let feedTask = self.feedTask
+        let engine = self.engine
+        let consumeTask = self.consumeTask
+        let sessionID = activeSessionID
+        let configuration = activeConfiguration
+        let startedAt = holdStarted
+        let completedEngineName = engineName
+        let compareMode = isComparing
+        let liveInsertion = self.liveInsertion
+        let soundEnabled = Settings.shared.soundEnabled
+
+        finishingTask = Task { @MainActor [weak self] in
+            guard let self else {
+                await liveInsertion?.cancel()
+                return
+            }
             // Drain every captured buffer into the engine before asking it to finalize,
             // or the tail of the utterance gets dropped.
-            audioContinuation?.finish()
-            audioContinuation = nil
-            recorded = await feedTask?.value ?? []
-            feedTask = nil
+            let recording = await feedTask?.value ?? []
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
+            self.recorded = recording
+            self.feedTask = nil
 
             await engine?.finish()
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
             await consumeTask?.value
-            consumeTask = nil
-            engine = nil
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
+            self.consumeTask = nil
+            self.engine = nil
 
-            if isComparing {
-                await runComparison()
+            if compareMode {
+                await self.runComparison(
+                    chunks: recording,
+                    startedAt: startedAt,
+                    releasedAt: releasedAt,
+                    language: configuration?.language.selection ?? .systemDefault,
+                    operation: operation
+                )
                 return
             }
 
-            guard let sessionID = activeSessionID, let releasedAt else {
-                fail("The recording session could not be recovered.")
+            guard let sessionID else {
+                self.fail(
+                    "The recording session could not be recovered.",
+                    operation: operation,
+                    liveInsertion: liveInsertion
+                )
                 return
             }
 
             do {
-                _ = try await sessionCoordinator.stageReleasedAudio(
+                _ = try await self.sessionCoordinator.stageReleasedAudio(
                     sessionID: sessionID,
-                    chunks: recorded,
+                    chunks: recording,
                     releasedAt: releasedAt
                 )
             } catch {
-                activeSessionID = nil
-                fail("The recording was retained locally, but audio staging failed: \(error.localizedDescription)")
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    return
+                }
+                self.activeSessionID = nil
+                self.fail(
+                    "The recording was retained locally, but audio staging failed: \(error.localizedDescription)",
+                    operation: operation,
+                    liveInsertion: liveInsertion
+                )
+                return
+            }
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
                 return
             }
 
-            let raw = transcript
+            let raw = self.transcript
             guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                await cancelLiveInsertion()
-                _ = try? await sessionCoordinator.persistProcessedText(
+                await liveInsertion?.cancel()
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    return
+                }
+                self.clearLiveInsertion(ifMatching: liveInsertion)
+                _ = try? await self.sessionCoordinator.persistProcessedText(
                     sessionID: sessionID,
                     finalText: raw
                 )
-                activeSessionID = nil
-                holdStarted = nil
-                self.releasedAt = nil
-                resetTriggerLifecycle()
-                state = .idle
-                transcript = ""
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    return
+                }
+                self.finishOperation(operation, liveInsertion: liveInsertion)
                 return
             }
 
-            guard let configuration = activeConfiguration else {
-                fail("The recording language configuration could not be recovered.")
+            guard let configuration else {
+                self.fail(
+                    "The recording language configuration could not be recovered.",
+                    operation: operation,
+                    liveInsertion: liveInsertion
+                )
                 return
             }
             let cleaned = configuration.cleanupEnabled
-                ? await activeFormatter(for: configuration).format(raw)
+                ? await self.activeFormatter(for: configuration).format(raw)
                 : raw
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
             let expansion = SnippetStore.shared.expander.expand(cleaned)
             if expansion.applied != nil {
                 Log.speech.info("snippet · exact whole-utterance replacement applied")
@@ -503,75 +695,90 @@ final class DictationController {
             }
 
             do {
-                _ = try await sessionCoordinator.persistProcessedText(
+                _ = try await self.sessionCoordinator.persistProcessedText(
                     sessionID: sessionID,
                     finalText: output
                 )
             } catch {
-                fail("The transcript could not be made durable: \(error.localizedDescription)")
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    return
+                }
+                self.fail(
+                    "The transcript could not be made durable: \(error.localizedDescription)",
+                    operation: operation,
+                    liveInsertion: liveInsertion
+                )
+                return
+            }
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
                 return
             }
 
             let run = DictationRun(
                 id: sessionID,
                 date: releasedAt,
-                engine: engineName,
+                engine: completedEngineName,
                 language: configuration.language.selection,
-                audioSeconds: releasedAt.timeIntervalSince(holdStarted ?? releasedAt),
+                audioSeconds: releasedAt.timeIntervalSince(startedAt ?? releasedAt),
                 processSeconds: Date().timeIntervalSince(releasedAt),
                 text: output,
                 corrections: corrections.isEmpty ? nil : corrections,
                 appliedSnippet: expansion.applied
             )
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
             let disposition = await liveInsertion?.finalize(output)
                 ?? .useOneShotInsertion
-            let completed = await sessionCoordinator.completeLiveSession(
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
+            let completed = await self.sessionCoordinator.completeLiveSession(
                 sessionID: sessionID,
                 run: run,
-                insert: { text in
-                    if disposition == .useOneShotInsertion {
-                        TextInjector.insert(text)
-                    }
+                insert: { [weak self] text in
+                    guard let self,
+                          LiveTypingCompletionPolicy.shouldUseOneShotInsertion(
+                            disposition: disposition,
+                            operationIsCurrent: self.operationLifecycle.isCurrent(operation)
+                          )
+                    else { return }
+                    TextInjector.insert(text)
                 }
             )
-            activeSessionID = nil
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
+            self.activeSessionID = nil
             guard completed else {
-                fail("The transcript is safe locally and will be retried from history recovery.")
+                self.fail(
+                    "The transcript is safe locally and will be retried from history recovery.",
+                    operation: operation,
+                    liveInsertion: liveInsertion
+                )
                 return
             }
             if disposition == .retainedInHistoryOnly {
-                fail(L10n.text(
-                    "Live typing stopped because the destination changed. Your final text is saved in History."
-                ))
+                self.fail(
+                    L10n.text(
+                        "Live typing stopped because the destination changed. Your final text is saved in History."
+                    ),
+                    operation: operation,
+                    liveInsertion: liveInsertion
+                )
                 return
             }
-            liveInsertion = nil
-            if Settings.shared.soundEnabled { NSSound(named: "Pop")?.play() }
-
-            holdStarted = nil
-            self.releasedAt = nil
-            resetTriggerLifecycle()
-            state = .idle
-            transcript = ""
+            self.clearLiveInsertion(ifMatching: liveInsertion)
+            if soundEnabled { NSSound(named: "Pop")?.play() }
+            self.finishOperation(operation, liveInsertion: liveInsertion)
         }
     }
 
     private func cancelDictation() {
-        capture.stop()
-        audioContinuation?.finish()
-        audioContinuation = nil
-        feedTask?.cancel()
-        feedTask = nil
-        consumeTask?.cancel()
-        consumeTask = nil
-
-        let engine = self.engine
-        self.engine = nil
-        Task { await engine?.finish() }
-        scheduleLiveInsertionCancellation()
-
-        if let sessionID = activeSessionID {
-            activeSessionID = nil
+        let stopped = stopCurrentOperation(liveInsertion: liveInsertion)
+        Task { await stopped.engine?.finish() }
+        scheduleLiveInsertionCancellation(stopped.liveInsertion)
+        if let sessionID = stopped.sessionID {
             Task { await sessionCoordinator.cancel(sessionID: sessionID) }
         }
 
@@ -581,52 +788,37 @@ final class DictationController {
         resetTriggerLifecycle()
     }
 
-    private func teardown() async {
-        capture.stop()
-        audioContinuation?.finish()
-        audioContinuation = nil
-        _ = await feedTask?.value
-        feedTask = nil
-        await engine?.finish()
-        engine = nil
-        consumeTask?.cancel()
-        consumeTask = nil
-        await cancelLiveInsertion()
-        if let sessionID = activeSessionID {
-            activeSessionID = nil
-            await sessionCoordinator.cancel(sessionID: sessionID)
-        }
-        resetTriggerLifecycle()
-        state = .idle
-    }
-
     // MARK: - Helpers
 
     /// Replays the recording through every engine and files the results as one group.
     ///
     /// Nothing is injected in this mode — the point is to read the outputs side by side,
     /// and typing one of them into whatever had focus would be a surprise.
-    private func runComparison() async {
-        let chunks = recorded
+    private func runComparison(
+        chunks: [AudioChunk],
+        startedAt: Date?,
+        releasedAt: Date,
+        language: TranscriptionLanguageSelection,
+        operation: DictationOperationToken
+    ) async {
+        guard operationLifecycle.isCurrent(operation), !Task.isCancelled else { return }
         recorded.removeAll(keepingCapacity: false)
 
-        guard !chunks.isEmpty, let holdStarted, let releasedAt else {
-            resetTriggerLifecycle()
-            state = .idle
-            transcript = ""
+        guard !chunks.isEmpty, let startedAt else {
+            finishOperation(operation, liveInsertion: nil)
             return
         }
 
         transcript = "Running both engines…"
 
         let group = UUID().uuidString
-        let held = releasedAt.timeIntervalSince(holdStarted)
+        let held = releasedAt.timeIntervalSince(startedAt)
         let audioFile = AudioHistoryStore.save(chunks, id: UUID())
 
         // Filed one at a time as each engine finishes, so the window fills in progressively
         // rather than snapping both rows into place at the end.
-        let language = activeConfiguration?.language.selection ?? .systemDefault
-        let results = await EngineComparison.run(chunks: chunks, language: language) { result in
+        let results = await EngineComparison.run(chunks: chunks, language: language) { [weak self] result in
+            guard let self, self.operationLifecycle.isCurrent(operation) else { return }
             RunLog.record(
                 DictationRun(
                     date: releasedAt,
@@ -640,6 +832,7 @@ final class DictationController {
                 )
             )
         }
+        guard operationLifecycle.isCurrent(operation), !Task.isCancelled else { return }
 
         for result in results {
             Log.speech.info("""
@@ -648,15 +841,9 @@ final class DictationController {
                 \(result.text, privacy: .public)
                 """)
         }
-
-        self.holdStarted = nil
-        self.releasedAt = nil
         isComparing = false
-        resetTriggerLifecycle()
-        state = .idle
-        transcript = ""
-
         if Settings.shared.soundEnabled { NSSound(named: "Glass")?.play() }
+        finishOperation(operation, liveInsertion: nil)
     }
 
     /// Light smoothing so the waveform glides instead of strobing at buffer rate.
@@ -664,9 +851,19 @@ final class DictationController {
         level += (new - level) * 0.35
     }
 
-    private func handleAudioInputChange(_ deviceName: String) {
-        guard state == .starting || state == .listening else { return }
-        fail("\(deviceName) changed or disconnected. This recording stopped safely; try again to re-resolve the microphone.")
+    private func handleAudioInputChange(
+        _ deviceName: String,
+        operation: DictationOperationToken,
+        liveInsertion: LiveTextInsertionSession?
+    ) {
+        guard operationLifecycle.isCurrent(operation),
+              state == .starting || state == .listening
+        else { return }
+        fail(
+            "\(deviceName) changed or disconnected. This recording stopped safely; try again to re-resolve the microphone.",
+            operation: operation,
+            liveInsertion: liveInsertion
+        )
     }
 
     private func resetTriggerLifecycle() {
@@ -677,39 +874,91 @@ final class DictationController {
         hotkey.handsFreeSessionIsActive = false
     }
 
-    private func cancelLiveInsertion() async {
-        guard let session = liveInsertion else { return }
-        await session.cancel()
-        if let current = liveInsertion, current === session {
-            liveInsertion = nil
+    private func abandonStaleStartup(
+        liveInsertion: LiveTextInsertionSession?,
+        engine: (any TranscriptionEngine)?,
+        sessionID: UUID?
+    ) async {
+        await engine?.finish()
+        if let sessionID {
+            await sessionCoordinator.cancel(sessionID: sessionID)
+        }
+        await liveInsertion?.cancel()
+    }
+
+    private func scheduleLiveInsertionCancellation(
+        _ liveInsertion: LiveTextInsertionSession?
+    ) {
+        guard let liveInsertion else { return }
+        Task { @MainActor in
+            await liveInsertion.cancel()
         }
     }
 
-    private func scheduleLiveInsertionCancellation() {
-        guard let session = liveInsertion else { return }
-        Task { @MainActor [weak self] in
-            await session.cancel()
-            guard let self,
-                  let current = self.liveInsertion,
-                  current === session
-            else { return }
-            self.liveInsertion = nil
-        }
+    private func clearLiveInsertion(ifMatching session: LiveTextInsertionSession?) {
+        guard let session,
+              let current = liveInsertion,
+              current === session
+        else { return }
+        liveInsertion = nil
     }
 
-    private func fail(_ message: String) {
-        Log.app.error("\(message)")
+    private func stopCurrentOperation(
+        liveInsertion ownedLiveInsertion: LiveTextInsertionSession?
+    ) -> StoppedDictationResources {
+        operationLifecycle.invalidate()
+        startupTask?.cancel()
+        startupTask = nil
+        finishingTask?.cancel()
+        finishingTask = nil
+
         capture.stop()
         audioContinuation?.finish()
         audioContinuation = nil
         feedTask?.cancel()
         feedTask = nil
-        engine = nil
         consumeTask?.cancel()
         consumeTask = nil
-        scheduleLiveInsertionCancellation()
-        if let sessionID = activeSessionID {
-            activeSessionID = nil
+
+        let stopped = StoppedDictationResources(
+            engine: engine,
+            liveInsertion: ownedLiveInsertion ?? liveInsertion,
+            sessionID: activeSessionID
+        )
+        engine = nil
+        liveInsertion = nil
+        activeSessionID = nil
+        return stopped
+    }
+
+    private func finishOperation(
+        _ operation: DictationOperationToken,
+        liveInsertion: LiveTextInsertionSession?
+    ) {
+        guard operationLifecycle.isCurrent(operation) else { return }
+        operationLifecycle.invalidate()
+        startupTask = nil
+        finishingTask = nil
+        activeSessionID = nil
+        clearLiveInsertion(ifMatching: liveInsertion)
+        holdStarted = nil
+        releasedAt = nil
+        resetTriggerLifecycle()
+        state = .idle
+        transcript = ""
+    }
+
+    private func fail(
+        _ message: String,
+        operation: DictationOperationToken? = nil,
+        liveInsertion: LiveTextInsertionSession? = nil
+    ) {
+        if let operation, !operationLifecycle.isCurrent(operation) { return }
+        Log.app.error("\(message)")
+        let stopped = stopCurrentOperation(liveInsertion: liveInsertion)
+        Task { await stopped.engine?.finish() }
+        scheduleLiveInsertionCancellation(stopped.liveInsertion)
+        if let sessionID = stopped.sessionID {
             let failure = RecordingFailure(stage: .transcription, message: message)
             Task { await sessionCoordinator.fail(sessionID: sessionID, failure: failure) }
         }
@@ -719,7 +968,7 @@ final class DictationController {
 
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(3))
-            if case .error = state { state = .idle }
+            if state == .error(message) { state = .idle }
         }
     }
 }

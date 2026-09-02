@@ -12,6 +12,32 @@ struct LiveTypingScenario: Sendable {
 @Suite("Verified live text ownership")
 @MainActor
 struct LiveTextInsertionSessionTests {
+    @Test("invalidated operation tokens cannot act and replacements are distinct")
+    func operationTokenLifecycle() {
+        var lifecycle = DictationOperationLifecycle()
+        let original = lifecycle.begin()
+
+        lifecycle.invalidate()
+        #expect(!lifecycle.isCurrent(original))
+
+        let replacement = lifecycle.begin()
+        #expect(replacement != original)
+        #expect(lifecycle.isCurrent(replacement))
+        #expect(!lifecycle.isCurrent(original))
+    }
+
+    @Test("one-shot routing rejects an invalidated operation")
+    func oneShotRoutingRequiresCurrentOperation() {
+        #expect(!LiveTypingCompletionPolicy.shouldUseOneShotInsertion(
+            disposition: .useOneShotInsertion,
+            operationIsCurrent: false
+        ))
+        #expect(LiveTypingCompletionPolicy.shouldUseOneShotInsertion(
+            disposition: .useOneShotInsertion,
+            operationIsCurrent: true
+        ))
+    }
+
     @Test(arguments: [
         LiveTypingScenario(timing: .whileSpeaking, engine: .apple, compare: false, expected: true),
         LiveTypingScenario(timing: .afterSpeaking, engine: .apple, compare: false, expected: false),
