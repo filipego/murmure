@@ -257,9 +257,7 @@ struct SettingsWindow: View {
 
                             Text(L10n.text(liveTypingStatusText))
                                 .font(DS.Font.caption)
-                                .foregroundStyle(
-                                    liveTypingIsAvailable ? DS.Color.inkSecondary : DS.Color.warning
-                                )
+                                .foregroundStyle(DS.Color.inkSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
 
                             Toggle(
