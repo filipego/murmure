@@ -253,7 +253,7 @@ struct SettingsWindow: View {
                                     .tag(TextInsertionTiming.whileSpeaking)
                             }
                             .pickerStyle(.menu)
-                            .frame(maxWidth: 260, alignment: .leading)
+                            .frame(maxWidth: DS.Size.settingsPickerMaxWidth, alignment: .leading)
 
                             Text(L10n.text(liveTypingStatusText))
                                 .font(DS.Font.caption)
@@ -784,9 +784,14 @@ struct SettingsWindow: View {
     }
 
     private var liveTypingStatusText: String {
-        liveTypingIsAvailable
-            ? "Live typing is ready with Apple."
-            : "Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish."
+        LiveTypingStatusPolicy.textKey(
+            timing: settings.textInsertionTiming,
+            engine: resolvedEngineChoice(
+                preferred: settings.engine,
+                language: settings.transcriptionLanguage.selection
+            ),
+            compareMode: settings.compareMode
+        )
     }
 
     private var smartCleanupSupported: Bool {

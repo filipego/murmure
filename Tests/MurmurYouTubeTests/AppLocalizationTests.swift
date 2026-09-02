@@ -87,6 +87,8 @@ struct AppLocalizationTests {
         #expect(L10n.text("While I’m speaking", language: .spanish) == "Mientras hablo")
         #expect(L10n.text("Live typing is ready with Apple.", language: .french) == "La saisie en direct est prête avec Apple.")
         #expect(L10n.text("Live typing is ready with Apple.", language: .spanish) == "La escritura en directo está lista con Apple.")
+        #expect(L10n.text("Compare Mode shows both engines, so Murmure will not type into the destination.", language: .french) == "Le mode Comparaison affiche les deux moteurs, donc Murmure n’écrira pas dans la destination.")
+        #expect(L10n.text("Compare Mode shows both engines, so Murmure will not type into the destination.", language: .spanish) == "El modo Comparación muestra ambos motores, así que Murmure no escribirá en el destino.")
         #expect(L10n.text("Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish.", language: .french) == "La saisie en direct nécessite Apple et une langue parlée sélectionnée. Avec ces réglages, Murmure écrira après que vous aurez fini de parler.")
         #expect(L10n.text("Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish.", language: .spanish) == "La escritura en directo requiere Apple y un idioma hablado seleccionado. Con estos ajustes, Murmure escribirá cuando termines de hablar.")
         #expect(L10n.text("Live typing stopped because the destination changed. Your final text is saved in History.", language: .french) == "La saisie en direct s’est arrêtée car la destination a changé. Votre texte final est enregistré dans l’historique.")

@@ -51,6 +51,25 @@ enum LiveTypingPolicy {
     }
 }
 
+enum LiveTypingStatusPolicy {
+    static func textKey(
+        timing: TextInsertionTiming,
+        engine: SpeechEngineChoice,
+        compareMode: Bool
+    ) -> String {
+        if compareMode {
+            return "Compare Mode shows both engines, so Murmure will not type into the destination."
+        }
+        return LiveTypingPolicy.isEnabled(
+            timing: timing,
+            engine: engine,
+            compareMode: compareMode
+        )
+            ? "Live typing is ready with Apple."
+            : "Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish."
+    }
+}
+
 enum LiveTypingCompletionPolicy {
     static func shouldUseOneShotInsertion(
         disposition: LiveTextFinalization,

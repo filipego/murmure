@@ -171,6 +171,7 @@ When should Murmure type?	Quand Murmure doit-il écrire ?	¿Cuándo debe escribi
 After I finish speaking	Après avoir fini de parler	Después de terminar de hablar
 While I’m speaking	Pendant que je parle	Mientras hablo
 Live typing is ready with Apple.	La saisie en direct est prête avec Apple.	La escritura en directo está lista con Apple.
+Compare Mode shows both engines, so Murmure will not type into the destination.	Le mode Comparaison affiche les deux moteurs, donc Murmure n’écrira pas dans la destination.	El modo Comparación muestra ambos motores, así que Murmure no escribirá en el destino.
 Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish.	La saisie en direct nécessite Apple et une langue parlée sélectionnée. Avec ces réglages, Murmure écrira après que vous aurez fini de parler.	La escritura en directo requiere Apple y un idioma hablado seleccionado. Con estos ajustes, Murmure escribirá cuando termines de hablar.
 Live typing stopped because the destination changed. Your final text is saved in History.	La saisie en direct s’est arrêtée car la destination a changé. Votre texte final est enregistré dans l’historique.	La escritura en directo se detuvo porque cambió el destino. Tu texto final se guardó en el historial.
 Compare both local engines	Comparer les deux moteurs locaux	Comparar ambos motores locales

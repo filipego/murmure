@@ -10,6 +10,13 @@ struct LiveTypingScenario: Sendable {
     let expected: Bool
 }
 
+struct LiveTypingStatusScenario: Sendable {
+    let timing: TextInsertionTiming
+    let engine: SpeechEngineChoice
+    let compare: Bool
+    let expectedTextKey: String
+}
+
 @Suite("Verified live text ownership")
 @MainActor
 struct LiveTextInsertionSessionTests {
@@ -122,6 +129,40 @@ struct LiveTextInsertionSessionTests {
             engine: scenario.engine,
             compareMode: scenario.compare
         ) == scenario.expected)
+    }
+
+    @Test(arguments: [
+        LiveTypingStatusScenario(
+            timing: .afterSpeaking,
+            engine: .apple,
+            compare: false,
+            expectedTextKey: "Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish."
+        ),
+        LiveTypingStatusScenario(
+            timing: .whileSpeaking,
+            engine: .apple,
+            compare: false,
+            expectedTextKey: "Live typing is ready with Apple."
+        ),
+        LiveTypingStatusScenario(
+            timing: .whileSpeaking,
+            engine: .parakeet,
+            compare: false,
+            expectedTextKey: "Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish."
+        ),
+        LiveTypingStatusScenario(
+            timing: .whileSpeaking,
+            engine: .apple,
+            compare: true,
+            expectedTextKey: "Compare Mode shows both engines, so Murmure will not type into the destination."
+        ),
+    ])
+    func liveTypingStatus(_ scenario: LiveTypingStatusScenario) {
+        #expect(LiveTypingStatusPolicy.textKey(
+            timing: scenario.timing,
+            engine: scenario.engine,
+            compareMode: scenario.compare
+        ) == scenario.expectedTextKey)
     }
 
     @Test("successive snapshots replace only the owned range")
