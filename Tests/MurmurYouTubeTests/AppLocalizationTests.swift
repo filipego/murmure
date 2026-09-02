@@ -1,4 +1,5 @@
 import Foundation
+import MurmurUpdateCore
 import Testing
 @testable import MurmurYouTube
 
@@ -99,5 +100,17 @@ struct AppLocalizationTests {
         #expect(L10n.text("Live typing stopped before temporary text could be safely removed. Check the destination; the recording is available in recovery.", language: .spanish) == "La escritura en directo se detuvo antes de poder quitar el texto temporal de forma segura. Revisa el destino; la grabación está disponible en recuperación.")
         let issues = try L10n.catalogIssues()
         #expect(issues.isEmpty, Comment(rawValue: issues.joined(separator: "\n")))
+    }
+
+    @Test("available update status formats a numeric build as text")
+    func availableUpdateStatusFormatting() {
+        let version = AppVersion(marketing: "0.1.17", build: 17)
+
+        #expect(UpdateStatusText.available(version, language: .english) ==
+            "Version 0.1.17 (17) is ready to install.")
+        #expect(UpdateStatusText.available(version, language: .french) ==
+            "La version 0.1.17 (17) est prête à être installée.")
+        #expect(UpdateStatusText.available(version, language: .spanish) ==
+            "La versión 0.1.17 (17) está lista para instalarse.")
     }
 }

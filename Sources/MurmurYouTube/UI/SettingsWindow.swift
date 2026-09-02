@@ -2,6 +2,7 @@ import AVFoundation
 import AppKit
 import MurmurAudioCore
 import MurmurPermissionCore
+import MurmurUpdateCore
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -1123,6 +1124,19 @@ private struct StorageCard: View {
     }
 }
 
+enum UpdateStatusText {
+    static func available(
+        _ version: AppVersion,
+        language: AppLanguage? = nil
+    ) -> String {
+        L10n.format(
+            "Version %@ (%@) is ready to install.",
+            language: language,
+            arguments: [version.marketing, String(version.build)]
+        )
+    }
+}
+
 private struct UpdateCard: View {
     let coordinator: AppUpdateCoordinator
     let canInstall: Bool
@@ -1188,10 +1202,7 @@ private struct UpdateCard: View {
         case .upToDate:
             "Murmure is up to date."
         case .available(let manifest):
-            L10n.format(
-                "Version %@ (%@) is ready to install.",
-                arguments: [manifest.version.marketing, manifest.version.build]
-            )
+            UpdateStatusText.available(manifest.version)
         case .installing:
             "Installing and relaunching Murmure…"
         case .failed(let message):
