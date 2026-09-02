@@ -74,8 +74,9 @@ final class LiveTextInsertionSession {
     private enum State {
         case unavailable
         case active(Ownership)
-        case abandoned(LiveTextFinalization)
-        case finished
+        case abandoned(Ownership, LiveTextFinalization)
+        case finalized(Ownership?, LiveTextFinalization)
+        case committed
         case cancelled
     }
 
@@ -123,12 +124,12 @@ final class LiveTextInsertionSession {
 
         switch state {
         case .unavailable:
-            state = .finished
+            state = .finalized(nil, .useOneShotInsertion)
             return .useOneShotInsertion
-        case .abandoned(let result):
-            state = .finished
+        case .abandoned(let ownership, let result):
+            state = .finalized(ownership, result)
             return result
-        case .finished, .cancelled:
+        case .finalized, .committed, .cancelled:
             return .alreadyInserted
         case .active(let ownership):
             guard !finalText.isEmpty else {
@@ -143,21 +144,42 @@ final class LiveTextInsertionSession {
                 replacement: finalText
             )
             let finalization = finalization(after: result, ownership: ownership)
-            state = .finished
+            let finalizedOwnership = result == .replaced
+                ? updatedOwnership(replacingWith: finalText, from: ownership) ?? ownership
+                : ownership
+            state = .finalized(finalizedOwnership, finalization)
             return finalization
         }
+    }
+
+    func commit() async {
+        await beginMutation()
+        defer { endMutation() }
+
+        guard case .finalized = state else { return }
+        state = .committed
     }
 
     func cancel() async {
         await beginMutation()
         defer { endMutation() }
 
-        guard case .active(let ownership) = state else {
+        let ownership: Ownership?
+        switch state {
+        case .active(let activeOwnership),
+             .abandoned(let activeOwnership, _),
+             .finalized(let activeOwnership?, _):
+            ownership = activeOwnership
+        case .unavailable, .finalized(nil, _):
             state = .cancelled
+            return
+        case .committed, .cancelled:
             return
         }
 
-        await cancel(ownership)
+        if let ownership {
+            await cancel(ownership)
+        }
     }
 
     private func cancel(_ ownership: Ownership) async {
@@ -203,30 +225,39 @@ final class LiveTextInsertionSession {
     ) {
         switch result {
         case .replaced:
-            guard let replacementRange = liveTextRange(
-                startingAt: ownership.ownedRange.location,
-                text: replacement
-            ) else {
-                state = .abandoned(.retainedInHistoryOnly)
+            guard let updated = updatedOwnership(replacingWith: replacement, from: ownership) else {
+                state = .abandoned(ownership, .retainedInHistoryOnly)
                 return
             }
-
-            var updated = ownership
-            updated.expectedSelection = NSRange(
-                location: replacementRange.location + replacementRange.length,
-                length: 0
-            )
-            updated.ownedRange = replacementRange
-            updated.ownedText = replacement
-            updated.hasVerifiedMutation = true
             state = .active(updated)
         case .notMutated:
             state = .abandoned(
+                ownership,
                 ownership.hasVerifiedMutation ? .retainedInHistoryOnly : .useOneShotInsertion
             )
         case .uncertain:
-            state = .abandoned(.retainedInHistoryOnly)
+            state = .abandoned(ownership, .retainedInHistoryOnly)
         }
+    }
+
+    private func updatedOwnership(
+        replacingWith replacement: String,
+        from ownership: Ownership
+    ) -> Ownership? {
+        guard let replacementRange = liveTextRange(
+            startingAt: ownership.ownedRange.location,
+            text: replacement
+        ) else { return nil }
+
+        var updated = ownership
+        updated.expectedSelection = NSRange(
+            location: replacementRange.location + replacementRange.length,
+            length: 0
+        )
+        updated.ownedRange = replacementRange
+        updated.ownedText = replacement
+        updated.hasVerifiedMutation = true
+        return updated
     }
 
     private func finalization(

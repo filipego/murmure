@@ -26,6 +26,23 @@ struct LiveTextInsertionSessionTests {
         #expect(!lifecycle.isCurrent(original))
     }
 
+    @Test("controller cancellation stays non-startable until rollback completes")
+    func cancellationLifecycleBlocksNewOperations() {
+        var lifecycle = DictationOperationLifecycle()
+        _ = lifecycle.begin()
+
+        let cancellation = lifecycle.beginCancellation()
+        #expect(!lifecycle.canBegin)
+        #expect(lifecycle.isCancelling(cancellation))
+
+        lifecycle.invalidate()
+        #expect(!lifecycle.canBegin)
+
+        let completed = lifecycle.completeCancellation(cancellation)
+        #expect(completed)
+        #expect(lifecycle.canBegin)
+    }
+
     @Test("one-shot routing rejects an invalidated operation")
     func oneShotRoutingRequiresCurrentOperation() {
         #expect(!LiveTypingCompletionPolicy.shouldUseOneShotInsertion(
@@ -183,6 +200,53 @@ struct LiveTextInsertionSessionTests {
         #expect(await session.finalize("Final") == .alreadyInserted)
         #expect(target.documentText == "Final")
         #expect(target.replacements.map(\.replacement) == ["old", "new", "Final"])
+    }
+
+    @Test("cancel waits for suspended finalization and rolls it back")
+    func cancelOverlappingFinalizationRollsBack() async {
+        let originalText = "Keep selected words."
+        let originalSelection = NSRange(location: 5, length: 8)
+        let target = FakeLiveTextTarget(selection: originalSelection, text: originalText)
+        let session = LiveTextInsertionSession(capturer: target)
+        await session.render("draft")
+
+        let gate = FakeMutationGate()
+        target.nextGate = gate
+        let finalization = Task { @MainActor in
+            await session.finalize("Final")
+        }
+        while !gate.isWaiting {
+            await Task.yield()
+        }
+
+        let cancellation = Task { @MainActor in
+            await session.cancel()
+        }
+        await Task.yield()
+        gate.release()
+
+        #expect(await finalization.value == .alreadyInserted)
+        await cancellation.value
+
+        #expect(target.documentText == originalText)
+        #expect(target.replacements.map(\.replacement) == ["draft", "Final", "selected"])
+        #expect(await session.finalize("Final") == .alreadyInserted)
+    }
+
+    @Test("committed final text is no longer cancellable")
+    func commitEndsRollbackOwnership() async {
+        let originalText = "Keep selected words."
+        let originalSelection = NSRange(location: 5, length: 8)
+        let target = FakeLiveTextTarget(selection: originalSelection, text: originalText)
+        let session = LiveTextInsertionSession(capturer: target)
+        await session.render("draft")
+
+        #expect(await session.finalize("Final") == .alreadyInserted)
+        await session.commit()
+        await session.cancel()
+
+        #expect(target.documentText == "Keep Final words.")
+        #expect(target.replacements.map(\.replacement) == ["draft", "Final"])
     }
 }
 

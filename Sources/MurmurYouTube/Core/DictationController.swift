@@ -64,14 +64,30 @@ struct DictationOperationToken: Equatable, Sendable {
     fileprivate let id: UUID
 }
 
+struct DictationCancellationToken: Equatable, Sendable {
+    fileprivate let id: UUID
+}
+
 struct DictationOperationLifecycle: Sendable {
     private var current: DictationOperationToken?
+    private var cancellation: DictationCancellationToken?
 
     var currentToken: DictationOperationToken? { current }
+    var canBegin: Bool { current == nil && cancellation == nil }
+    var hasPendingCancellation: Bool { cancellation != nil }
 
     mutating func begin() -> DictationOperationToken {
+        precondition(canBegin)
         let token = DictationOperationToken(id: UUID())
         current = token
+        return token
+    }
+
+    mutating func beginCancellation() -> DictationCancellationToken {
+        precondition(cancellation == nil)
+        current = nil
+        let token = DictationCancellationToken(id: UUID())
+        cancellation = token
         return token
     }
 
@@ -81,6 +97,17 @@ struct DictationOperationLifecycle: Sendable {
 
     func isCurrent(_ token: DictationOperationToken) -> Bool {
         current == token
+    }
+
+    func isCancelling(_ token: DictationCancellationToken) -> Bool {
+        cancellation == token
+    }
+
+    @discardableResult
+    mutating func completeCancellation(_ token: DictationCancellationToken) -> Bool {
+        guard cancellation == token else { return false }
+        cancellation = nil
+        return true
     }
 }
 
@@ -153,6 +180,7 @@ final class DictationController {
     private var engine: (any TranscriptionEngine)?
     private var startupTask: Task<Void, Never>?
     private var finishingTask: Task<Void, Never>?
+    private var cancellationTask: Task<Void, Never>?
     private var consumeTask: Task<Void, Never>?
     /// Returns the ordered recording when the session finishes. The same buffers are fed to
     /// the selected engine and retained briefly so Murmure can archive the local audio once
@@ -315,7 +343,8 @@ final class DictationController {
     private func beginDictation(trigger: RecordingTrigger) {
         guard case .idle = state,
               !commandMode.isBusy,
-              liveInsertion == nil
+              liveInsertion == nil,
+              operationLifecycle.canBegin
         else { return }
         let operation = operationLifecycle.begin()
         state = .starting
@@ -758,6 +787,10 @@ final class DictationController {
                 )
                 return
             }
+            await liveInsertion?.commit()
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
             if disposition == .retainedInHistoryOnly {
                 self.fail(
                     L10n.text(
@@ -775,17 +808,29 @@ final class DictationController {
     }
 
     private func cancelDictation() {
+        guard !operationLifecycle.hasPendingCancellation else { return }
+        guard state != .idle || operationLifecycle.currentToken != nil || liveInsertion != nil else {
+            return
+        }
+
+        let cancellation = operationLifecycle.beginCancellation()
+        state = .finishing
         let stopped = stopCurrentOperation(liveInsertion: liveInsertion)
         Task { await stopped.engine?.finish() }
-        scheduleLiveInsertionCancellation(stopped.liveInsertion)
         if let sessionID = stopped.sessionID {
             Task { await sessionCoordinator.cancel(sessionID: sessionID) }
         }
 
-        state = .idle
         transcript = ""
         level = 0
+        holdStarted = nil
+        releasedAt = nil
         resetTriggerLifecycle()
+        trackLiveInsertionCancellation(
+            stopped.liveInsertion,
+            cancellation: cancellation,
+            returnsToIdle: true
+        )
     }
 
     // MARK: - Helpers
@@ -886,12 +931,19 @@ final class DictationController {
         await liveInsertion?.cancel()
     }
 
-    private func scheduleLiveInsertionCancellation(
-        _ liveInsertion: LiveTextInsertionSession?
+    private func trackLiveInsertionCancellation(
+        _ capturedSession: LiveTextInsertionSession?,
+        cancellation: DictationCancellationToken,
+        returnsToIdle: Bool
     ) {
-        guard let liveInsertion else { return }
-        Task { @MainActor in
-            await liveInsertion.cancel()
+        cancellationTask = Task { @MainActor [weak self] in
+            await capturedSession?.cancel()
+            guard let self else { return }
+            self.clearLiveInsertion(ifMatching: capturedSession)
+            guard self.operationLifecycle.completeCancellation(cancellation) else { return }
+            self.cancellationTask = nil
+            guard returnsToIdle, self.state == .finishing else { return }
+            self.state = .idle
         }
     }
 
@@ -906,7 +958,6 @@ final class DictationController {
     private func stopCurrentOperation(
         liveInsertion ownedLiveInsertion: LiveTextInsertionSession?
     ) -> StoppedDictationResources {
-        operationLifecycle.invalidate()
         startupTask?.cancel()
         startupTask = nil
         finishingTask?.cancel()
@@ -926,7 +977,6 @@ final class DictationController {
             sessionID: activeSessionID
         )
         engine = nil
-        liveInsertion = nil
         activeSessionID = nil
         return stopped
     }
@@ -955,20 +1005,27 @@ final class DictationController {
     ) {
         if let operation, !operationLifecycle.isCurrent(operation) { return }
         Log.app.error("\(message)")
+        let cancellation = operationLifecycle.beginCancellation()
         let stopped = stopCurrentOperation(liveInsertion: liveInsertion)
         Task { await stopped.engine?.finish() }
-        scheduleLiveInsertionCancellation(stopped.liveInsertion)
         if let sessionID = stopped.sessionID {
             let failure = RecordingFailure(stage: .transcription, message: message)
             Task { await sessionCoordinator.fail(sessionID: sessionID, failure: failure) }
         }
+        trackLiveInsertionCancellation(
+            stopped.liveInsertion,
+            cancellation: cancellation,
+            returnsToIdle: false
+        )
+        let cancellationTask = self.cancellationTask
         resetTriggerLifecycle()
         state = .error(message)
         level = 0
 
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(3))
-            if state == .error(message) { state = .idle }
+            await cancellationTask?.value
+            if state == .error(message), operationLifecycle.canBegin { state = .idle }
         }
     }
 }
