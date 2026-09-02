@@ -7,14 +7,18 @@ import Testing
 struct LiveTextInsertionSessionTests {
     @Test("successive snapshots replace only the owned range")
     func replacesOwnedRange() async {
-        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        let target = FakeLiveTextTarget(
+            selection: NSRange(location: 4, length: 0),
+            text: "Say  now."
+        )
         let session = LiveTextInsertionSession(capturer: target)
 
         await session.render("hel")
+        #expect(target.documentText == "Say hel now.")
         await session.render("hello")
 
         #expect(target.replacements.map(\.replacement) == ["hel", "hello"])
-        #expect(target.documentText == "hello")
+        #expect(target.documentText == "Say hello now.")
     }
 
     @Test("caret movement stops mutation and prevents duplicate final insertion")
@@ -34,11 +38,12 @@ struct LiveTextInsertionSessionTests {
     @Test("unavailable target before first mutation uses one shot final insertion")
     func unavailableTargetFallsBackCleanly() async {
         let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
-        let session = LiveTextInsertionSession(capturer: target)
         target.isAvailable = false
+        let session = LiveTextInsertionSession(capturer: target)
 
         #expect(await session.finalize("Hello.") == .useOneShotInsertion)
         #expect(target.documentText.isEmpty)
+        #expect(target.replacements.isEmpty)
     }
 
     @Test("cancel restores the original selection only while ownership is verified")
@@ -93,6 +98,19 @@ struct LiveTextInsertionSessionTests {
         #expect(target.replacements.map(\.replacement) == ["maybe landed"])
     }
 
+    @Test("a posted paste with an unchanged observation remains uncertain")
+    func postedPasteUnchangedNeverFallsBackCleanly() async {
+        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        target.nextOutcome = .postedPasteUnchanged
+        let session = LiveTextInsertionSession(capturer: target)
+
+        await session.render("possibly delayed")
+
+        #expect(await session.finalize("Final text") == .retainedInHistoryOnly)
+        #expect(target.documentText.isEmpty)
+        #expect(target.replacements.map(\.replacement) == ["possibly delayed"])
+    }
+
     @Test("an older suspended snapshot never overwrites newer text")
     func serializesSuspendedMutations() async {
         let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
@@ -132,6 +150,7 @@ private final class FakeLiveTextTarget: LiveTextTargetCapturing, LiveTextTarget 
 
     enum NextOutcome {
         case normal
+        case postedPasteUnchanged
         case uncertainAfterMutation
     }
 
@@ -175,17 +194,24 @@ private final class FakeLiveTextTarget: LiveTextTargetCapturing, LiveTextTarget 
               documentText.substring(in: ownedRange) == expectedText
         else { return .notMutated }
 
+        let requestedReplacement = Replacement(
+            expectedSelection: expectedSelection,
+            ownedRange: ownedRange,
+            expectedText: expectedText,
+            replacement: replacement
+        )
+        if nextOutcome == .postedPasteUnchanged {
+            nextOutcome = .normal
+            replacements.append(requestedReplacement)
+            return .afterPostedPaste(.unchanged)
+        }
+
         documentText = documentText.replacingCharacters(in: ownedRange, with: replacement)
         selection = NSRange(
             location: ownedRange.location + replacement.utf16.count,
             length: 0
         )
-        replacements.append(Replacement(
-            expectedSelection: expectedSelection,
-            ownedRange: ownedRange,
-            expectedText: expectedText,
-            replacement: replacement
-        ))
+        replacements.append(requestedReplacement)
 
         if nextOutcome == .uncertainAfterMutation {
             nextOutcome = .normal

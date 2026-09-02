@@ -12,6 +12,30 @@ enum LiveTextMutationResult: Equatable, Sendable {
     case replaced
     case notMutated
     case uncertain
+
+    static func afterPostedPaste(
+        _ observation: LiveTextReplacementObservation
+    ) -> LiveTextMutationResult {
+        switch observation {
+        case .verified:
+            .replaced
+        case .unchanged, .uncertain:
+            .uncertain
+        }
+    }
+}
+
+enum LiveTextReplacementObservation: Equatable, Sendable {
+    case verified
+    case unchanged
+    case uncertain
+}
+
+private func liveTextRange(startingAt location: Int, text: String) -> NSRange? {
+    guard location != NSNotFound, location >= 0 else { return nil }
+    let (end, overflow) = location.addingReportingOverflow(text.utf16.count)
+    guard !overflow else { return nil }
+    return NSRange(location: location, length: end - location)
 }
 
 @MainActor
@@ -179,7 +203,7 @@ final class LiveTextInsertionSession {
     ) {
         switch result {
         case .replaced:
-            guard let replacementRange = Self.range(
+            guard let replacementRange = liveTextRange(
                 startingAt: ownership.ownedRange.location,
                 text: replacement
             ) else {
@@ -218,13 +242,6 @@ final class LiveTextInsertionSession {
             return .retainedInHistoryOnly
         }
     }
-
-    private static func range(startingAt location: Int, text: String) -> NSRange? {
-        guard location != NSNotFound, location >= 0 else { return nil }
-        let (end, overflow) = location.addingReportingOverflow(text.utf16.count)
-        guard !overflow else { return nil }
-        return NSRange(location: location, length: end - location)
-    }
 }
 
 @MainActor
@@ -250,12 +267,6 @@ final class AXLiveTextTargetCapturer: LiveTextTargetCapturing {
 
 @MainActor
 private final class AXLiveTextTarget: LiveTextTarget {
-    private enum ReplacementObservation {
-        case verified
-        case unchanged
-        case uncertain
-    }
-
     private let element: AXUIElement
     private let processIdentifier: pid_t
 
@@ -319,22 +330,20 @@ private final class AXLiveTextTarget: LiveTextTarget {
             return .notMutated
         }
 
-        switch observeReplacement(
+        let observation = observeReplacement(
             ownedRange: ownedRange,
             expectedText: expectedText,
             replacement: replacement,
             documentBefore: documentBefore
-        ) {
-        case .verified:
-            return verifyAndCollapseCaret(ownedRange: ownedRange, replacement: replacement)
-                ? .replaced
-                : .uncertain
-        case .unchanged:
-            restoreExpectedSelection(expectedSelection, ownedRange: ownedRange, expectedText: expectedText)
-            return .notMutated
-        case .uncertain:
-            return .uncertain
+        )
+        guard observation == .verified else {
+            // Once Command-V is posted, an unchanged read is not proof that no write will
+            // arrive. The target app may consume the event after our observation window.
+            return .afterPostedPaste(observation)
         }
+        return verifyAndCollapseCaret(ownedRange: ownedRange, replacement: replacement)
+            ? .afterPostedPaste(.verified)
+            : .uncertain
     }
 
     fileprivate func text(in range: NSRange) -> String? {
@@ -359,9 +368,9 @@ private final class AXLiveTextTarget: LiveTextTarget {
         expectedText: String,
         replacement: String,
         documentBefore: String?
-    ) -> ReplacementObservation {
+    ) -> LiveTextReplacementObservation {
         guard isFocused,
-              let replacementRange = AXLiveTextSupport.range(
+              let replacementRange = liveTextRange(
                 startingAt: ownedRange.location,
                 text: replacement
               )
@@ -398,7 +407,7 @@ private final class AXLiveTextTarget: LiveTextTarget {
     }
 
     private func verifyAndCollapseCaret(ownedRange: NSRange, replacement: String) -> Bool {
-        guard let replacementRange = AXLiveTextSupport.range(
+        guard let replacementRange = liveTextRange(
             startingAt: ownedRange.location,
             text: replacement
         ),
@@ -514,13 +523,6 @@ private enum AXLiveTextSupport {
             kAXSelectedTextRangeAttribute as CFString,
             value
         ) == .success
-    }
-
-    static func range(startingAt location: Int, text: String) -> NSRange? {
-        guard location != NSNotFound, location >= 0 else { return nil }
-        let (end, overflow) = location.addingReportingOverflow(text.utf16.count)
-        guard !overflow else { return nil }
-        return NSRange(location: location, length: end - location)
     }
 
     static func replacing(range: NSRange, in text: String, with replacement: String) -> String? {

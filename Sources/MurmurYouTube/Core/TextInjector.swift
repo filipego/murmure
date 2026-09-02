@@ -112,9 +112,19 @@ enum TextInjector {
     // MARK: - Strategy 2: Pasteboard + ⌘V
 
     private static func insertViaPasteboard(_ text: String) {
+        let prepared = preparePasteboard(for: text)
+
         Task { @MainActor in
-            _ = await pasteViaCommandV(text)
+            // Give the target app a moment to observe the new pasteboard generation before
+            // ⌘V arrives, or a fast paste can grab the *previous* contents.
+            try? await Task.sleep(for: .milliseconds(40))
+            _ = postCommandV()
             Log.inject.info("pasted (\(text.count) chars)")
+
+            // The paste is asynchronous in the target app; restore only once it's had time
+            // to read the pasteboard.
+            try? await Task.sleep(for: .milliseconds(500))
+            restore(prepared.saved, to: prepared.pasteboard)
         }
     }
 
@@ -126,6 +136,34 @@ enum TextInjector {
         _ text: String,
         ifStillSafe canPaste: @escaping @MainActor () -> Bool = { true }
     ) async -> Bool {
+        let prepared = preparePasteboard(for: text)
+
+        // Give the target app a moment to observe the new pasteboard generation before
+        // ⌘V arrives, or a fast paste can grab the *previous* contents.
+        try? await Task.sleep(for: .milliseconds(40))
+        guard canPaste() else {
+            restore(prepared.saved, to: prepared.pasteboard)
+            return false
+        }
+
+        guard postCommandV() else {
+            restore(prepared.saved, to: prepared.pasteboard)
+            return false
+        }
+
+        // The paste is asynchronous in the target app; restore only once it's had time
+        // to read the pasteboard.
+        try? await Task.sleep(for: .milliseconds(500))
+        restore(prepared.saved, to: prepared.pasteboard)
+        return true
+    }
+
+    private struct PreparedPasteboard {
+        let pasteboard: NSPasteboard
+        let saved: [[NSPasteboard.PasteboardType: Data]]?
+    }
+
+    private static func preparePasteboard(for text: String) -> PreparedPasteboard {
         let pasteboard = NSPasteboard.general
         let saved = pasteboard.pasteboardItems?.compactMap { item -> [NSPasteboard.PasteboardType: Data] in
             var copy: [NSPasteboard.PasteboardType: Data] = [:]
@@ -137,25 +175,7 @@ enum TextInjector {
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-
-        // Give the target app a moment to observe the new pasteboard generation before
-        // ⌘V arrives, or a fast paste can grab the *previous* contents.
-        try? await Task.sleep(for: .milliseconds(40))
-        guard canPaste() else {
-            restore(saved, to: pasteboard)
-            return false
-        }
-
-        guard postCommandV() else {
-            restore(saved, to: pasteboard)
-            return false
-        }
-
-        // The paste is asynchronous in the target app; restore only once it's had time
-        // to read the pasteboard.
-        try? await Task.sleep(for: .milliseconds(500))
-        restore(saved, to: pasteboard)
-        return true
+        return PreparedPasteboard(pasteboard: pasteboard, saved: saved)
     }
 
     private static func postCommandV() -> Bool {
