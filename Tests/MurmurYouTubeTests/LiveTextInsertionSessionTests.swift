@@ -117,6 +117,35 @@ struct LiveTextInsertionSessionTests {
         ))
     }
 
+    @Test("controller-to-coordinator delivery keeps final, failed, stale, compare, and protected paths distinct")
+    func completionDeliveryBoundary() {
+        #expect(LiveTypingCompletionPolicy.delivery(
+            disposition: .useOneShotInsertion,
+            operationIsCurrent: true,
+            compareMode: false
+        ) == .insertOneShot)
+        #expect(LiveTypingCompletionPolicy.delivery(
+            disposition: .alreadyInserted,
+            operationIsCurrent: true,
+            compareMode: false
+        ) == .alreadyDelivered)
+        #expect(LiveTypingCompletionPolicy.delivery(
+            disposition: .retainedInHistoryOnly,
+            operationIsCurrent: true,
+            compareMode: false
+        ) == .retainInHistory)
+        #expect(LiveTypingCompletionPolicy.delivery(
+            disposition: .useOneShotInsertion,
+            operationIsCurrent: false,
+            compareMode: false
+        ) == .suppressed)
+        #expect(LiveTypingCompletionPolicy.delivery(
+            disposition: .useOneShotInsertion,
+            operationIsCurrent: true,
+            compareMode: true
+        ) == .suppressed)
+    }
+
     @Test(arguments: [
         LiveTypingScenario(timing: .whileSpeaking, engine: .apple, compare: false, expected: true),
         LiveTypingScenario(timing: .afterSpeaking, engine: .apple, compare: false, expected: false),
@@ -136,7 +165,7 @@ struct LiveTextInsertionSessionTests {
             timing: .afterSpeaking,
             engine: .apple,
             compare: false,
-            expectedTextKey: "Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish."
+            expectedTextKey: "Murmure will type after you finish speaking."
         ),
         LiveTypingStatusScenario(
             timing: .whileSpeaking,
@@ -163,6 +192,56 @@ struct LiveTextInsertionSessionTests {
             engine: scenario.engine,
             compareMode: scenario.compare
         ) == scenario.expectedTextKey)
+    }
+
+    @Test("operation invalidation suppresses a pending live render")
+    func staleOperationSuppressesPendingRender() async {
+        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        let validity = FakeOperationValidity()
+        let session = LiveTextInsertionSession(
+            capturer: target,
+            operationIsCurrent: { validity.isCurrent }
+        )
+
+        session.schedule("draft")
+        validity.isCurrent = false
+        await Task.yield()
+
+        #expect(target.documentText.isEmpty)
+        #expect(target.replacements.isEmpty)
+    }
+
+    @Test("Command-V policy rejects cancellation before either post window and preserves foreign clipboard changes")
+    func commandVPastePolicyIsCancellationAndOwnershipSafe() {
+        #expect(!LiveTextPastePolicy.canPostCommandV(
+            taskIsCancelled: true,
+            operationIsCurrent: true
+        ))
+        #expect(!LiveTextPastePolicy.canPostCommandV(
+            taskIsCancelled: false,
+            operationIsCurrent: false
+        ))
+        #expect(LiveTextPastePolicy.canPostCommandV(
+            taskIsCancelled: false,
+            operationIsCurrent: true
+        ))
+        #expect(LiveTextPastePolicy.shouldRestorePasteboard(
+            currentChangeCount: 3,
+            ownedChangeCount: 3
+        ))
+        #expect(!LiveTextPastePolicy.shouldRestorePasteboard(
+            currentChangeCount: 4,
+            ownedChangeCount: 3
+        ))
+    }
+
+    @Test("uncertain rollback keeps the staged recording recoverable")
+    func uncertainRollbackRecoveryPolicy() {
+        #expect(LiveTypingCancellationRecoveryPolicy.retainsRecoverableRecording(
+            .retainedInHistoryOnly
+        ))
+        #expect(!LiveTypingCancellationRecoveryPolicy.retainsRecoverableRecording(.restored))
+        #expect(!LiveTypingCancellationRecoveryPolicy.retainsRecoverableRecording(.noLiveText))
     }
 
     @Test("successive snapshots replace only the owned range")
@@ -214,7 +293,7 @@ struct LiveTextInsertionSessionTests {
         let session = LiveTextInsertionSession(capturer: target)
 
         await session.render("temporary")
-        await session.cancel()
+        _ = await session.cancel()
 
         #expect(target.documentText == originalText)
         #expect(target.replacements.map(\.replacement) == ["temporary", "selected"])
@@ -239,7 +318,7 @@ struct LiveTextInsertionSessionTests {
         await session.render("temporary")
 
         target.replaceExternally(with: "user text")
-        await session.cancel()
+        _ = await session.cancel()
 
         #expect(target.documentText == "user text")
         #expect(target.replacements.map(\.replacement) == ["temporary"])
@@ -271,31 +350,56 @@ struct LiveTextInsertionSessionTests {
         #expect(target.replacements.map(\.replacement) == ["possibly delayed"])
     }
 
-    @Test("an older suspended snapshot never overwrites newer text")
-    func serializesSuspendedMutations() async {
+    @Test("rapid snapshots coalesce to the latest pending text before finalization")
+    func coalescesRapidSnapshots() async {
         let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
-        let gate = FakeMutationGate()
-        target.nextGate = gate
         let session = LiveTextInsertionSession(capturer: target)
 
-        let older = Task { @MainActor in
-            await session.render("old")
-        }
-        while !gate.isWaiting {
-            await Task.yield()
-        }
-
-        let newer = Task { @MainActor in
-            await session.render("new")
-        }
-        await Task.yield()
-        gate.release()
-        await older.value
-        await newer.value
+        session.schedule("old")
+        session.schedule("new")
 
         #expect(await session.finalize("Final") == .alreadyInserted)
         #expect(target.documentText == "Final")
-        #expect(target.replacements.map(\.replacement) == ["old", "new", "Final"])
+        #expect(target.replacements.map(\.replacement) == ["new", "Final"])
+    }
+
+    @Test("restored exact ownership removes abandoned live text before one-shot fallback")
+    func restoredOwnershipRollsBackBeforeFallback() async {
+        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        let session = LiveTextInsertionSession(capturer: target)
+        await session.render("draft")
+
+        target.selection = NSRange(location: 0, length: 0)
+        await session.render("ignored")
+        target.selection = NSRange(location: 5, length: 0)
+
+        #expect(await session.finalize("Final") == .useOneShotInsertion)
+        #expect(target.documentText.isEmpty)
+        #expect(target.replacements.map(\.replacement) == ["draft", ""])
+    }
+
+    @Test("cancellation reports retained temporary text when exact rollback is no longer safe")
+    func cancellationReportsRollbackUncertainty() async {
+        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        let session = LiveTextInsertionSession(capturer: target)
+        await session.render("draft")
+
+        target.selection = NSRange(location: 0, length: 0)
+
+        #expect(await session.cancel() == .retainedInHistoryOnly)
+        #expect(target.documentText == "draft")
+    }
+
+    @Test("empty finalization reports retained temporary text when rollback is uncertain")
+    func emptyFinalizationReportsRollbackUncertainty() async {
+        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        let session = LiveTextInsertionSession(capturer: target)
+        await session.render("draft")
+
+        target.selection = NSRange(location: 0, length: 0)
+
+        #expect(await session.finalize("") == .retainedInHistoryOnly)
+        #expect(target.documentText == "draft")
     }
 
     @Test("cancel waits for suspended finalization and rolls it back")
@@ -317,7 +421,7 @@ struct LiveTextInsertionSessionTests {
 
         var cancellationCompleted = false
         let cancellation = Task { @MainActor in
-            await session.cancel()
+            _ = await session.cancel()
             cancellationCompleted = true
         }
         while session.pendingMutationCount == 0 {
@@ -346,7 +450,7 @@ struct LiveTextInsertionSessionTests {
 
         #expect(await session.finalize("Final") == .alreadyInserted)
         await session.commit()
-        await session.cancel()
+        _ = await session.cancel()
 
         #expect(target.documentText == "Keep Final words.")
         #expect(target.replacements.map(\.replacement) == ["draft", "Final"])
@@ -396,14 +500,17 @@ private final class FakeLiveTextTarget: LiveTextTargetCapturing, LiveTextTarget 
         expectedSelection: NSRange,
         ownedRange: NSRange,
         expectedText: String,
-        replacement: String
+        replacement: String,
+        allowsPasteFallback: Bool,
+        operationIsCurrent: @escaping @MainActor @Sendable () -> Bool
     ) async -> LiveTextMutationResult {
         if let gate = nextGate {
             nextGate = nil
             await gate.wait()
         }
 
-        guard isAvailable,
+        guard operationIsCurrent(),
+              isAvailable,
               selection == expectedSelection,
               documentText.substring(in: ownedRange) == expectedText
         else { return .notMutated }
@@ -438,6 +545,11 @@ private final class FakeLiveTextTarget: LiveTextTargetCapturing, LiveTextTarget 
         documentText = text
         selection = NSRange(location: text.utf16.count, length: 0)
     }
+}
+
+@MainActor
+private final class FakeOperationValidity {
+    var isCurrent = true
 }
 
 @MainActor

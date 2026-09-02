@@ -60,6 +60,9 @@ enum LiveTypingStatusPolicy {
         if compareMode {
             return "Compare Mode shows both engines, so Murmure will not type into the destination."
         }
+        if timing == .afterSpeaking {
+            return "Murmure will type after you finish speaking."
+        }
         return LiveTypingPolicy.isEnabled(
             timing: timing,
             engine: engine,
@@ -71,11 +74,45 @@ enum LiveTypingStatusPolicy {
 }
 
 enum LiveTypingCompletionPolicy {
+    enum Delivery: Equatable, Sendable {
+        case insertOneShot
+        case alreadyDelivered
+        case retainInHistory
+        case suppressed
+    }
+
+    static func delivery(
+        disposition: LiveTextFinalization,
+        operationIsCurrent: Bool,
+        compareMode: Bool
+    ) -> Delivery {
+        guard operationIsCurrent, !compareMode else { return .suppressed }
+        switch disposition {
+        case .useOneShotInsertion: return .insertOneShot
+        case .alreadyInserted: return .alreadyDelivered
+        case .retainedInHistoryOnly: return .retainInHistory
+        }
+    }
+
     static func shouldUseOneShotInsertion(
         disposition: LiveTextFinalization,
-        operationIsCurrent: Bool
+        operationIsCurrent: Bool,
+        compareMode: Bool = false
     ) -> Bool {
-        operationIsCurrent && disposition == .useOneShotInsertion
+        delivery(
+            disposition: disposition,
+            operationIsCurrent: operationIsCurrent,
+            compareMode: compareMode
+        ) == .insertOneShot
+    }
+}
+
+enum LiveTypingCancellationRecoveryPolicy {
+    static let warningKey =
+        "Live typing stopped before temporary text could be safely removed. Check the destination; the recording is available in recovery."
+
+    static func retainsRecoverableRecording(_ result: LiveTextCancellation) -> Bool {
+        result == .retainedInHistoryOnly
     }
 }
 
@@ -436,14 +473,18 @@ final class DictationController {
             timing: configuration.insertionTiming,
             engine: configuration.engine,
             compareMode: compareMode
-        ) ? LiveTextInsertionSession() : nil
+        ) ? LiveTextInsertionSession(
+            operationIsCurrent: { [weak self] in
+                self?.operationLifecycle.isCurrent(operation) == true
+            }
+        ) : nil
         self.liveInsertion = liveInsertion
         let microphoneSelection = Settings.shared.microphoneSelection
         let soundEnabled = Settings.shared.soundEnabled
 
         startupTask = Task { @MainActor [weak self] in
             guard let self else {
-                await liveInsertion?.cancel()
+                _ = await liveInsertion?.cancel()
                 return
             }
             var startedEngine: (any TranscriptionEngine)?
@@ -607,7 +648,7 @@ final class DictationController {
                                   !Task.isCancelled
                             else { return }
                             self.transcript = chunk.text
-                            await liveInsertion?.render(chunk.text)
+                            liveInsertion?.schedule(chunk.text)
                         }
                     } catch {
                         guard self.operationLifecycle.isCurrent(operation),
@@ -687,7 +728,7 @@ final class DictationController {
 
         finishingTask = Task { @MainActor [weak self] in
             guard let self else {
-                await liveInsertion?.cancel()
+                _ = await liveInsertion?.cancel()
                 return
             }
             // Drain every captured buffer into the engine before asking it to finalize,
@@ -754,16 +795,33 @@ final class DictationController {
 
             let raw = self.transcript
             guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                await liveInsertion?.cancel()
+                let cancellation = await liveInsertion?.cancel() ?? .noLiveText
                 guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
                     return
                 }
                 self.clearLiveInsertion(ifMatching: liveInsertion)
-                _ = try? await self.sessionCoordinator.persistProcessedText(
-                    sessionID: sessionID,
-                    finalText: raw
-                )
+                do {
+                    _ = try await self.sessionCoordinator.persistProcessedText(
+                        sessionID: sessionID,
+                        finalText: raw
+                    )
+                } catch {
+                    self.fail(
+                        "The empty recording could not be retained for recovery: \(error.localizedDescription)",
+                        operation: operation,
+                        liveInsertion: nil
+                    )
+                    return
+                }
                 guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    return
+                }
+                if LiveTypingCancellationRecoveryPolicy.retainsRecoverableRecording(cancellation) {
+                    self.fail(
+                        L10n.text(LiveTypingCancellationRecoveryPolicy.warningKey),
+                        operation: operation,
+                        liveInsertion: nil
+                    )
                     return
                 }
                 self.finishOperation(operation, liveInsertion: liveInsertion)
@@ -843,7 +901,8 @@ final class DictationController {
                     guard let self,
                           LiveTypingCompletionPolicy.shouldUseOneShotInsertion(
                             disposition: disposition,
-                            operationIsCurrent: self.operationLifecycle.isCurrent(operation)
+                            operationIsCurrent: self.operationLifecycle.isCurrent(operation),
+                            compareMode: compareMode
                           )
                     else { return }
                     TextInjector.insert(text)
@@ -891,10 +950,6 @@ final class DictationController {
         state = .idle
         let stopped = stopCurrentOperation(liveInsertion: liveInsertion)
         Task { await stopped.engine?.finish() }
-        if let sessionID = stopped.sessionID {
-            Task { await sessionCoordinator.cancel(sessionID: sessionID) }
-        }
-
         transcript = ""
         level = 0
         holdStarted = nil
@@ -902,7 +957,8 @@ final class DictationController {
         resetTriggerLifecycle()
         trackLiveInsertionCancellation(
             stopped.liveInsertion,
-            cancellation: cancellation
+            cancellation: cancellation,
+            sessionID: stopped.sessionID
         )
     }
 
@@ -998,22 +1054,60 @@ final class DictationController {
         sessionID: UUID?
     ) async {
         await engine?.finish()
+        let cancellation = await liveInsertion?.cancel() ?? .noLiveText
         if let sessionID {
-            await sessionCoordinator.cancel(sessionID: sessionID)
+            if LiveTypingCancellationRecoveryPolicy.retainsRecoverableRecording(cancellation) {
+                await sessionCoordinator.fail(
+                    sessionID: sessionID,
+                    failure: RecordingFailure(
+                        stage: .transcription,
+                        message: LiveTypingCancellationRecoveryPolicy.warningKey
+                    )
+                )
+            } else {
+                await sessionCoordinator.cancel(sessionID: sessionID)
+            }
         }
-        await liveInsertion?.cancel()
     }
 
     private func trackLiveInsertionCancellation(
         _ capturedSession: LiveTextInsertionSession?,
-        cancellation: DictationCancellationToken
+        cancellation: DictationCancellationToken,
+        sessionID: UUID? = nil
     ) {
         cancellationTask = Task { @MainActor [weak self] in
-            await capturedSession?.cancel()
+            let result = await capturedSession?.cancel() ?? .noLiveText
             guard let self else { return }
+            let retainedTemporaryText = LiveTypingCancellationRecoveryPolicy
+                .retainsRecoverableRecording(result)
+            if let sessionID {
+                if retainedTemporaryText {
+                    await self.sessionCoordinator.fail(
+                        sessionID: sessionID,
+                        failure: RecordingFailure(
+                            stage: .transcription,
+                            message: LiveTypingCancellationRecoveryPolicy.warningKey
+                        )
+                    )
+                    self.state = .error(L10n.text(LiveTypingCancellationRecoveryPolicy.warningKey))
+                } else {
+                    await self.sessionCoordinator.cancel(sessionID: sessionID)
+                }
+            }
             self.clearLiveInsertion(ifMatching: capturedSession)
             guard self.operationLifecycle.completeCancellation(cancellation) else { return }
             self.cancellationTask = nil
+            if retainedTemporaryText {
+                let warning = L10n.text(LiveTypingCancellationRecoveryPolicy.warningKey)
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .seconds(3))
+                    guard let self,
+                          self.state == .error(warning),
+                          self.operationLifecycle.canBegin
+                    else { return }
+                    self.state = .idle
+                }
+            }
         }
     }
 

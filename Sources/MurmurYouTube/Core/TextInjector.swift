@@ -2,6 +2,16 @@ import AppKit
 import ApplicationServices
 import Foundation
 
+enum LiveTextPastePolicy {
+    static func canPostCommandV(taskIsCancelled: Bool, operationIsCurrent: Bool) -> Bool {
+        !taskIsCancelled && operationIsCurrent
+    }
+
+    static func shouldRestorePasteboard(currentChangeCount: Int, ownedChangeCount: Int) -> Bool {
+        currentChangeCount == ownedChangeCount
+    }
+}
+
 /// Puts text into whatever field currently has keyboard focus.
 ///
 /// Two strategies, in order:
@@ -124,7 +134,7 @@ enum TextInjector {
             // The paste is asynchronous in the target app; restore only once it's had time
             // to read the pasteboard.
             try? await Task.sleep(for: .milliseconds(500))
-            restore(prepared.saved, to: prepared.pasteboard)
+            restore(prepared)
         }
     }
 
@@ -140,27 +150,39 @@ enum TextInjector {
 
         // Give the target app a moment to observe the new pasteboard generation before
         // ⌘V arrives, or a fast paste can grab the *previous* contents.
-        try? await Task.sleep(for: .milliseconds(40))
-        guard canPaste() else {
-            restore(prepared.saved, to: prepared.pasteboard)
+        do {
+            try await Task.sleep(for: .milliseconds(40))
+        } catch {
+            restore(prepared)
+            return false
+        }
+        guard LiveTextPastePolicy.canPostCommandV(
+            taskIsCancelled: Task.isCancelled,
+            operationIsCurrent: canPaste()
+        ) else {
+            restore(prepared)
             return false
         }
 
         guard postCommandV() else {
-            restore(prepared.saved, to: prepared.pasteboard)
+            restore(prepared)
             return false
         }
 
         // The paste is asynchronous in the target app; restore only once it's had time
         // to read the pasteboard.
-        try? await Task.sleep(for: .milliseconds(500))
-        restore(prepared.saved, to: prepared.pasteboard)
+        // A cancelled caller still needs a complete observation window: Command-V was
+        // already posted and the AX target must classify whether it changed text. A detached
+        // wait is intentionally independent of the caller's cancellation state.
+        await waitForPostedPasteObservation()
+        restore(prepared)
         return true
     }
 
     private struct PreparedPasteboard {
         let pasteboard: NSPasteboard
-        let saved: [[NSPasteboard.PasteboardType: Data]]?
+        let saved: [[NSPasteboard.PasteboardType: Data]]
+        let ownedChangeCount: Int
     }
 
     private static func preparePasteboard(for text: String) -> PreparedPasteboard {
@@ -171,11 +193,15 @@ enum TextInjector {
                 if let data = item.data(forType: type) { copy[type] = data }
             }
             return copy
-        }
+        } ?? []
 
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
-        return PreparedPasteboard(pasteboard: pasteboard, saved: saved)
+        return PreparedPasteboard(
+            pasteboard: pasteboard,
+            saved: saved,
+            ownedChangeCount: pasteboard.changeCount
+        )
     }
 
     private static func postCommandV() -> Bool {
@@ -196,13 +222,22 @@ enum TextInjector {
         return true
     }
 
-    private static func restore(
-        _ saved: [[NSPasteboard.PasteboardType: Data]]?,
-        to pasteboard: NSPasteboard
-    ) {
-        guard let saved, !saved.isEmpty else { return }
+    private static func waitForPostedPasteObservation() async {
+        await Task<Void, Never>.detached {
+            try? await Task.sleep(for: .milliseconds(500))
+        }.value
+    }
+
+    private static func restore(_ prepared: PreparedPasteboard) {
+        let pasteboard = prepared.pasteboard
+        guard LiveTextPastePolicy.shouldRestorePasteboard(
+            currentChangeCount: pasteboard.changeCount,
+            ownedChangeCount: prepared.ownedChangeCount
+        ) else { return }
+
         pasteboard.clearContents()
-        let items = saved.map { entry -> NSPasteboardItem in
+        guard !prepared.saved.isEmpty else { return }
+        let items = prepared.saved.map { entry -> NSPasteboardItem in
             let item = NSPasteboardItem()
             for (type, data) in entry { item.setData(data, forType: type) }
             return item

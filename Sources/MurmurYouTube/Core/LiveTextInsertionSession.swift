@@ -8,6 +8,12 @@ enum LiveTextFinalization: Equatable, Sendable {
     case retainedInHistoryOnly
 }
 
+enum LiveTextCancellation: Equatable, Sendable {
+    case restored
+    case noLiveText
+    case retainedInHistoryOnly
+}
+
 enum LiveTextMutationResult: Equatable, Sendable {
     case replaced
     case notMutated
@@ -44,7 +50,9 @@ protocol LiveTextTarget: AnyObject {
         expectedSelection: NSRange,
         ownedRange: NSRange,
         expectedText: String,
-        replacement: String
+        replacement: String,
+        allowsPasteFallback: Bool,
+        operationIsCurrent: @escaping @MainActor @Sendable () -> Bool
     ) async -> LiveTextMutationResult
 }
 
@@ -83,12 +91,23 @@ final class LiveTextInsertionSession {
     private var state: State
     private var mutationInFlight = false
     private var mutationWaiters: [CheckedContinuation<Void, Never>] = []
+    private var pendingSnapshot: String?
+    private var renderTask: Task<Void, Never>?
+    private var acceptsSnapshots = true
+    private var discardsPendingSnapshots = false
+    private let operationIsCurrent: @MainActor @Sendable () -> Bool
 
     /// Internal diagnostic count for mutations waiting behind the active target change.
     /// It provides lifecycle coordination without changing mutation scheduling.
-    var pendingMutationCount: Int { mutationWaiters.count }
+    var pendingMutationCount: Int {
+        mutationWaiters.count + (renderTask == nil ? 0 : 1)
+    }
 
-    init(capturer: any LiveTextTargetCapturing = AXLiveTextTargetCapturer()) {
+    init(
+        capturer: any LiveTextTargetCapturing = AXLiveTextTargetCapturer(),
+        operationIsCurrent: @escaping @MainActor @Sendable () -> Bool = { true }
+    ) {
+        self.operationIsCurrent = operationIsCurrent
         guard let capture = capturer.capture() else {
             state = .unavailable
             return
@@ -106,23 +125,65 @@ final class LiveTextInsertionSession {
     }
 
     func render(_ snapshot: String) async {
-        await beginMutation()
-        defer { endMutation() }
+        schedule(snapshot)
+        await renderTask?.value
+    }
 
-        guard !snapshot.isEmpty, case .active(let ownership) = state else { return }
-        apply(
-            await ownership.target.replace(
-                expectedSelection: ownership.expectedSelection,
-                ownedRange: ownership.ownedRange,
-                expectedText: ownership.ownedText,
-                replacement: snapshot
-            ),
-            replacement: snapshot,
-            to: ownership
-        )
+    /// Accepts high-frequency recognizer snapshots without making the producer wait for the
+    /// accessibility target. Only the most recent pending snapshot is rendered.
+    func schedule(_ snapshot: String) {
+        guard acceptsSnapshots,
+              operationIsCurrent(),
+              !snapshot.isEmpty,
+              case .active = state
+        else { return }
+
+        pendingSnapshot = snapshot
+        guard renderTask == nil else { return }
+        renderTask = Task { @MainActor [weak self] in
+            // Let adjacent recognizer updates coalesce before the first target mutation.
+            await Task.yield()
+            await self?.drainPendingSnapshots()
+        }
+    }
+
+    private func drainPendingSnapshots() async {
+        defer { renderTask = nil }
+
+        while !discardsPendingSnapshots, let snapshot = pendingSnapshot {
+            pendingSnapshot = nil
+            await beginMutation()
+            guard operationIsCurrent(), case .active(let ownership) = state else {
+                endMutation()
+                return
+            }
+            apply(
+                await ownership.target.replace(
+                    expectedSelection: ownership.expectedSelection,
+                    ownedRange: ownership.ownedRange,
+                    expectedText: ownership.ownedText,
+                    replacement: snapshot,
+                    allowsPasteFallback: true,
+                    operationIsCurrent: operationIsCurrent
+                ),
+                replacement: snapshot,
+                to: ownership
+            )
+            endMutation()
+        }
+    }
+
+    private func waitForScheduledRenders(discardPending: Bool) async {
+        acceptsSnapshots = false
+        if discardPending {
+            discardsPendingSnapshots = true
+            pendingSnapshot = nil
+        }
+        await renderTask?.value
     }
 
     func finalize(_ finalText: String) async -> LiveTextFinalization {
+        await waitForScheduledRenders(discardPending: false)
         await beginMutation()
         defer { endMutation() }
 
@@ -131,21 +192,47 @@ final class LiveTextInsertionSession {
             state = .finalized(nil, .useOneShotInsertion)
             return .useOneShotInsertion
         case .abandoned(let ownership, let result):
-            state = .finalized(ownership, result)
-            return result
+            guard !finalText.isEmpty else {
+                let cancellation = await rollback(ownership)
+                state = .cancelled
+                return cancellation == .retainedInHistoryOnly
+                    ? .retainedInHistoryOnly
+                    : .alreadyInserted
+            }
+            guard ownership.hasVerifiedMutation else {
+                state = .finalized(ownership, result)
+                return result
+            }
+            let cancellation = await rollback(ownership)
+            switch cancellation {
+            case .restored:
+                state = .finalized(nil, .useOneShotInsertion)
+                return .useOneShotInsertion
+            case .noLiveText:
+                state = .finalized(ownership, result)
+                return result
+            case .retainedInHistoryOnly:
+                state = .finalized(ownership, .retainedInHistoryOnly)
+                return .retainedInHistoryOnly
+            }
         case .finalized, .committed, .cancelled:
             return .alreadyInserted
         case .active(let ownership):
             guard !finalText.isEmpty else {
-                await cancel(ownership)
-                return .alreadyInserted
+                let cancellation = await rollback(ownership)
+                state = .cancelled
+                return cancellation == .retainedInHistoryOnly
+                    ? .retainedInHistoryOnly
+                    : .alreadyInserted
             }
 
             let result = await ownership.target.replace(
                 expectedSelection: ownership.expectedSelection,
                 ownedRange: ownership.ownedRange,
                 expectedText: ownership.ownedText,
-                replacement: finalText
+                replacement: finalText,
+                allowsPasteFallback: true,
+                operationIsCurrent: operationIsCurrent
             )
             let finalization = finalization(after: result, ownership: ownership)
             let finalizedOwnership = result == .replaced
@@ -164,7 +251,8 @@ final class LiveTextInsertionSession {
         state = .committed
     }
 
-    func cancel() async {
+    func cancel() async -> LiveTextCancellation {
+        await waitForScheduledRenders(discardPending: true)
         await beginMutation()
         defer { endMutation() }
 
@@ -176,29 +264,33 @@ final class LiveTextInsertionSession {
             ownership = activeOwnership
         case .unavailable, .finalized(nil, _):
             state = .cancelled
-            return
+            return .noLiveText
         case .committed, .cancelled:
-            return
+            return .noLiveText
         }
 
         if let ownership {
-            await cancel(ownership)
+            let cancellation = await rollback(ownership)
+            state = .cancelled
+            return cancellation
         }
+        return .noLiveText
     }
 
-    private func cancel(_ ownership: Ownership) async {
+    private func rollback(_ ownership: Ownership) async -> LiveTextCancellation {
         guard ownership.hasVerifiedMutation else {
-            state = .cancelled
-            return
+            return .noLiveText
         }
 
-        _ = await ownership.target.replace(
+        let result = await ownership.target.replace(
             expectedSelection: ownership.expectedSelection,
             ownedRange: ownership.ownedRange,
             expectedText: ownership.ownedText,
-            replacement: ownership.originalText
+            replacement: ownership.originalText,
+            allowsPasteFallback: false,
+            operationIsCurrent: { true }
         )
-        state = .cancelled
+        return result == .replaced ? .restored : .retainedInHistoryOnly
     }
 
     private func beginMutation() async {
@@ -314,9 +406,12 @@ private final class AXLiveTextTarget: LiveTextTarget {
         expectedSelection: NSRange,
         ownedRange: NSRange,
         expectedText: String,
-        replacement: String
+        replacement: String,
+        allowsPasteFallback: Bool,
+        operationIsCurrent: @escaping @MainActor @Sendable () -> Bool
     ) async -> LiveTextMutationResult {
-        guard isFocused,
+        guard operationIsCurrent(),
+              isFocused,
               AXLiveTextSupport.selectedRange(of: element) == expectedSelection,
               text(in: ownedRange) == expectedText
         else { return .notMutated }
@@ -353,12 +448,15 @@ private final class AXLiveTextTarget: LiveTextTarget {
             }
         }
 
+        guard allowsPasteFallback else { return .notMutated }
+
         guard verifiedSelectedOwnedRange(ownedRange, expectedText: expectedText) else {
             return .uncertain
         }
 
         let didPaste = await TextInjector.pasteViaCommandV(replacement) { [weak self] in
-            self?.verifiedSelectedOwnedRange(ownedRange, expectedText: expectedText) == true
+            operationIsCurrent()
+                && self?.verifiedSelectedOwnedRange(ownedRange, expectedText: expectedText) == true
         }
         guard didPaste else {
             restoreExpectedSelection(expectedSelection, ownedRange: ownedRange, expectedText: expectedText)
