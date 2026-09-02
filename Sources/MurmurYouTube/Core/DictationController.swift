@@ -60,6 +60,15 @@ enum LiveTypingCompletionPolicy {
     }
 }
 
+enum DictationStartPolicy {
+    static func canBegin(
+        visibleState: DictationController.State,
+        lifecycleCanBegin: Bool
+    ) -> Bool {
+        visibleState == .idle && lifecycleCanBegin
+    }
+}
+
 struct DictationOperationToken: Equatable, Sendable {
     fileprivate let id: UUID
 }
@@ -162,7 +171,10 @@ final class DictationController {
 
     var canStartButtonRecording: Bool {
         guard !isHotkeySuspendedForModalInput else { return false }
-        return state == .idle
+        return DictationStartPolicy.canBegin(
+            visibleState: state,
+            lifecycleCanBegin: operationLifecycle.canBegin
+        )
     }
 
     /// Injected only by tests; production reads the setting per-utterance below.
@@ -341,10 +353,13 @@ final class DictationController {
     // MARK: - Dictation
 
     private func beginDictation(trigger: RecordingTrigger) {
-        guard case .idle = state,
+        let canBegin = DictationStartPolicy.canBegin(
+            visibleState: state,
+            lifecycleCanBegin: operationLifecycle.canBegin
+        )
+        guard canBegin,
               !commandMode.isBusy,
-              liveInsertion == nil,
-              operationLifecycle.canBegin
+              liveInsertion == nil
         else { return }
         let operation = operationLifecycle.begin()
         state = .starting
@@ -814,7 +829,7 @@ final class DictationController {
         }
 
         let cancellation = operationLifecycle.beginCancellation()
-        state = .finishing
+        state = .idle
         let stopped = stopCurrentOperation(liveInsertion: liveInsertion)
         Task { await stopped.engine?.finish() }
         if let sessionID = stopped.sessionID {
@@ -828,8 +843,7 @@ final class DictationController {
         resetTriggerLifecycle()
         trackLiveInsertionCancellation(
             stopped.liveInsertion,
-            cancellation: cancellation,
-            returnsToIdle: true
+            cancellation: cancellation
         )
     }
 
@@ -933,8 +947,7 @@ final class DictationController {
 
     private func trackLiveInsertionCancellation(
         _ capturedSession: LiveTextInsertionSession?,
-        cancellation: DictationCancellationToken,
-        returnsToIdle: Bool
+        cancellation: DictationCancellationToken
     ) {
         cancellationTask = Task { @MainActor [weak self] in
             await capturedSession?.cancel()
@@ -942,8 +955,6 @@ final class DictationController {
             self.clearLiveInsertion(ifMatching: capturedSession)
             guard self.operationLifecycle.completeCancellation(cancellation) else { return }
             self.cancellationTask = nil
-            guard returnsToIdle, self.state == .finishing else { return }
-            self.state = .idle
         }
     }
 
@@ -1014,8 +1025,7 @@ final class DictationController {
         }
         trackLiveInsertionCancellation(
             stopped.liveInsertion,
-            cancellation: cancellation,
-            returnsToIdle: false
+            cancellation: cancellation
         )
         let cancellationTask = self.cancellationTask
         resetTriggerLifecycle()

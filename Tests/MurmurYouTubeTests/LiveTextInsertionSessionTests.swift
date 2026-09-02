@@ -26,21 +26,32 @@ struct LiveTextInsertionSessionTests {
         #expect(!lifecycle.isCurrent(original))
     }
 
-    @Test("controller cancellation stays non-startable until rollback completes")
-    func cancellationLifecycleBlocksNewOperations() {
+    @Test("visible idle remains non-startable until rollback completes")
+    func idleStartPolicyHonorsCancellationLifecycle() {
         var lifecycle = DictationOperationLifecycle()
         _ = lifecycle.begin()
 
         let cancellation = lifecycle.beginCancellation()
-        #expect(!lifecycle.canBegin)
+        let visibleState = DictationController.State.idle
+        #expect(visibleState == .idle)
+        #expect(!DictationStartPolicy.canBegin(
+            visibleState: visibleState,
+            lifecycleCanBegin: lifecycle.canBegin
+        ))
         #expect(lifecycle.isCancelling(cancellation))
 
         lifecycle.invalidate()
-        #expect(!lifecycle.canBegin)
+        #expect(!DictationStartPolicy.canBegin(
+            visibleState: visibleState,
+            lifecycleCanBegin: lifecycle.canBegin
+        ))
 
         let completed = lifecycle.completeCancellation(cancellation)
         #expect(completed)
-        #expect(lifecycle.canBegin)
+        #expect(DictationStartPolicy.canBegin(
+            visibleState: visibleState,
+            lifecycleCanBegin: lifecycle.canBegin
+        ))
     }
 
     @Test("one-shot routing rejects an invalidated operation")
@@ -219,10 +230,17 @@ struct LiveTextInsertionSessionTests {
             await Task.yield()
         }
 
+        var cancellationCompleted = false
         let cancellation = Task { @MainActor in
             await session.cancel()
+            cancellationCompleted = true
         }
-        await Task.yield()
+        while session.pendingMutationCount == 0 {
+            await Task.yield()
+        }
+        #expect(session.pendingMutationCount == 1)
+        #expect(!cancellationCompleted)
+        #expect(target.documentText == "Keep draft words.")
         gate.release()
 
         #expect(await finalization.value == .alreadyInserted)

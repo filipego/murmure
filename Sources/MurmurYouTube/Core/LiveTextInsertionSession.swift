@@ -84,6 +84,10 @@ final class LiveTextInsertionSession {
     private var mutationInFlight = false
     private var mutationWaiters: [CheckedContinuation<Void, Never>] = []
 
+    /// Internal diagnostic count for mutations waiting behind the active target change.
+    /// It provides lifecycle coordination without changing mutation scheduling.
+    var pendingMutationCount: Int { mutationWaiters.count }
+
     init(capturer: any LiveTextTargetCapturing = AXLiveTextTargetCapturer()) {
         guard let capture = capturer.capture() else {
             state = .unavailable
