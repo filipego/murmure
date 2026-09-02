@@ -112,6 +112,20 @@ enum TextInjector {
     // MARK: - Strategy 2: Pasteboard + ⌘V
 
     private static func insertViaPasteboard(_ text: String) {
+        Task { @MainActor in
+            _ = await pasteViaCommandV(text)
+            Log.inject.info("pasted (\(text.count) chars)")
+        }
+    }
+
+    /// Performs the existing pasteboard-preserving Command-V insertion and waits until the
+    /// target application has had time to consume it. Live insertion supplies a final safety
+    /// check because focus or selection may change during the short pasteboard handoff.
+    @discardableResult
+    static func pasteViaCommandV(
+        _ text: String,
+        ifStillSafe canPaste: @escaping @MainActor () -> Bool = { true }
+    ) async -> Bool {
         let pasteboard = NSPasteboard.general
         let saved = pasteboard.pasteboardItems?.compactMap { item -> [NSPasteboard.PasteboardType: Data] in
             var copy: [NSPasteboard.PasteboardType: Data] = [:]
@@ -124,27 +138,33 @@ enum TextInjector {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
 
-        Task { @MainActor in
-            // Give the target app a moment to observe the new pasteboard generation before
-            // ⌘V arrives, or a fast paste can grab the *previous* contents.
-            try? await Task.sleep(for: .milliseconds(40))
-            postCommandV()
-            Log.inject.info("pasted (\(text.count) chars)")
-
-            // The paste is asynchronous in the target app; restore only once it's had time
-            // to read the pasteboard.
-            try? await Task.sleep(for: .milliseconds(500))
+        // Give the target app a moment to observe the new pasteboard generation before
+        // ⌘V arrives, or a fast paste can grab the *previous* contents.
+        try? await Task.sleep(for: .milliseconds(40))
+        guard canPaste() else {
             restore(saved, to: pasteboard)
+            return false
         }
+
+        guard postCommandV() else {
+            restore(saved, to: pasteboard)
+            return false
+        }
+
+        // The paste is asynchronous in the target app; restore only once it's had time
+        // to read the pasteboard.
+        try? await Task.sleep(for: .milliseconds(500))
+        restore(saved, to: pasteboard)
+        return true
     }
 
-    private static func postCommandV() {
-        guard let source = CGEventSource(stateID: .privateState) else { return }
+    private static func postCommandV() -> Bool {
+        guard let source = CGEventSource(stateID: .privateState) else { return false }
         let vKey: CGKeyCode = 9 // kVK_ANSI_V
 
         guard let down = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: true),
               let up = CGEvent(keyboardEventSource: source, virtualKey: vKey, keyDown: false)
-        else { return }
+        else { return false }
 
         // Set explicitly rather than inheriting live hardware modifier state — the user may
         // still be resting a finger on something.
@@ -153,6 +173,7 @@ enum TextInjector {
 
         down.post(tap: .cghidEventTap)
         up.post(tap: .cghidEventTap)
+        return true
     }
 
     private static func restore(
