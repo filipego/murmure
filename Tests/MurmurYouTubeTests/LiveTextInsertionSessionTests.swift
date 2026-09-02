@@ -2,9 +2,30 @@ import Foundation
 import Testing
 @testable import MurmurYouTube
 
+struct LiveTypingScenario: Sendable {
+    let timing: TextInsertionTiming
+    let engine: SpeechEngineChoice
+    let compare: Bool
+    let expected: Bool
+}
+
 @Suite("Verified live text ownership")
 @MainActor
 struct LiveTextInsertionSessionTests {
+    @Test(arguments: [
+        LiveTypingScenario(timing: .whileSpeaking, engine: .apple, compare: false, expected: true),
+        LiveTypingScenario(timing: .afterSpeaking, engine: .apple, compare: false, expected: false),
+        LiveTypingScenario(timing: .whileSpeaking, engine: .parakeet, compare: false, expected: false),
+        LiveTypingScenario(timing: .whileSpeaking, engine: .apple, compare: true, expected: false),
+    ])
+    func liveTypingActivation(_ scenario: LiveTypingScenario) {
+        #expect(LiveTypingPolicy.isEnabled(
+            timing: scenario.timing,
+            engine: scenario.engine,
+            compareMode: scenario.compare
+        ) == scenario.expected)
+    }
+
     @Test("successive snapshots replace only the owned range")
     func replacesOwnedRange() async {
         let target = FakeLiveTextTarget(

@@ -41,9 +41,20 @@ func resolvedEngineChoice(
     return preferred
 }
 
+enum LiveTypingPolicy {
+    static func isEnabled(
+        timing: TextInsertionTiming,
+        engine: SpeechEngineChoice,
+        compareMode: Bool
+    ) -> Bool {
+        timing == .whileSpeaking && engine == .apple && !compareMode
+    }
+}
+
 private struct LiveTranscriptionConfiguration {
     let engine: SpeechEngineChoice
     let language: TranscriptionLanguageOption
+    let insertionTiming: TextInsertionTiming
     let cleanupEnabled: Bool
     let smartCleanup: Bool
 }
@@ -118,6 +129,7 @@ final class DictationController {
     private var isComparing = false
     private var activeSessionID: UUID?
     private var activeConfiguration: LiveTranscriptionConfiguration?
+    private var liveInsertion: LiveTextInsertionSession?
 
     init(
         formatter: (any TextFormatter)? = nil,
@@ -259,7 +271,10 @@ final class DictationController {
     // MARK: - Dictation
 
     private func beginDictation(trigger: RecordingTrigger) {
-        guard case .idle = state, !commandMode.isBusy else { return }
+        guard case .idle = state,
+              !commandMode.isBusy,
+              liveInsertion == nil
+        else { return }
         state = .starting
         activeTrigger = trigger
         transcript = ""
@@ -273,11 +288,19 @@ final class DictationController {
                 language: Settings.shared.transcriptionLanguage.selection
             ),
             language: Settings.shared.transcriptionLanguage,
+            insertionTiming: Settings.shared.textInsertionTiming,
             cleanupEnabled: Settings.shared.cleanupEnabled,
             smartCleanup: Settings.shared.smartCleanup
         )
         activeConfiguration = configuration
         engineName = isComparing ? "Comparing…" : configuration.engine.displayName
+        if LiveTypingPolicy.isEnabled(
+            timing: configuration.insertionTiming,
+            engine: configuration.engine,
+            compareMode: isComparing
+        ) {
+            liveInsertion = LiveTextInsertionSession()
+        }
 
         Task { @MainActor in
             do {
@@ -379,6 +402,7 @@ final class DictationController {
                     do {
                         for try await chunk in chunks {
                             self.transcript = chunk.text
+                            await self.liveInsertion?.render(chunk.text)
                         }
                     } catch {
                         self.fail(error.localizedDescription)
@@ -444,6 +468,7 @@ final class DictationController {
 
             let raw = transcript
             guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                await cancelLiveInsertion()
                 _ = try? await sessionCoordinator.persistProcessedText(
                     sessionID: sessionID,
                     finalText: raw
@@ -498,16 +523,29 @@ final class DictationController {
                 corrections: corrections.isEmpty ? nil : corrections,
                 appliedSnippet: expansion.applied
             )
+            let disposition = await liveInsertion?.finalize(output)
+                ?? .useOneShotInsertion
             let completed = await sessionCoordinator.completeLiveSession(
                 sessionID: sessionID,
                 run: run,
-                insert: { text in TextInjector.insert(text) }
+                insert: { text in
+                    if disposition == .useOneShotInsertion {
+                        TextInjector.insert(text)
+                    }
+                }
             )
             activeSessionID = nil
             guard completed else {
                 fail("The transcript is safe locally and will be retried from history recovery.")
                 return
             }
+            if disposition == .retainedInHistoryOnly {
+                fail(L10n.text(
+                    "Live typing stopped because the destination changed. Your final text is saved in History."
+                ))
+                return
+            }
+            liveInsertion = nil
             if Settings.shared.soundEnabled { NSSound(named: "Pop")?.play() }
 
             holdStarted = nil
@@ -530,6 +568,7 @@ final class DictationController {
         let engine = self.engine
         self.engine = nil
         Task { await engine?.finish() }
+        scheduleLiveInsertionCancellation()
 
         if let sessionID = activeSessionID {
             activeSessionID = nil
@@ -552,6 +591,7 @@ final class DictationController {
         engine = nil
         consumeTask?.cancel()
         consumeTask = nil
+        await cancelLiveInsertion()
         if let sessionID = activeSessionID {
             activeSessionID = nil
             await sessionCoordinator.cancel(sessionID: sessionID)
@@ -637,6 +677,26 @@ final class DictationController {
         hotkey.handsFreeSessionIsActive = false
     }
 
+    private func cancelLiveInsertion() async {
+        guard let session = liveInsertion else { return }
+        await session.cancel()
+        if let current = liveInsertion, current === session {
+            liveInsertion = nil
+        }
+    }
+
+    private func scheduleLiveInsertionCancellation() {
+        guard let session = liveInsertion else { return }
+        Task { @MainActor [weak self] in
+            await session.cancel()
+            guard let self,
+                  let current = self.liveInsertion,
+                  current === session
+            else { return }
+            self.liveInsertion = nil
+        }
+    }
+
     private func fail(_ message: String) {
         Log.app.error("\(message)")
         capture.stop()
@@ -647,6 +707,7 @@ final class DictationController {
         engine = nil
         consumeTask?.cancel()
         consumeTask = nil
+        scheduleLiveInsertionCancellation()
         if let sessionID = activeSessionID {
             activeSessionID = nil
             let failure = RecordingFailure(stage: .transcription, message: message)
