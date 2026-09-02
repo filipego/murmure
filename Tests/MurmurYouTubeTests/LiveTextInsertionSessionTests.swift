@@ -1,4 +1,5 @@
 import Foundation
+import MurmurSessionCore
 import Testing
 @testable import MurmurYouTube
 
@@ -26,8 +27,11 @@ struct LiveTextInsertionSessionTests {
         #expect(!lifecycle.isCurrent(original))
     }
 
-    @Test("visible idle remains non-startable until rollback completes")
-    func idleStartPolicyHonorsCancellationLifecycle() {
+    @Test(
+        "rollback blocks every recording-like start while visible idle",
+        arguments: DictationStartEntryPoint.allCases
+    )
+    func idleStartPolicyHonorsCancellationLifecycle(_ entryPoint: DictationStartEntryPoint) {
         var lifecycle = DictationOperationLifecycle()
         _ = lifecycle.begin()
 
@@ -35,6 +39,7 @@ struct LiveTextInsertionSessionTests {
         let visibleState = DictationController.State.idle
         #expect(visibleState == .idle)
         #expect(!DictationStartPolicy.canBegin(
+            entryPoint: entryPoint,
             visibleState: visibleState,
             lifecycleCanBegin: lifecycle.canBegin
         ))
@@ -42,6 +47,7 @@ struct LiveTextInsertionSessionTests {
 
         lifecycle.invalidate()
         #expect(!DictationStartPolicy.canBegin(
+            entryPoint: entryPoint,
             visibleState: visibleState,
             lifecycleCanBegin: lifecycle.canBegin
         ))
@@ -49,9 +55,47 @@ struct LiveTextInsertionSessionTests {
         let completed = lifecycle.completeCancellation(cancellation)
         #expect(completed)
         #expect(DictationStartPolicy.canBegin(
+            entryPoint: entryPoint,
             visibleState: visibleState,
             lifecycleCanBegin: lifecycle.canBegin
         ))
+    }
+
+    @Test("rollback rejects inactive hands-free start without mutating active state")
+    func handsFreeStartGatePreservesInactivePolicy() {
+        var rejectedPolicy = HandsFreeGesturePolicy()
+
+        #expect(HandsFreeEventRoutingPolicy.handle(
+            .bindingPressed,
+            policy: &rejectedPolicy,
+            canBegin: false
+        ) == .ignore)
+        #expect(!rejectedPolicy.isActive)
+
+        var finishingPolicy = HandsFreeGesturePolicy()
+        #expect(HandsFreeEventRoutingPolicy.handle(
+            .bindingPressed,
+            policy: &finishingPolicy,
+            canBegin: true
+        ) == .start)
+        #expect(HandsFreeEventRoutingPolicy.handle(
+            .enterPressed,
+            policy: &finishingPolicy,
+            canBegin: false
+        ) == .finish)
+
+        var cancellingPolicy = HandsFreeGesturePolicy()
+        #expect(HandsFreeEventRoutingPolicy.handle(
+            .bindingPressed,
+            policy: &cancellingPolicy,
+            canBegin: true
+        ) == .start)
+        #expect(HandsFreeEventRoutingPolicy.handle(
+            .escapePressed,
+            policy: &cancellingPolicy,
+            canBegin: false
+        ) == .cancel)
+        #expect(!cancellingPolicy.isActive)
     }
 
     @Test("one-shot routing rejects an invalidated operation")

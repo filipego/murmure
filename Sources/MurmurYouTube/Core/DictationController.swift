@@ -60,12 +60,38 @@ enum LiveTypingCompletionPolicy {
     }
 }
 
+enum DictationStartEntryPoint: CaseIterable, Sendable {
+    case primary
+    case button
+    case commandMode
+    case handsFree
+}
+
 enum DictationStartPolicy {
     static func canBegin(
+        entryPoint: DictationStartEntryPoint,
         visibleState: DictationController.State,
         lifecycleCanBegin: Bool
     ) -> Bool {
-        visibleState == .idle && lifecycleCanBegin
+        switch entryPoint {
+        case .primary, .button, .commandMode, .handsFree:
+            return visibleState == .idle && lifecycleCanBegin
+        }
+    }
+}
+
+enum HandsFreeEventRoutingPolicy {
+    static func handle(
+        _ event: HandsFreeGesturePolicy.Event,
+        policy: inout HandsFreeGesturePolicy,
+        canBegin: Bool
+    ) -> HandsFreeGesturePolicy.Command {
+        if event == .bindingPressed,
+           !policy.isActive,
+           !canBegin {
+            return .ignore
+        }
+        return policy.handle(event)
     }
 }
 
@@ -171,10 +197,7 @@ final class DictationController {
 
     var canStartButtonRecording: Bool {
         guard !isHotkeySuspendedForModalInput else { return false }
-        return DictationStartPolicy.canBegin(
-            visibleState: state,
-            lifecycleCanBegin: operationLifecycle.canBegin
-        )
+        return canBeginRecordingLikeAction(.button)
     }
 
     /// Injected only by tests; production reads the setting per-utterance below.
@@ -260,7 +283,9 @@ final class DictationController {
             self?.handleHandsFree(.escapePressed)
         }
         hotkey.onCommandModePress = { [weak self] in
-            guard let self, self.state == .idle else { return }
+            guard let self,
+                  self.canBeginRecordingLikeAction(.commandMode)
+            else { return }
             self.commandMode.begin()
         }
         hotkey.onCommandModeRelease = { [weak self] in
@@ -303,7 +328,7 @@ final class DictationController {
     /// Starts a recording from a Record button rather than the hotkey.
     func startButtonRecording() {
         guard canStartButtonRecording else { return }
-        beginDictation(trigger: .mainButton)
+        beginDictation(trigger: .mainButton, entryPoint: .button)
     }
 
     func stopButtonRecording() {
@@ -316,10 +341,16 @@ final class DictationController {
     }
 
     private func handlePrimaryBinding(_ edge: HotkeyGesturePolicy.Edge) {
+        if activeTrigger == nil,
+           !canBeginRecordingLikeAction(.primary) {
+            return
+        }
+
         switch primaryGesturePolicy.handle(edge) {
         case .start:
             beginDictation(
-                trigger: .holdToTalk(bindingID: Settings.shared.pushToTalkBinding.id)
+                trigger: .holdToTalk(bindingID: Settings.shared.pushToTalkBinding.id),
+                entryPoint: .primary
             )
         case .finish:
             endHoldToTalkDictation()
@@ -329,16 +360,16 @@ final class DictationController {
     }
 
     private func handleHandsFree(_ event: HandsFreeGesturePolicy.Event) {
-        if event == .bindingPressed,
-           !handsFreePolicy.isActive,
-           state != .idle {
-            return
-        }
-
-        switch handsFreePolicy.handle(event) {
+        let command = HandsFreeEventRoutingPolicy.handle(
+            event,
+            policy: &handsFreePolicy,
+            canBegin: canBeginRecordingLikeAction(.handsFree)
+        )
+        switch command {
         case .start:
             beginDictation(
-                trigger: .handsFree(bindingID: Settings.shared.handsFreeBinding.id)
+                trigger: .handsFree(bindingID: Settings.shared.handsFreeBinding.id),
+                entryPoint: .handsFree
             )
         case .finish:
             endDictation()
@@ -352,12 +383,11 @@ final class DictationController {
 
     // MARK: - Dictation
 
-    private func beginDictation(trigger: RecordingTrigger) {
-        let canBegin = DictationStartPolicy.canBegin(
-            visibleState: state,
-            lifecycleCanBegin: operationLifecycle.canBegin
-        )
-        guard canBegin,
+    private func beginDictation(
+        trigger: RecordingTrigger,
+        entryPoint: DictationStartEntryPoint
+    ) {
+        guard canBeginRecordingLikeAction(entryPoint),
               !commandMode.isBusy,
               liveInsertion == nil
         else { return }
@@ -588,6 +618,16 @@ final class DictationController {
                 )
             }
         }
+    }
+
+    private func canBeginRecordingLikeAction(
+        _ entryPoint: DictationStartEntryPoint
+    ) -> Bool {
+        DictationStartPolicy.canBegin(
+            entryPoint: entryPoint,
+            visibleState: state,
+            lifecycleCanBegin: operationLifecycle.canBegin
+        )
     }
 
     private func endDictation() {
