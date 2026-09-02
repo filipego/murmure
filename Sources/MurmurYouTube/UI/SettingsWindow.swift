@@ -243,6 +243,25 @@ struct SettingsWindow: View {
                                 )
                                 .fixedSize(horizontal: false, vertical: true)
 
+                            Picker(
+                                L10n.text("When should Murmure type?"),
+                                selection: $settings.textInsertionTiming
+                            ) {
+                                Text(L10n.text("After I finish speaking"))
+                                    .tag(TextInsertionTiming.afterSpeaking)
+                                Text(L10n.text("While I’m speaking"))
+                                    .tag(TextInsertionTiming.whileSpeaking)
+                            }
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: 260, alignment: .leading)
+
+                            Text(L10n.text(liveTypingStatusText))
+                                .font(DS.Font.caption)
+                                .foregroundStyle(
+                                    liveTypingIsAvailable ? DS.Color.inkSecondary : DS.Color.warning
+                                )
+                                .fixedSize(horizontal: false, vertical: true)
+
                             Toggle(
                                 L10n.text("Compare both local engines"), isOn: $settings.compareMode
                             )
@@ -751,6 +770,23 @@ struct SettingsWindow: View {
     private var transcriptionLanguageIsError: Bool {
         settings.engine == .apple
             && speechLanguages.status(for: settings.transcriptionLanguage)?.isSupported == false
+    }
+
+    private var liveTypingIsAvailable: Bool {
+        LiveTypingPolicy.isEnabled(
+            timing: settings.textInsertionTiming,
+            engine: resolvedEngineChoice(
+                preferred: settings.engine,
+                language: settings.transcriptionLanguage.selection
+            ),
+            compareMode: settings.compareMode
+        )
+    }
+
+    private var liveTypingStatusText: String {
+        liveTypingIsAvailable
+            ? "Live typing is ready with Apple."
+            : "Live typing requires Apple and a selected spoken language. With these settings, Murmure will type after you finish."
     }
 
     private var smartCleanupSupported: Bool {
