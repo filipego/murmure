@@ -64,6 +64,18 @@ struct LiveTextInsertionSessionTests {
             rangeText: nil
         ))
     }
+
+    @Test("a posted paste becomes owned when selecting its inserted range verifies the text")
+    func postedPasteCanBecomeVerifiedOwnership() {
+        #expect(LiveTextMutationResult.afterPostedPaste(
+            .uncertain,
+            verifiedOwnedRange: true
+        ) == .replaced)
+        #expect(LiveTextMutationResult.afterPostedPaste(
+            .unchanged,
+            verifiedOwnedRange: false
+        ) == .uncertain)
+    }
     @Test("invalidated operation tokens cannot act and replacements are distinct")
     func operationTokenLifecycle() {
         var lifecycle = DictationOperationLifecycle()

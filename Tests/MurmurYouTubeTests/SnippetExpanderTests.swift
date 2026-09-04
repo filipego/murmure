@@ -26,6 +26,35 @@ struct SnippetExpanderTests {
         }
     }
 
+    @Test("Murmure add deliberately invokes a whole-utterance snippet")
+    func deliberateCommandExpansion() {
+        let snippet = SnippetEntry(trigger: "contact card", replacement: "Private replacement")
+
+        for utterance in [
+            "Murmure add, contact card.",
+            "Murmur add, contact card.",
+            "murmure add contact card",
+            "MURMURE ADD: CONTACT CARD!",
+        ] {
+            let result = SnippetExpander(entries: [snippet]).expand(utterance)
+
+            #expect(result.text == "Private replacement")
+            #expect(result.applied?.id == snippet.id)
+        }
+    }
+
+    @Test("Murmure add still requires an exact trigger after the command")
+    func deliberateCommandRejectsAddedWords() {
+        let snippet = SnippetEntry(trigger: "contact card", replacement: "Private replacement")
+
+        let result = SnippetExpander(entries: [snippet]).expand(
+            "Murmure add, please use contact card."
+        )
+
+        #expect(result.text == "Murmure add, please use contact card.")
+        #expect(result.applied == nil)
+    }
+
     @Test("trailing punctuation tolerance never permits added words")
     func punctuationDoesNotPermitAddedWords() {
         let snippet = SnippetEntry(trigger: "contact card", replacement: "Private replacement")

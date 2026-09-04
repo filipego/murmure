@@ -20,9 +20,11 @@ enum LiveTextMutationResult: Equatable, Sendable {
     case uncertain
 
     static func afterPostedPaste(
-        _ observation: LiveTextReplacementObservation
+        _ observation: LiveTextReplacementObservation,
+        verifiedOwnedRange: Bool = false
     ) -> LiveTextMutationResult {
-        switch observation {
+        if verifiedOwnedRange { return .replaced }
+        return switch observation {
         case .verified:
             .replaced
         case .unchanged, .uncertain:
@@ -494,6 +496,10 @@ private final class AXLiveTextTarget: LiveTextTarget {
         guard didPaste else {
             restoreExpectedSelection(expectedSelection, ownedRange: ownedRange, expectedText: expectedText)
             return .notMutated
+        }
+
+        if verifyAndCollapseCaret(ownedRange: ownedRange, replacement: replacement) {
+            return .afterPostedPaste(.uncertain, verifiedOwnedRange: true)
         }
 
         let observation = observeReplacement(

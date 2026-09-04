@@ -152,8 +152,7 @@ actor AppleSpeechEngine: TranscriptionEngine {
         SpeechTranscriber(
             locale: locale,
             transcriptionOptions: [],
-            // `.volatileResults` is what makes live text appear while you're still talking.
-            reportingOptions: [.volatileResults],
+            reportingOptions: AppleSpeechConfiguration.reportingOptions,
             attributeOptions: []
         )
     }
@@ -187,4 +186,11 @@ actor AppleSpeechEngine: TranscriptionEngine {
             throw TranscriptionError.modelInstallFailed(error.localizedDescription)
         }
     }
+}
+
+enum AppleSpeechConfiguration {
+    static let reportingOptions: Set<SpeechTranscriber.ReportingOption> = [
+        .volatileResults,
+        .fastResults,
+    ]
 }

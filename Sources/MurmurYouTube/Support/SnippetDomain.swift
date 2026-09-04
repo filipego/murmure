@@ -95,9 +95,28 @@ struct SnippetExpander: Sendable {
     }
 
     private static func utteranceKey(_ value: String) -> String {
-        let normalized = value.precomposedStringWithCanonicalMapping
+        let normalized = commandBody(value).precomposedStringWithCanonicalMapping
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .punctuationCharacters)
         return SnippetValidator.comparisonKey(normalized)
+    }
+
+    private static func commandBody(_ value: String) -> String {
+        let normalized = value.precomposedStringWithCanonicalMapping
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let folded = normalized.folding(
+            options: [.caseInsensitive],
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+
+        for prefix in ["murmure add", "murmur add"] where folded.hasPrefix(prefix) {
+            let suffix = normalized.dropFirst(prefix.count)
+            guard suffix.first.map({ $0.isWhitespace || $0.isPunctuation }) == true else {
+                continue
+            }
+            return String(suffix)
+                .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+        }
+        return normalized
     }
 }
