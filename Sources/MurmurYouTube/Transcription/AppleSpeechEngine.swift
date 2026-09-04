@@ -14,7 +14,9 @@ actor AppleSpeechEngine: TranscriptionEngine {
     private var transcriber: SpeechTranscriber?
     private var analyzer: SpeechAnalyzer?
     private var inputContinuation: AsyncStream<AnalyzerInput>.Continuation?
+    private var outputContinuation: AsyncThrowingStream<TranscriptionChunk, Error>.Continuation?
     private var resultsTask: Task<Void, Never>?
+    private var capturedAudioSeconds = 0.0
 
     /// Text the engine has committed. Volatile results are appended on top for display
     /// but discarded as soon as a final result covering the same range arrives.
@@ -65,8 +67,10 @@ actor AppleSpeechEngine: TranscriptionEngine {
         }
 
         finalizedText = ""
+        capturedAudioSeconds = 0
 
         let (chunks, chunkContinuation) = AsyncThrowingStream<TranscriptionChunk, Error>.makeStream()
+        outputContinuation = chunkContinuation
 
         // Drain the transcriber's results into our simpler chunk stream.
         resultsTask = Task { [weak self] in
@@ -92,6 +96,10 @@ actor AppleSpeechEngine: TranscriptionEngine {
     }
 
     func feed(_ chunk: AudioChunk) async {
+        let sampleRate = chunk.buffer.format.sampleRate
+        if sampleRate > 0 {
+            capturedAudioSeconds += Double(chunk.buffer.frameLength) / sampleRate
+        }
         inputContinuation?.yield(AnalyzerInput(buffer: chunk.buffer))
     }
 
@@ -99,16 +107,28 @@ actor AppleSpeechEngine: TranscriptionEngine {
         inputContinuation?.finish()
         inputContinuation = nil
 
-        do {
-            try await analyzer?.finalizeAndFinishThroughEndOfInput()
-        } catch {
-            Log.speech.error("finalize failed: \(error.localizedDescription)")
+        switch AppleSpeechFinalizationPolicy.action(
+            capturedAudioSeconds: capturedAudioSeconds
+        ) {
+        case .cancel:
+            Log.speech.info("Apple: skipped a sub-tenth-second capture")
             await analyzer?.cancelAndFinishNow()
+            resultsTask?.cancel()
+            outputContinuation?.finish()
+        case .finalize:
+            do {
+                try await analyzer?.finalizeAndFinishThroughEndOfInput()
+            } catch {
+                Log.speech.error("finalize failed: \(error.localizedDescription)")
+                await analyzer?.cancelAndFinishNow()
+            }
         }
 
         analyzer = nil
         transcriber = nil
+        outputContinuation = nil
         resultsTask = nil
+        capturedAudioSeconds = 0
     }
 
     // MARK: - Result accumulation
@@ -193,4 +213,15 @@ enum AppleSpeechConfiguration {
         .volatileResults,
         .fastResults,
     ]
+}
+
+enum AppleSpeechFinalizationAction: Equatable, Sendable {
+    case finalize
+    case cancel
+}
+
+enum AppleSpeechFinalizationPolicy {
+    static func action(capturedAudioSeconds: Double) -> AppleSpeechFinalizationAction {
+        capturedAudioSeconds < 0.1 ? .cancel : .finalize
+    }
 }
