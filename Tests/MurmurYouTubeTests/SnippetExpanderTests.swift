@@ -26,53 +26,53 @@ struct SnippetExpanderTests {
         }
     }
 
-    @Test("Voice add deliberately invokes a whole-utterance snippet")
+    @Test("Insert deliberately invokes a whole-utterance snippet")
     func deliberateCommandExpansion() {
         let snippet = SnippetEntry(trigger: "contact card", replacement: "Private replacement")
 
         for utterance in [
-            "Voice add, contact card.",
-            "voice add contact card",
-            "VOICE ADD: CONTACT CARD!",
+            "Insert, contact card.",
+            "insert contact card",
+            "INSERT: CONTACT CARD!",
         ] {
-            let result = SnippetExpander(entries: [snippet]).expand(utterance)
+            let result = SnippetExpander(entries: [snippet], language: .english).expand(utterance)
 
             #expect(result.text == "Private replacement")
             #expect(result.applied?.id == snippet.id)
         }
     }
 
-    @Test("Voice add still requires an exact trigger after the command")
+    @Test("Insert still requires an exact trigger after the command")
     func deliberateCommandRejectsAddedWords() {
         let snippet = SnippetEntry(trigger: "contact card", replacement: "Private replacement")
 
-        let result = SnippetExpander(entries: [snippet]).expand(
-            "Voice add, please use contact card."
+        let result = SnippetExpander(entries: [snippet], language: .english).expand(
+            "Insert, please use contact card."
         )
 
-        #expect(result.text == "Voice add, please use contact card.")
+        #expect(result.text == "Insert, please use contact card.")
         #expect(result.applied == nil)
     }
 
-    @Test("Voice add expands its trigger and preserves the rest of the sentence")
+    @Test("Insert expands its trigger and preserves the rest of the sentence")
     func deliberateCommandExpansionInsideSentence() {
         let snippet = SnippetEntry(trigger: "contact card", replacement: "Saved contact")
 
-        let result = SnippetExpander(entries: [snippet]).expand(
-            "Voice add contact card, and send a letter there."
+        let result = SnippetExpander(entries: [snippet], language: .english).expand(
+            "Insert contact card, and send a letter there."
         )
 
         #expect(result.text == "Saved contact, and send a letter there.")
         #expect(result.applied == AppliedSnippet(id: snippet.id, trigger: "contact card"))
     }
 
-    @Test("Voice add chooses the longest matching trigger before trailing speech")
+    @Test("Insert chooses the longest matching trigger before trailing speech")
     func deliberateCommandUsesLongestTrigger() {
         let short = SnippetEntry(trigger: "contact", replacement: "Short")
         let long = SnippetEntry(trigger: "contact card", replacement: "Long")
 
-        let result = SnippetExpander(entries: [short, long]).expand(
-            "Voice add contact card and continue"
+        let result = SnippetExpander(entries: [short, long], language: .english).expand(
+            "Insert contact card and continue"
         )
 
         #expect(result.text == "Long and continue")
@@ -87,6 +87,69 @@ struct SnippetExpanderTests {
 
         #expect(result.text == "Murmure add, contact card")
         #expect(result.applied == nil)
+    }
+
+    @Test("every explicit spoken language has one localized command")
+    func everyLanguageHasCommand() {
+        let expected: [TranscriptionLanguageOption: String] = [
+            .english: "Insert", .spanish: "Inserta", .french: "Insère",
+            .bulgarian: "Вмъкни", .croatian: "Umetni", .czech: "Vlož",
+            .danish: "Indsæt", .dutch: "Voeg", .estonian: "Sisesta",
+            .finnish: "Lisää", .german: "Einfügen", .greek: "Εισαγωγή",
+            .hungarian: "Illeszd", .italian: "Inserisci", .latvian: "Ievieto",
+            .lithuanian: "Įterpk", .maltese: "Daħħal", .polish: "Wstaw",
+            .portuguese: "Insira", .romanian: "Inserează", .russian: "Вставь",
+            .slovak: "Vlož", .slovenian: "Vstavi", .swedish: "Infoga",
+            .ukrainian: "Встав",
+        ]
+
+        #expect(expected.count == TranscriptionLanguageOption.allCases.count - 1)
+        for (language, command) in expected {
+            #expect(SnippetCommandLexicon.commands(for: language) == [command])
+        }
+    }
+
+    @Test("Automatic accepts every localized command")
+    func automaticAcceptsEveryCommand() {
+        for language in TranscriptionLanguageOption.allCases where language != .systemDefault {
+            let command = SnippetCommandLexicon.primaryCommand(for: language)
+            let snippet = SnippetEntry(trigger: "saved phrase", replacement: "Expanded")
+            let result = SnippetExpander(entries: [snippet], language: .systemDefault)
+                .expand("\(command) saved phrase, continue")
+
+            #expect(result.text == "Expanded, continue")
+            #expect(result.applied?.id == snippet.id)
+        }
+    }
+
+    @Test("an explicit language rejects a different language command")
+    func explicitLanguageRejectsOtherCommand() {
+        let snippet = SnippetEntry(trigger: "mon adresse", replacement: "Adresse")
+        let result = SnippetExpander(entries: [snippet], language: .french)
+            .expand("Inserta mon adresse")
+
+        #expect(result.text == "Inserta mon adresse")
+        #expect(result.applied == nil)
+    }
+
+    @Test("localized commands require a word boundary")
+    func commandRequiresBoundary() {
+        let snippet = SnippetEntry(trigger: "contact", replacement: "Expanded")
+        let result = SnippetExpander(entries: [snippet], language: .english)
+            .expand("Inserted contact")
+
+        #expect(result.text == "Inserted contact")
+        #expect(result.applied == nil)
+    }
+
+    @Test("localized commands use canonical Unicode equivalence")
+    func commandUnicodeNormalization() {
+        let snippet = SnippetEntry(trigger: "mon adresse", replacement: "Adresse")
+        let decomposed = "Inse\u{300}re mon adresse"
+        let result = SnippetExpander(entries: [snippet], language: .french).expand(decomposed)
+
+        #expect(result.text == "Adresse")
+        #expect(result.applied?.id == snippet.id)
     }
 
     @Test("trailing punctuation tolerance never permits added words")

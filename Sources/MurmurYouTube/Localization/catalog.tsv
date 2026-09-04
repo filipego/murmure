@@ -197,10 +197,12 @@ Opening the selected microphone…	Ouverture du microphone sélectionné…	Abri
 Starting microphone	Démarrage du microphone	Iniciando micrófono
 Preparing microphone	Préparation du microphone	Preparando micrófono
 Snippets	Extraits	Fragmentos
-Say “Voice add,” then the trigger, or say the trigger by itself. Snippets run before dictionary corrections.	Dites « Voice add », puis le déclencheur, ou prononcez uniquement le déclencheur. Les extraits s’appliquent avant les corrections du dictionnaire.	Di «Voice add» seguido del activador, o di solo el activador. Los fragmentos se aplican antes que las correcciones del diccionario.
+Snippet command	Commande d’extrait	Comando de fragmento
+Say “%@” before the exact trigger. You can continue speaking after it. Say the trigger by itself when it is the whole dictation.	Dites « %@ » avant le déclencheur exact. Vous pouvez continuer à parler ensuite. Dites uniquement le déclencheur lorsqu’il constitue toute la dictée.	Di «%@» antes del activador exacto. Puedes seguir hablando después. Di solamente el activador cuando sea todo el dictado.
+Automatic accepts the insertion command in every supported spoken language. Examples: %@.	Automatique accepte la commande d’insertion dans toutes les langues parlées prises en charge. Exemples : %@.	Automático acepta el comando de inserción en todos los idiomas hablados compatibles. Ejemplos: %@.
 Add snippet	Ajouter un extrait	Añadir fragmento
-No snippets yet. Try “Voice add, my address” after creating a “my address” trigger.	Aucun extrait pour l’instant. Après avoir créé le déclencheur « mon adresse », essayez « Voice add, mon adresse ».	Aún no hay fragmentos. Después de crear el activador «mi dirección», prueba «Voice add, mi dirección».
-Murmure matches a complete trigger, either alone or after “Voice add.” It never changes a phrase inside ordinary prose.	Murmure reconnaît un déclencheur complet, seul ou après « Voice add ». Il ne modifie jamais une phrase au milieu d’un texte ordinaire.	Murmure reconoce un activador completo, solo o después de «Voice add». Nunca cambia una frase dentro de un texto normal.
+No snippets yet. Add one below, then say the command followed by its exact trigger.	Aucun extrait pour l’instant. Ajoutez-en un ci-dessous, puis dites la commande suivie de son déclencheur exact.	Aún no hay fragmentos. Añade uno abajo y di el comando seguido de su activador exacto.
+The command invokes a complete trigger and can preserve the rest of your sentence.	La commande invoque un déclencheur complet et peut conserver la suite de votre phrase.	El comando invoca un activador completo y puede conservar el resto de la frase.
 Line breaks are kept in the inserted text.	Les sauts de ligne sont conservés dans le texte inséré.	Los saltos de línea se conservan en el texto insertado.
 Permissions	Autorisations	Permisos
 Grant Microphone…	Autoriser le microphone…	Conceder micrófono…

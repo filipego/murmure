@@ -98,6 +98,12 @@ struct AppLocalizationTests {
         #expect(L10n.text("Live typing stopped because the destination changed. Your final text is saved in History.", language: .spanish) == "La escritura en directo se detuvo porque cambió el destino. Tu texto final se guardó en el historial.")
         #expect(L10n.text("Live typing stopped before temporary text could be safely removed. Check the destination; the recording is available in recovery.", language: .french) == "La saisie en direct s’est arrêtée avant que le texte temporaire puisse être retiré en toute sécurité. Vérifiez la destination ; l’enregistrement est disponible dans la récupération.")
         #expect(L10n.text("Live typing stopped before temporary text could be safely removed. Check the destination; the recording is available in recovery.", language: .spanish) == "La escritura en directo se detuvo antes de poder quitar el texto temporal de forma segura. Revisa el destino; la grabación está disponible en recuperación.")
+        #expect(L10n.text("Snippet command", language: .french) == "Commande d’extrait")
+        #expect(L10n.text("Snippet command", language: .spanish) == "Comando de fragmento")
+        #expect(L10n.text("Say “%@” before the exact trigger. You can continue speaking after it. Say the trigger by itself when it is the whole dictation.", language: .french) == "Dites « %@ » avant le déclencheur exact. Vous pouvez continuer à parler ensuite. Dites uniquement le déclencheur lorsqu’il constitue toute la dictée.")
+        #expect(L10n.text("Say “%@” before the exact trigger. You can continue speaking after it. Say the trigger by itself when it is the whole dictation.", language: .spanish) == "Di «%@» antes del activador exacto. Puedes seguir hablando después. Di solamente el activador cuando sea todo el dictado.")
+        #expect(L10n.text("Automatic accepts the insertion command in every supported spoken language. Examples: %@.", language: .french) == "Automatique accepte la commande d’insertion dans toutes les langues parlées prises en charge. Exemples : %@.")
+        #expect(L10n.text("Automatic accepts the insertion command in every supported spoken language. Examples: %@.", language: .spanish) == "Automático acepta el comando de inserción en todos los idiomas hablados compatibles. Ejemplos: %@.")
         let issues = try L10n.catalogIssues()
         #expect(issues.isEmpty, Comment(rawValue: issues.joined(separator: "\n")))
     }

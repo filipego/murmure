@@ -4,6 +4,7 @@ struct SnippetEditorSheet: View {
     let original: SnippetEntry
 
     @Environment(\.dismiss) private var dismiss
+    @State private var settings = Settings.shared
     @State private var trigger: String
     @State private var replacement: String
     @State private var isEnabled: Bool
@@ -23,7 +24,14 @@ struct SnippetEditorSheet: View {
                 Text(L10n.text(original.trigger.isEmpty ? "Add snippet" : "Edit snippet"))
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.ink)
-                Text(L10n.text("Murmure matches a complete trigger, either alone or after “Voice add.” It never changes a phrase inside ordinary prose."))
+                Text(L10n.text("Snippet command"))
+                    .font(DS.Font.eyebrow)
+                    .tracking(DS.Font.silkscreenTracking)
+                    .foregroundStyle(DS.Color.inkSecondary)
+                Text(commandDisplay)
+                    .font(DS.Font.title)
+                    .foregroundStyle(DS.Color.ink)
+                Text(commandInstruction)
                     .font(DS.Font.label)
                     .foregroundStyle(DS.Color.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -88,6 +96,26 @@ struct SnippetEditorSheet: View {
         .frame(width: DS.Size.correctionSheetWidth)
         .background(DS.Color.canvas)
         .interactiveDismissDisabled(isSaving)
+    }
+
+    private var commandDisplay: String {
+        if settings.transcriptionLanguage == .systemDefault {
+            return "Insert / Insère / Inserta / …"
+        }
+        return SnippetCommandLexicon.primaryCommand(for: settings.transcriptionLanguage)
+    }
+
+    private var commandInstruction: String {
+        if settings.transcriptionLanguage == .systemDefault {
+            return L10n.format(
+                "Automatic accepts the insertion command in every supported spoken language. Examples: %@.",
+                arguments: ["Insert, Insère, Inserta"]
+            )
+        }
+        return L10n.format(
+            "Say “%@” before the exact trigger. You can continue speaking after it. Say the trigger by itself when it is the whole dictation.",
+            arguments: [commandDisplay]
+        )
     }
 
     private func save() async {

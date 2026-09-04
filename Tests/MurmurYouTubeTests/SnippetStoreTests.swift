@@ -41,7 +41,7 @@ struct SnippetStoreTests {
         )
 
         store.beginDeferredHydration()
-        async let expansion = store.expand("contact card")
+        async let expansion = store.expand("contact card", language: .english)
         await gate.release([snippet])
 
         #expect(await expansion.applied?.id == snippet.id)

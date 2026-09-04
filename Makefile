@@ -186,7 +186,8 @@ share: app
 		echo '   Review the proposal before replacing the selection, or copy it instead. Settings'; \
 		echo '   explains if Apple Intelligence is unavailable. There is no network fallback.'; \
 		echo; \
-		echo 'Say “Voice add,” then an exact snippet trigger, or say the trigger alone. Snippets'; \
+		echo 'Say the localized insertion command, then an exact snippet trigger, or say the trigger'; \
+		echo 'alone. English uses “Insert,” French uses “Insère,” and Spanish uses “Inserta.” Snippets'; \
 		echo 'replace the complete spoken phrase with reusable local text. Automatic'; \
 		echo 'recognition, deterministic cleanup, snippets, dictionary corrections, history, and audio'; \
 		echo 'all run locally. Model downloads and update checks are the only network operations.'; \

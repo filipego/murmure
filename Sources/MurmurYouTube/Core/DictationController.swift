@@ -842,7 +842,10 @@ final class DictationController {
             guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
                 return
             }
-            let expansion = await SnippetStore.shared.expand(cleaned)
+            let expansion = await SnippetStore.shared.expand(
+                cleaned,
+                language: configuration.language
+            )
             guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
                 return
             }

@@ -80,7 +80,11 @@ struct RetranscriptionDependencies: Sendable {
                 return await formatter.format(raw)
             },
             expand: { text in
-                await MainActor.run { SnippetStore.shared.expander.expand(text) }
+                await MainActor.run {
+                    SnippetStore.shared.expander(
+                        for: Settings.shared.transcriptionLanguage
+                    ).expand(text)
+                }
             },
             correct: { text in
                 let corrector = await MainActor.run { DictionaryStore.shared.corrector }

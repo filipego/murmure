@@ -77,10 +77,19 @@ struct SnippetExpansionResult: Equatable, Sendable {
 
 struct SnippetExpander: Sendable {
     let entries: [SnippetEntry]
+    let language: TranscriptionLanguageOption
+
+    init(
+        entries: [SnippetEntry],
+        language: TranscriptionLanguageOption = .english
+    ) {
+        self.entries = entries
+        self.language = language
+    }
 
     func expand(_ text: String) -> SnippetExpansionResult {
         let normalizedText = text.precomposedStringWithCanonicalMapping
-        if let commandBody = Self.deliberateCommandBody(normalizedText),
+        if let commandBody = deliberateCommandBody(normalizedText),
            let invocation = deliberateInvocation(in: commandBody) {
             return SnippetExpansionResult(
                 text: invocation.entry.replacement.precomposedStringWithCanonicalMapping
@@ -150,22 +159,22 @@ struct SnippetExpander: Sendable {
         return SnippetValidator.comparisonKey(normalized)
     }
 
-    private static func deliberateCommandBody(_ value: String) -> String? {
+    private func deliberateCommandBody(_ value: String) -> String? {
         let normalized = value.precomposedStringWithCanonicalMapping
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let folded = normalized.folding(
-            options: [.caseInsensitive],
-            locale: Locale(identifier: "en_US_POSIX")
-        )
+        let folded = SnippetCommandLexicon.comparisonKey(normalized)
 
-        let prefix = "voice add"
-        guard folded.hasPrefix(prefix) else { return nil }
-        let suffix = normalized.dropFirst(prefix.count)
-        guard suffix.first.map({ $0.isWhitespace || $0.isPunctuation }) == true else {
-            return nil
+        for command in SnippetCommandLexicon.commands(for: language) {
+            let prefix = SnippetCommandLexicon.comparisonKey(command)
+            guard folded.hasPrefix(prefix) else { continue }
+            let suffix = normalized.dropFirst(command.count)
+            guard suffix.first.map({ $0.isWhitespace || $0.isPunctuation }) == true else {
+                continue
+            }
+            return String(suffix).drop(while: {
+                $0.isWhitespace || $0.isPunctuation
+            }).description
         }
-        return String(suffix).drop(while: {
-            $0.isWhitespace || $0.isPunctuation
-        }).description
+        return nil
     }
 }

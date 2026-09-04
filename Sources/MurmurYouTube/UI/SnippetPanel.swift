@@ -4,6 +4,7 @@ import SwiftUI
 /// by `SnippetStore`; this panel only coordinates the list and its editor affordances.
 struct SnippetPanel: View {
     @State private var snippets = SnippetStore.shared
+    @State private var settings = Settings.shared
     @State private var snippetDraft: SnippetEntry?
     @State private var pendingDeletion: SnippetEntry?
     @State private var message: String?
@@ -33,10 +34,15 @@ struct SnippetPanel: View {
                     Text(L10n.text("Reusable phrases"))
                         .font(DS.Font.title)
                         .foregroundStyle(DS.Color.ink)
+                    Text(L10n.text("Snippet command"))
+                        .font(DS.Font.eyebrow)
+                        .tracking(DS.Font.silkscreenTracking)
+                        .foregroundStyle(DS.Color.inkSecondary)
+                    Text(commandDisplay)
+                        .font(DS.Font.title)
+                        .foregroundStyle(DS.Color.ink)
                     Text(
-                        L10n.text(
-                            "Say “Voice add,” then the trigger, or say the trigger by itself. Snippets run before dictionary corrections."
-                        )
+                        commandInstruction
                     )
                     .font(DS.Font.label)
                     .foregroundStyle(DS.Color.inkSecondary)
@@ -45,7 +51,7 @@ struct SnippetPanel: View {
                     if snippets.entries.isEmpty {
                         Text(
                             L10n.text(
-                                "No snippets yet. Try “Voice add, my address” after creating a “my address” trigger."
+                                "No snippets yet. Add one below, then say the command followed by its exact trigger."
                             )
                         )
                         .font(DS.Font.body)
@@ -100,6 +106,26 @@ struct SnippetPanel: View {
         } message: {
             Text(pendingDeletion?.trigger ?? "")
         }
+    }
+
+    private var commandDisplay: String {
+        if settings.transcriptionLanguage == .systemDefault {
+            return "Insert / Insère / Inserta / …"
+        }
+        return SnippetCommandLexicon.primaryCommand(for: settings.transcriptionLanguage)
+    }
+
+    private var commandInstruction: String {
+        if settings.transcriptionLanguage == .systemDefault {
+            return L10n.format(
+                "Automatic accepts the insertion command in every supported spoken language. Examples: %@.",
+                arguments: ["Insert, Insère, Inserta"]
+            )
+        }
+        return L10n.format(
+            "Say “%@” before the exact trigger. You can continue speaking after it. Say the trigger by itself when it is the whole dictation.",
+            arguments: [commandDisplay]
+        )
     }
 
     private func snippetRow(_ entry: SnippetEntry) -> some View {
