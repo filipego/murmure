@@ -223,9 +223,8 @@ private struct HomePanel: View {
         return source.filter { $0.text.localizedStandardContains(trimmed) }
     }
 
-    private var groupedRuns: [(Date, [DictationRun])] {
-        let groups = Dictionary(grouping: filteredRuns) { Calendar.current.startOfDay(for: $0.date) }
-        return groups.keys.sorted(by: >).map { date in (date, groups[date] ?? []) }
+    private var historyItems: [HistoryListItem] {
+        HistoryListItems.make(fromNewestFirst: filteredRuns)
     }
 
     private var words: Int {
@@ -239,6 +238,7 @@ private struct HomePanel: View {
     }
 
     var body: some View {
+        let historyItems = historyItems
         ScrollView {
             VStack(alignment: .leading, spacing: DS.Space.wide) {
                 stats
@@ -260,12 +260,13 @@ private struct HomePanel: View {
 
                 SearchField(text: $query, placeholder: "Search your local history")
 
-                if groupedRuns.isEmpty {
+                if historyItems.isEmpty {
                     EmptyHomeState(hasHistory: !store.runs.isEmpty)
                 } else {
-                    LazyVStack(alignment: .leading, spacing: DS.Space.roomy) {
-                        ForEach(groupedRuns, id: \.0) { date, runs in
-                            VStack(alignment: .leading, spacing: DS.Space.snug) {
+                    LazyVStack(alignment: .leading, spacing: DS.Space.snug) {
+                        ForEach(historyItems) { item in
+                            switch item {
+                            case .day(let date, let isFirst):
                                 Text(date.formatted(
                                     Date.FormatStyle(date: .abbreviated, time: .omitted)
                                         .locale(appLanguage.language.locale)
@@ -273,22 +274,27 @@ private struct HomePanel: View {
                                     .font(DS.Font.eyebrow)
                                     .tracking(DS.Font.silkscreenTracking)
                                     .foregroundStyle(DS.Color.inkSecondary)
-                                ForEach(runs) { run in
-                                    HistoryRow(
-                                        run: run,
-                                        correctionDisabled: controller.state.isActive,
-                                        isPlaying: audioPlayer.state == .playing(run.id),
-                                        playbackMessage: playbackMessage(for: run.id),
-                                        onPlay: { play(run) },
-                                        onRetranscribe: {
-                                            openRetranscription(.history(run))
-                                        },
-                                        onCorrect: { openCorrection(run) },
-                                        onDelete: {
-                                            withAnimation(DS.Motion.panel) { RunLog.delete(run) }
-                                        }
+                                    .padding(
+                                        .top,
+                                        isFirst
+                                            ? DS.Space.none
+                                            : DS.Space.roomy - DS.Space.snug
                                     )
-                                }
+                            case .run(let run):
+                                HistoryRow(
+                                    run: run,
+                                    correctionDisabled: controller.state.isActive,
+                                    isPlaying: audioPlayer.state == .playing(run.id),
+                                    playbackMessage: playbackMessage(for: run.id),
+                                    onPlay: { play(run) },
+                                    onRetranscribe: {
+                                        openRetranscription(.history(run))
+                                    },
+                                    onCorrect: { openCorrection(run) },
+                                    onDelete: {
+                                        withAnimation(DS.Motion.panel) { RunLog.delete(run) }
+                                    }
+                                )
                             }
                         }
                     }
