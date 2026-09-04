@@ -25,7 +25,8 @@ Download the latest release: https://github.com/filipego/murmure/releases/latest
    Review the proposal before replacing the selection, or copy it instead. Settings
    explains if Apple Intelligence is unavailable. There is no network fallback.
 
-Say “Voice add,” then an exact snippet trigger, or say the trigger alone. Snippets
+Say the localized insertion command, then an exact snippet trigger, or say the trigger
+alone. English uses “Insert,” French uses “Insère,” and Spanish uses “Inserta.” Snippets
 replace the complete spoken phrase with reusable local text. Automatic
 recognition, deterministic cleanup, snippets, dictionary corrections, history, and audio
 all run locally. Model downloads and update checks are the only network operations.
