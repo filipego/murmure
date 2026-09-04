@@ -54,6 +54,31 @@ struct SnippetExpanderTests {
         #expect(result.applied == nil)
     }
 
+    @Test("Voice add expands its trigger and preserves the rest of the sentence")
+    func deliberateCommandExpansionInsideSentence() {
+        let snippet = SnippetEntry(trigger: "contact card", replacement: "Saved contact")
+
+        let result = SnippetExpander(entries: [snippet]).expand(
+            "Voice add contact card, and send a letter there."
+        )
+
+        #expect(result.text == "Saved contact, and send a letter there.")
+        #expect(result.applied == AppliedSnippet(id: snippet.id, trigger: "contact card"))
+    }
+
+    @Test("Voice add chooses the longest matching trigger before trailing speech")
+    func deliberateCommandUsesLongestTrigger() {
+        let short = SnippetEntry(trigger: "contact", replacement: "Short")
+        let long = SnippetEntry(trigger: "contact card", replacement: "Long")
+
+        let result = SnippetExpander(entries: [short, long]).expand(
+            "Voice add contact card and continue"
+        )
+
+        #expect(result.text == "Long and continue")
+        #expect(result.applied == AppliedSnippet(id: long.id, trigger: "contact card"))
+    }
+
     @Test("the retired Murmure add phrase is no longer treated as a command")
     func retiredCommandDoesNotInvokeSnippet() {
         let snippet = SnippetEntry(trigger: "contact card", replacement: "Saved contact")

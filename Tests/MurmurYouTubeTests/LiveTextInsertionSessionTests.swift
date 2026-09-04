@@ -20,6 +20,22 @@ struct LiveTypingStatusScenario: Sendable {
 @Suite("Verified live text ownership")
 @MainActor
 struct LiveTextInsertionSessionTests {
+    @Test("application fallback remains owned only while its original app is frontmost")
+    func applicationFallbackFocusPolicy() {
+        #expect(LiveTextApplicationFocusPolicy.isStillFocused(
+            targetProcessIdentifier: 42,
+            frontmostProcessIdentifier: 42
+        ))
+        #expect(!LiveTextApplicationFocusPolicy.isStillFocused(
+            targetProcessIdentifier: 42,
+            frontmostProcessIdentifier: 43
+        ))
+        #expect(!LiveTextApplicationFocusPolicy.isStillFocused(
+            targetProcessIdentifier: 42,
+            frontmostProcessIdentifier: nil
+        ))
+    }
+
     @Test("keystroke fallback appends new speech without rewriting the stable prefix")
     func keystrokeFallbackAppendPlan() {
         #expect(LiveTextKeystrokePlan(from: "hello", to: "hello world") == .init(

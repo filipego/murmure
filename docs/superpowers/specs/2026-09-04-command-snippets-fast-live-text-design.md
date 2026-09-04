@@ -6,7 +6,7 @@ Make deliberate snippet commands and live dictation behave predictably. Saying `
 
 ## Spoken command
 
-`Voice add` is the fixed command prefix. Matching is case-insensitive, Unicode-normalized, whitespace-tolerant, and tolerant of ordinary punctuation between the prefix and trigger. The prefix is removed before exact whole-trigger matching. Extra words before or after the trigger do not match. A bare exact trigger continues to match for compatibility.
+`Voice add` is the fixed command prefix. Matching is case-insensitive, Unicode-normalized, whitespace-tolerant, and tolerant of ordinary punctuation between the prefix and trigger. The longest configured trigger immediately after the prefix is expanded, and any trailing speech remains after the replacement. Extra words before the trigger do not match. A bare exact trigger continues to match for compatibility.
 
 ## Streaming behavior
 

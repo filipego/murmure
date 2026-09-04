@@ -62,6 +62,15 @@ struct LiveTextKeystrokePlan: Equatable, Sendable {
     }
 }
 
+enum LiveTextApplicationFocusPolicy {
+    static func isStillFocused(
+        targetProcessIdentifier: pid_t,
+        frontmostProcessIdentifier: pid_t?
+    ) -> Bool {
+        frontmostProcessIdentifier == targetProcessIdentifier
+    }
+}
+
 private func liveTextRange(startingAt location: Int, text: String) -> NSRange? {
     guard location != NSNotFound, location >= 0 else { return nil }
     let (end, overflow) = location.addingReportingOverflow(text.utf16.count)
@@ -430,7 +439,21 @@ final class LiveTextInsertionSession {
 @MainActor
 final class AXLiveTextTargetCapturer: LiveTextTargetCapturing {
     func capture() -> LiveTextTargetCapture? {
-        guard let focused = AXLiveTextSupport.focusedElement() else { return nil }
+        guard let focused = AXLiveTextSupport.focusedElement() else {
+            guard let frontmostProcessIdentifier = NSWorkspace.shared.frontmostApplication?
+                .processIdentifier,
+                  frontmostProcessIdentifier != ProcessInfo.processInfo.processIdentifier
+            else { return nil }
+
+            return LiveTextTargetCapture(
+                target: KeystrokeLiveTextTarget(
+                    element: nil,
+                    processIdentifier: frontmostProcessIdentifier
+                ),
+                selection: NSRange(location: 0, length: 0),
+                selectedText: ""
+            )
+        }
 
         guard let selection = AXLiveTextSupport.selectedRange(of: focused.element) else {
             return LiveTextTargetCapture(
@@ -462,10 +485,10 @@ final class AXLiveTextTargetCapturer: LiveTextTargetCapturing {
 
 @MainActor
 private final class KeystrokeLiveTextTarget: LiveTextTarget {
-    private let element: AXUIElement
+    private let element: AXUIElement?
     private let processIdentifier: pid_t
 
-    init(element: AXUIElement, processIdentifier: pid_t) {
+    init(element: AXUIElement?, processIdentifier: pid_t) {
         self.element = element
         self.processIdentifier = processIdentifier
     }
@@ -483,14 +506,21 @@ private final class KeystrokeLiveTextTarget: LiveTextTarget {
         let plan = LiveTextKeystrokePlan(from: expectedText, to: replacement)
         guard TextInjector.applyLiveKeystrokePlan(plan) else { return .notMutated }
 
-        await Task.yield()
+        try? await Task.sleep(for: .milliseconds(30))
         return isFocused ? .replaced : .uncertain
     }
 
     private var isFocused: Bool {
+        let frontmostProcessIdentifier = NSWorkspace.shared.frontmostApplication?
+            .processIdentifier
+        guard LiveTextApplicationFocusPolicy.isStillFocused(
+            targetProcessIdentifier: processIdentifier,
+            frontmostProcessIdentifier: frontmostProcessIdentifier
+        ) else { return false }
+
+        guard let element else { return true }
         guard let focused = AXLiveTextSupport.focusedElement() else { return false }
-        return focused.processIdentifier == processIdentifier
-            && CFEqual(focused.element, element)
+        return focused.processIdentifier == processIdentifier && CFEqual(focused.element, element)
     }
 }
 
@@ -562,11 +592,15 @@ private final class AXLiveTextTarget: LiveTextTarget {
             deleteCount: 0,
             insertion: replacement
         )) {
-            await Task.yield()
-            if verifyAndCollapseCaret(ownedRange: ownedRange, replacement: replacement) {
+            if await waitForKeystrokeReplacement(
+                ownedRange: ownedRange,
+                expectedText: expectedText,
+                replacement: replacement,
+                documentBefore: documentBefore
+            ) {
                 return .replaced
             }
-            return isFocused ? .replaced : .uncertain
+            return .uncertain
         }
 
         let didPaste = await TextInjector.pasteViaCommandV(replacement) { [weak self] in
@@ -596,6 +630,30 @@ private final class AXLiveTextTarget: LiveTextTarget {
         return verifyAndCollapseCaret(ownedRange: ownedRange, replacement: replacement)
             ? .afterPostedPaste(.verified)
             : .uncertain
+    }
+
+    private func waitForKeystrokeReplacement(
+        ownedRange: NSRange,
+        expectedText: String,
+        replacement: String,
+        documentBefore: String?
+    ) async -> Bool {
+        for _ in 0..<15 {
+            switch observeReplacement(
+                ownedRange: ownedRange,
+                expectedText: expectedText,
+                replacement: replacement,
+                documentBefore: documentBefore
+            ) {
+            case .verified:
+                return verifyAndCollapseCaret(ownedRange: ownedRange, replacement: replacement)
+            case .uncertain:
+                return false
+            case .unchanged:
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+        }
+        return false
     }
 
     fileprivate func text(in range: NSRange) -> String? {

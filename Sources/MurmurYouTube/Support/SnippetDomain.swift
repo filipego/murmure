@@ -79,12 +79,25 @@ struct SnippetExpander: Sendable {
     let entries: [SnippetEntry]
 
     func expand(_ text: String) -> SnippetExpansionResult {
-        let key = Self.utteranceKey(text)
+        let normalizedText = text.precomposedStringWithCanonicalMapping
+        if let commandBody = Self.deliberateCommandBody(normalizedText),
+           let invocation = deliberateInvocation(in: commandBody) {
+            return SnippetExpansionResult(
+                text: invocation.entry.replacement.precomposedStringWithCanonicalMapping
+                    + invocation.trailingText,
+                applied: AppliedSnippet(
+                    id: invocation.entry.id,
+                    trigger: invocation.entry.trigger
+                )
+            )
+        }
+
+        let key = Self.utteranceKey(normalizedText)
         guard let entry = entries.first(where: {
             $0.isEnabled && Self.utteranceKey($0.trigger) == key
         }) else {
             return SnippetExpansionResult(
-                text: text.precomposedStringWithCanonicalMapping,
+                text: normalizedText,
                 applied: nil
             )
         }
@@ -94,14 +107,50 @@ struct SnippetExpander: Sendable {
         )
     }
 
+    private func deliberateInvocation(
+        in body: String
+    ) -> (entry: SnippetEntry, trailingText: String)? {
+        var best: (entry: SnippetEntry, end: String.Index, triggerLength: Int)?
+        let boundaries = body.indices.filter {
+            body[$0].isWhitespace || body[$0].isPunctuation
+        } + [body.endIndex]
+
+        for end in boundaries {
+            let candidateKey = Self.utteranceKey(String(body[..<end]))
+            guard !candidateKey.isEmpty,
+                  let entry = entries.first(where: {
+                      $0.isEnabled && Self.utteranceKey($0.trigger) == candidateKey
+                  })
+            else { continue }
+
+            let triggerLength = candidateKey.count
+            let candidateEnd = body.distance(from: body.startIndex, to: end)
+            let shouldReplaceBest = best.map {
+                triggerLength > $0.triggerLength
+                    || (triggerLength == $0.triggerLength
+                        && candidateEnd < body.distance(from: body.startIndex, to: $0.end))
+            } ?? true
+            if shouldReplaceBest {
+                best = (entry, end, triggerLength)
+            }
+        }
+
+        guard let best else { return nil }
+        let trailingText = String(body[best.end...])
+        let preservesTrailingText = trailingText.contains {
+            !$0.isWhitespace && !$0.isPunctuation
+        }
+        return (best.entry, preservesTrailingText ? trailingText : "")
+    }
+
     private static func utteranceKey(_ value: String) -> String {
-        let normalized = commandBody(value).precomposedStringWithCanonicalMapping
+        let normalized = value.precomposedStringWithCanonicalMapping
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: .punctuationCharacters)
         return SnippetValidator.comparisonKey(normalized)
     }
 
-    private static func commandBody(_ value: String) -> String {
+    private static func deliberateCommandBody(_ value: String) -> String? {
         let normalized = value.precomposedStringWithCanonicalMapping
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let folded = normalized.folding(
@@ -109,14 +158,14 @@ struct SnippetExpander: Sendable {
             locale: Locale(identifier: "en_US_POSIX")
         )
 
-        for prefix in ["voice add"] where folded.hasPrefix(prefix) {
-            let suffix = normalized.dropFirst(prefix.count)
-            guard suffix.first.map({ $0.isWhitespace || $0.isPunctuation }) == true else {
-                continue
-            }
-            return String(suffix)
-                .trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
+        let prefix = "voice add"
+        guard folded.hasPrefix(prefix) else { return nil }
+        let suffix = normalized.dropFirst(prefix.count)
+        guard suffix.first.map({ $0.isWhitespace || $0.isPunctuation }) == true else {
+            return nil
         }
-        return normalized
+        return String(suffix).drop(while: {
+            $0.isWhitespace || $0.isPunctuation
+        }).description
     }
 }
