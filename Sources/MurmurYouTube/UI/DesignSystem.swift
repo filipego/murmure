@@ -100,6 +100,7 @@ enum DS {
         static let settingsCategoryRailWidth: CGFloat = 214
         static let settingsCategoryIconWidth: CGFloat = 18
         static let settingsPickerMaxWidth: CGFloat = 260
+        static let settingsRetentionPickerWidth: CGFloat = 440
         static let settingsTimingPickerWidth: CGFloat = 440
         static let correctionSheetWidth: CGFloat = 560
         static let correctionSheetMinHeight: CGFloat = 520

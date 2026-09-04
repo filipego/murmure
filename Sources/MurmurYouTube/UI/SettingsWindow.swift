@@ -1098,7 +1098,7 @@ private struct StorageCard: View {
                 }
             }
             .pickerStyle(.menu)
-            .frame(maxWidth: DS.Size.settingsPickerMaxWidth, alignment: .leading)
+            .frame(width: DS.Size.settingsRetentionPickerWidth, alignment: .leading)
             .onChange(of: settings.historyRetention) { _, period in
                 Task { await RunLog.applyRetention(period) }
             }
