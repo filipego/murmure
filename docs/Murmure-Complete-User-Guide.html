@@ -127,6 +127,16 @@
     .nav div { margin-bottom: 10px; padding: 12px; border: 1px solid #3f4340; font-size: 13px; font-weight: 700; }
     .nav div.active { color: var(--ink); background: var(--paper); }
     .surface { padding: 24px; border: 1px solid #b7b3aa; background: white; }
+    .app-shot { display: block; width: 100%; max-height: 390px; object-fit: cover; object-position: top; border: 1px solid #777a76; border-radius: 10px; background: #171817; }
+    .app-shot.compact { max-height: 300px; }
+    .app-shot.modal { max-height: 345px; object-fit: contain; }
+    .page.languages .app-shot { max-height: 220px; }
+    .page.languages .language-grid span { padding: 5px 10px; }
+    .page.languages h3 { margin-bottom: 10px; }
+    .page.updates .app-shot { max-height: 255px; }
+    .page.updates .trouble > div { padding: 10px 12px; }
+    .shot-caption { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
+    .dark .shot-caption { color: #999c97; }
     .history-row { margin: 11px 0; padding: 14px; border: 1px solid #ccc8bf; background: #f5f3ed; }
     .icons { display: flex; gap: 8px; margin-top: 10px; }
     .icon { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid #aaa79e; font-size: 12px; font-weight: 800; }
@@ -263,14 +273,8 @@
   <section class="page" data-document-role="page" data-label="App Map">
     <p class="kicker">03 / App map</p>
     <h2>Four destinations. One local workflow.</h2>
-    <div class="app-map">
-      <div class="nav"><div class="active">Home</div><div>Dictionary</div><div>Snippets</div><div>Settings</div></div>
-      <div class="surface">
-        <h3>Home</h3><p>Shows readiness, session totals, recoverable recordings, and searchable local history.</p>
-        <div class="history-row"><b>Recent dictation</b><p class="small">Apple (streaming) / time / processing duration</p><div class="icons"><span class="icon">Play</span><span class="icon">Retry</span><span class="icon">Edit</span><span class="icon">Copy</span><span class="icon">Trash</span></div></div>
-        <div class="grid-2"><div class="note"><h3>Dictionary</h3><p>Manage terms and hear-to-write corrections.</p></div><div class="note"><h3>Snippets</h3><p>Create reusable text for complete phrases you say often.</p></div></div>
-      </div>
-    </div>
+    <img class="app-shot" src="assets/murmure-guide/home-v0.1.25.png" alt="Current Murmure 0.1.25 Home screen with the four primary destinations and a privacy-safe empty history result">
+    <p class="shot-caption">Current Murmure 0.1.25 interface. The history search is intentionally filtered so no private dictation appears in this guide.</p>
     <h3 style="margin-top:26px">Settings is grouped by task</h3>
     <div class="grid-2"><div class="note"><p><strong>Dictation / Shortcuts / Microphone &amp; sounds</strong><br>Configure how speech starts, what engine listens, and which input is used.</p></div><div class="note"><p><strong>Appearance / Privacy &amp; storage / Advanced &amp; updates</strong><br>Choose the display language, review local data, run diagnostics, or update Murmure.</p></div></div>
     <div class="callout" style="margin-top:18px"><p><strong>One category at a time.</strong> Settings keeps its category list visible and shows only the selected category's controls. Home still provides the large Record control for setup and testing.</p></div>
@@ -315,28 +319,24 @@
   <section class="page" data-document-role="page" data-label="Speech Engines">
     <p class="kicker">06 / Engines</p>
     <h2>Two local engines with different strengths.</h2>
-    <div class="grid-2" style="margin-top:30px">
-      <div class="engine"><span class="tag dark-tag">Apple streaming</span><h3 style="margin-top:22px">Text while you speak</h3><ul><li>Runs through Apple's Speech framework.</li><li>Can write live transcript updates into the focused field.</li><li>Final cleanup replaces the live draft after release.</li><li>Uses an explicit language hint.</li><li>Best when you want immediate feedback.</li></ul></div>
-      <div class="engine"><span class="tag dark-tag">Parakeet batch</span><h3 style="margin-top:22px">Text after release</h3><ul><li>Runs locally through FluidAudio and Core ML.</li><li>Transcribes after the recording finishes.</li><li>Provides Automatic recognition for 25 languages.</li><li>May download about 470 MB on first use.</li><li>Best for multilingual automatic recognition.</li></ul></div>
-    </div>
+    <img class="app-shot compact" src="assets/murmure-guide/settings-dictation-v0.1.25.png" alt="Current Murmure 0.1.25 Dictation settings showing engine, spoken language, live typing, comparison, and cleanup controls">
+    <div class="grid-2" style="margin-top:18px"><div class="card"><h3>Apple streaming</h3><p>Writes live updates at the cursor when While I’m speaking is selected, then applies final cleanup after release.</p></div><div class="card"><h3>Parakeet batch</h3><p>Transcribes after release, supports Automatic recognition for 25 languages, and may download its local model once.</p></div></div>
     <h3 style="margin-top:32px">Compare both local engines</h3>
     <p>Compare Mode runs both engines on one recording and opens a side-by-side result window. It deliberately does <strong>not</strong> type either result into the focused app.</p>
     <div class="callout"><p><strong>Timing caution.</strong> Treat the comparison as a quality review, not a universal speed ranking. Engine timing begins after different preparation stages.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>08 / 20</span></div>
   </section>
 
-  <section class="page" data-document-role="page" data-label="Languages">
+  <section class="page languages" data-document-role="page" data-label="Languages">
     <p class="kicker">07 / Languages</p>
     <h2>What you see and what you speak are separate.</h2>
-    <div class="grid-2">
-      <div class="card"><h3>Language you speak</h3><p>In <strong>Settings &gt; Dictation</strong>, Automatic selects Parakeet and recognizes supported languages as you speak. Choose an explicit language only when you want a decoder hint.</p></div>
-      <div class="card"><h3>Display language</h3><p>In <strong>Settings &gt; Appearance</strong>, choose English, Français, or Español for menus, buttons, and instructions. This never changes the language you dictate.</p></div>
-    </div>
-    <h3 style="margin-top:30px">Automatic supports these 25 languages</h3>
+    <p><strong>Language you speak</strong> lives in Dictation and controls recognition. <strong>Display language</strong> lives in Appearance and changes menus, buttons, and instructions without changing what you dictate.</p>
+    <img class="app-shot compact" src="assets/murmure-guide/settings-appearance-v0.1.25.png" alt="Current Murmure 0.1.25 Appearance settings showing English, French, and Spanish display language choices">
+    <h3 style="margin-top:20px">Automatic supports these 25 languages</h3>
     <div class="language-grid">
       <span>Bulgarian</span><span>Croatian</span><span>Czech</span><span>Danish</span><span>Dutch</span><span>English</span><span>Estonian</span><span>Finnish</span><span>French</span><span>German</span><span>Greek</span><span>Hungarian</span><span>Italian</span><span>Latvian</span><span>Lithuanian</span><span>Maltese</span><span>Polish</span><span>Portuguese</span><span>Romanian</span><span>Russian</span><span>Slovak</span><span>Slovenian</span><span>Spanish</span><span>Swedish</span><span>Ukrainian</span>
     </div>
-    <h3 style="margin-top:28px">Cleanup behavior</h3>
+    <h3 style="margin-top:14px">Cleanup behavior</h3>
     <p>English, Spanish, and French have language-specific deterministic cleanup. Other explicit languages and Automatic use neutral cleanup, so English assumptions are never applied to another language.</p>
     <div class="callout"><p><strong>Smart cleanup limitation.</strong> Apple's on-device AI cleanup is unavailable while <strong>Language you speak</strong> is Automatic. Choose explicit English, Spanish, or French if you want that optional feature.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>09 / 20</span></div>
@@ -345,12 +345,7 @@
   <section class="page" data-document-role="page" data-label="Microphone and Sound">
     <p class="kicker">08 / Audio input</p>
     <h2>Choose the microphone you actually want Murmure to follow.</h2>
-    <div class="window" style="margin-top:28px">
-      <div class="window-bar"><span>MICROPHONE</span><span class="status"><span class="lamp"></span>Ready</span></div>
-      <div class="form-row" style="margin-top:20px"><label>Input</label><div class="field">System default</div></div>
-      <div class="meter" style="height:70px;margin:18px 0"><i style="height:20%"></i><i style="height:37%"></i><i style="height:61%"></i><i style="height:44%"></i><i style="height:76%"></i><i style="height:90%"></i><i style="height:58%"></i><i style="height:81%"></i><i style="height:68%"></i><i style="height:95%"></i></div>
-      <div class="button-row"><span class="button primary">Test microphone</span></div>
-    </div>
+    <img class="app-shot" src="assets/murmure-guide/settings-microphone-v0.1.25.png" alt="Current Murmure 0.1.25 Microphone and sounds settings with input selector, level meter, test control, and sound option">
     <h3 style="margin-top:30px">System default</h3>
     <p>Follows the current macOS input without changing macOS. This is the safest choice if you regularly switch between built-in, USB, Bluetooth, or display microphones.</p>
     <h3>Specific device</h3>
@@ -376,7 +371,7 @@
       <li>It does not upload audio or transcripts.</li>
       <li>It does not replace the explicit correction and dictionary workflow.</li>
       <li>It does not use English-specific assumptions in Automatic mode.</li>
-      <li>It does not change snippet matching: a snippet still requires a complete matching utterance.</li>
+      <li>It does not change snippet matching: a bare trigger must match the utterance, while “Voice add” can invoke a trigger inside a longer sentence.</li>
     </ul>
     <div class="callout" style="margin-top:26px"><p><strong>Turn it off when exact raw wording matters.</strong> Disable Clean up transcripts before legal quoting, code-like strings, or other situations where every recognized token should remain untouched.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>11 / 20</span></div>
@@ -406,7 +401,7 @@
     <p class="kicker">11 / Snippets</p>
     <h2>Turn one complete spoken phrase into reusable text.</h2>
     <div class="grid-2" style="margin-top:28px">
-      <div class="window"><div class="window-bar"><span>ADD SNIPPET</span><span>Local</span></div><div class="form-row" style="margin-top:18px"><label>When I say</label><div class="field">email signature</div></div><div class="form-row"><label>Write</label><div class="field tall">Best,<br>Filipe<br>Studio in the Box</div></div><div class="status"><span class="lamp"></span><b>Enabled</b></div></div>
+      <img class="app-shot modal" src="assets/murmure-guide/snippet-form-v0.1.25.png" alt="Current Murmure 0.1.25 Add snippet form">
       <div><h3>Use “Voice add”</h3><p>Say “Voice add,” followed by the complete trigger, such as “Voice add, my address.” You may continue speaking after it; Murmure inserts the snippet and keeps the rest of your sentence. Saying only the exact trigger still works.</p><h3>Multiline replacements</h3><p>Line breaks are preserved in the inserted text.</p><h3>Before dictionary rules</h3><p>Snippet expansion happens before dictionary correction.</p></div>
     </div>
     <h3 style="margin-top:30px">Manage snippets from the main Snippets destination</h3>
@@ -427,10 +422,7 @@
       <div class="card"><h3>Term</h3><p>Add a name, product, place, or phrase that exists in your vocabulary. Terms can help bias speech recognition and preserve preferred spelling.</p></div>
       <div class="card"><h3>Correction</h3><p>Define what Murmure commonly hears and what it should write instead. Example: cloud code &gt; Claude Code.</p></div>
     </div>
-    <div style="margin-top:28px">
-      <div class="term-row"><span class="lamp"></span><b>Anthropic</b><span class="term-kind">Term</span><span class="icon">Edit</span><span class="icon">Pause</span><span class="icon">Trash</span></div>
-      <div class="term-row"><span class="lamp"></span><b>cloud code &gt; Claude Code</b><span class="term-kind">Correction</span><span class="icon">Edit</span><span class="icon">Pause</span><span class="icon">Trash</span></div>
-    </div>
+    <img class="app-shot compact" src="assets/murmure-guide/dictionary-v0.1.25.png" alt="Current Murmure 0.1.25 Dictionary destination with search and Add entry controls">
     <h3 style="margin-top:28px">Dictionary controls</h3>
     <ul>
       <li>Search terms and corrections from the top of the Dictionary page.</li>
@@ -467,10 +459,7 @@
   <section class="page" data-document-role="page" data-label="History">
     <p class="kicker">14 / History</p>
     <h2>Every saved recording remains useful.</h2>
-    <div class="surface" style="margin-top:24px">
-      <div class="window-bar"><span>LOCAL HISTORY</span><span>Search your local history</span></div>
-      <div class="history-row"><b>Apple (streaming) / 0.42s</b><p>Your saved transcript appears here with its engine, time, and processing duration.</p><div class="icons"><span class="icon">Play</span><span class="icon">Retry</span><span class="icon">Edit</span><span class="icon">Copy</span><span class="icon">Trash</span></div></div>
-    </div>
+    <img class="app-shot compact" src="assets/murmure-guide/home-v0.1.25.png" alt="Current Murmure 0.1.25 Home history area with a privacy-safe empty search result">
     <div class="grid-2" style="margin-top:24px">
       <div class="card"><h3>Play</h3><p>Starts or stops the local saved audio. Starting another row stops the first.</p></div>
       <div class="card"><h3>Retranscribe</h3><p>Runs the saved audio through a selected local engine and shows a preview before replacing history.</p></div>
@@ -508,7 +497,7 @@
   <section class="page dark" data-document-role="page" data-label="Storage and Privacy">
     <p class="kicker">15 / Storage and privacy</p>
     <h2>Your working data stays in the local loop.</h2>
-    <div class="privacy-loop"><div class="computer"><div class="screen">LOCAL DATA</div></div><span class="outbound one">Model download</span><span class="outbound two">Update check</span></div>
+    <img class="app-shot" src="assets/murmure-guide/settings-privacy-v0.1.25.png" alt="Current Murmure 0.1.25 Privacy and storage settings showing permissions, storage readiness, retention, deletion, and diagnostics">
     <div class="grid-2">
       <div class="card"><h3>Stored locally</h3><p>Settings, snippets, dictionary entries, transcript history, captured audio, and Command Mode processing remain on the Mac or configured data drive.</p></div>
       <div class="card"><h3>Network exceptions</h3><p>Only one-time local model downloads and optional update checks use the network. There is no cloud transcription or Command Mode fallback.</p></div>
@@ -519,17 +508,13 @@
     <div class="footer"><span class="brand">MURMURE</span><span>18 / 20</span></div>
   </section>
 
-  <section class="page" data-document-role="page" data-label="Updates and Troubleshooting">
+  <section class="page updates" data-document-role="page" data-label="Updates and Troubleshooting">
     <p class="kicker">15 / Updates and support</p>
     <h2>Update safely. Diagnose without exposing your words.</h2>
     <h3>Check for updates</h3>
-    <ol class="step-list">
-      <li>Open <strong>Settings &gt; Advanced &amp; updates</strong>.</li>
-      <li>Choose Check for updates. Murmure checks GitHub Releases and stages a verified archive locally.</li>
-      <li>When a newer version is ready and no recording is active, choose Install and relaunch.</li>
-      <li>After relaunch, confirm the version number shown in Settings.</li>
-    </ol>
-    <h3 style="margin-top:24px">Common problems</h3>
+    <img class="app-shot compact" src="assets/murmure-guide/settings-advanced-v0.1.25.png" alt="Current Murmure 0.1.25 Advanced and updates settings showing guided setup, version, and update control">
+    <p class="shot-caption">Open Settings &gt; Advanced &amp; updates, choose Check for updates, then install and relaunch when a verified update is ready.</p>
+    <h3 style="margin-top:16px">Common problems</h3>
     <div class="trouble">
       <div class="problem">Shortcut does nothing</div><div>Confirm Accessibility is Granted. Quit and reopen Murmure after changing the macOS permission.</div>
       <div class="problem">No audio level</div><div>Confirm Microphone is Granted, select System default, then run Test microphone.</div>
