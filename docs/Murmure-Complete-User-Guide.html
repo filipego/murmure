@@ -179,11 +179,11 @@
   </style>
 </head>
 <body>
-  <a class="download-control" href="../output/pdf/Murmure-Complete-User-Guide.pdf" download>Download PDF</a>
+  <a class="download-control" href="Murmure-Complete-User-Guide.pdf" download>Download PDF</a>
   <section class="page dark" data-document-role="page" data-label="Cover">
     <p class="kicker"><span class="record-dot"></span>Complete user guide</p>
     <h1>Murmure.<br>Your local<br>voice desk.</h1>
-    <p class="lead">Everything you need to install, configure, dictate, edit, personalize, recover, and troubleshoot Murmure 0.1.15.</p>
+    <p class="lead">Everything you need to install, configure, dictate, edit, personalize, recover, and troubleshoot Murmure 0.1.25.</p>
     <div class="cover-deck"><div class="cover-face"><small>MURMURE / INPUT LEVEL</small><div class="meter"><i style="height:25%"></i><i style="height:39%"></i><i style="height:62%"></i><i style="height:83%"></i><i style="height:57%"></i><i style="height:73%"></i><i style="height:91%"></i><i style="height:69%"></i><i style="height:48%"></i><i style="height:80%"></i><i style="height:92%"></i><i style="height:100%"></i></div><div class="knobs"><span class="knob"></span><span class="knob"></span><span class="knob"></span><span class="record-dot" style="width:56px;height:56px;margin-left:auto"></span></div></div></div>
     <div class="footer"><span class="brand">MURMURE</span><span>Apple Silicon / macOS 26+</span></div>
   </section>
@@ -283,12 +283,12 @@
     <div class="grid-3" style="margin-top:34px">
       <div class="gesture"><span class="tag">01</span><h3 style="margin-top:54px">Place the cursor</h3><p>Click the exact editable field in Mail, Notes, Messages, a browser, or another Mac app.</p></div>
       <div class="gesture"><span class="tag">02</span><h3 style="margin-top:54px">Start recording</h3><p>Use your selected key and gesture. Speak normally, including pauses.</p></div>
-      <div class="gesture"><span class="tag">03</span><h3 style="margin-top:54px">Finish</h3><p>Murmure transcribes, cleans, applies snippets and dictionary rules, saves history, and inserts the result.</p></div>
+      <div class="gesture"><span class="tag">03</span><h3 style="margin-top:54px">Finish</h3><p>With While I’m speaking enabled, words appear at the cursor as you talk. On release, Murmure finishes and cleans the result.</p></div>
     </div>
     <h3 style="margin-top:38px">What happens after you finish</h3>
     <div class="pipeline"><span class="pipe">Audio</span><span class="pipe-arrow">&gt;</span><span class="pipe">Speech engine</span><span class="pipe-arrow">&gt;</span><span class="pipe">Cleanup</span><span class="pipe-arrow">&gt;</span><span class="pipe">Snippet</span><span class="pipe-arrow">&gt;</span><span class="pipe">Dictionary</span><span class="pipe-arrow">&gt;</span><span class="pipe">History + insertion</span></div>
     <div class="note"><p><strong>Focus matters.</strong> Leave the destination field focused while Murmure finishes. Compare Mode is the exception: it shows engine results instead of typing anything.</p></div>
-    <div class="note" style="margin-top:14px"><p><strong>Start and finish sounds.</strong> Enable them in Settings if you want audible confirmation without watching the screen.</p></div>
+    <div class="note" style="margin-top:14px"><p><strong>Choose when text appears.</strong> In Settings &gt; Dictation, select While I’m speaking for live text at the cursor, or After I finish for one final insertion.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>06 / 20</span></div>
   </section>
 
@@ -316,7 +316,7 @@
     <p class="kicker">06 / Engines</p>
     <h2>Two local engines with different strengths.</h2>
     <div class="grid-2" style="margin-top:30px">
-      <div class="engine"><span class="tag dark-tag">Apple streaming</span><h3 style="margin-top:22px">Text while you speak</h3><ul><li>Runs through Apple's Speech framework.</li><li>Shows streaming transcript updates.</li><li>Uses an explicit language hint.</li><li>The operating system manages language assets.</li><li>Best when you want immediate feedback.</li></ul></div>
+      <div class="engine"><span class="tag dark-tag">Apple streaming</span><h3 style="margin-top:22px">Text while you speak</h3><ul><li>Runs through Apple's Speech framework.</li><li>Can write live transcript updates into the focused field.</li><li>Final cleanup replaces the live draft after release.</li><li>Uses an explicit language hint.</li><li>Best when you want immediate feedback.</li></ul></div>
       <div class="engine"><span class="tag dark-tag">Parakeet batch</span><h3 style="margin-top:22px">Text after release</h3><ul><li>Runs locally through FluidAudio and Core ML.</li><li>Transcribes after the recording finishes.</li><li>Provides Automatic recognition for 25 languages.</li><li>May download about 470 MB on first use.</li><li>Best for multilingual automatic recognition.</li></ul></div>
     </div>
     <h3 style="margin-top:32px">Compare both local engines</h3>
@@ -479,7 +479,7 @@
     </div>
     <h3 style="margin-top:27px">History status labels</h3>
     <p>Rows may show Retranscribed locally, Correction saved, Correction saved and remembered, or Correction saved; rule pending.</p>
-    <div class="callout"><p><strong>Search is local.</strong> Use the Home search field to filter your saved transcripts without sending the query or results to a service.</p></div>
+    <div class="callout"><p><strong>Search and loading are local.</strong> Home renders history in smaller batches as you scroll so a large archive stays responsive. Filtering never sends your query or results to a service.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>16 / 20</span></div>
   </section>
 
@@ -500,6 +500,7 @@
       <li>Recovery retranscription adds the recovered recording to history only after confirmation.</li>
       <li>Parakeet may download its free local model before the first retry.</li>
       <li>If saving fails, the original recording and history remain unchanged.</li>
+      <li>Delete one recoverable recording from its row, or delete every recoverable recording with the Home cleanup action.</li>
     </ul>
     <div class="footer"><span class="brand">MURMURE</span><span>17 / 20</span></div>
   </section>
@@ -512,8 +513,8 @@
       <div class="card"><h3>Stored locally</h3><p>Settings, snippets, dictionary entries, transcript history, captured audio, and Command Mode processing remain on the Mac or configured data drive.</p></div>
       <div class="card"><h3>Network exceptions</h3><p>Only one-time local model downloads and optional update checks use the network. There is no cloud transcription or Command Mode fallback.</p></div>
     </div>
-    <h3 style="margin-top:26px">Data storage card</h3>
-    <p><strong>Settings &gt; Privacy &amp; storage</strong> shows the exact active storage location and whether it is ready. Most Macs use Application Support automatically. A specially configured operator Mac may use its named external drive. Use Reveal Murmure data folder to inspect the active location.</p>
+    <h3 style="margin-top:26px">Storage and automatic cleanup</h3>
+    <p><strong>Settings &gt; Privacy &amp; storage</strong> shows the active storage location and lets you keep completed history forever or automatically delete entries older than 1 week, 30 days, 6 months, or 1 year. Delete all history removes it immediately. These controls do not erase Dictionary entries or Snippets.</p>
     <div class="note"><p><strong>Diagnostics are sanitized.</strong> Preview, copy, or export configuration and permission facts. Reports exclude dictated text, history, audio, snippets, dictionary data, and local paths.</p></div>
     <div class="footer"><span class="brand">MURMURE</span><span>18 / 20</span></div>
   </section>
@@ -565,7 +566,8 @@
         <div class="check-row"><span class="tag">Settings</span><p>Six focused categories: Dictation, Shortcuts, Microphone &amp; sounds, Appearance, Privacy &amp; storage, Advanced &amp; updates</p></div>
         <h3 style="margin-top:27px">Remember</h3>
         <div class="note"><p>Display language never changes Language you speak.</p></div>
-        <div class="note" style="margin-top:9px"><p>Compare Mode does not type. Snippets match a whole utterance.</p></div>
+        <div class="note" style="margin-top:9px"><p>Compare Mode does not type. Say “Voice add” plus a snippet trigger, even inside a longer sentence.</p></div>
+        <div class="note" style="margin-top:9px"><p>Set history retention under Privacy &amp; storage; dictionary entries and snippets remain separate.</p></div>
         <div class="note" style="margin-top:9px"><p>Corrections save only after confirmation.</p></div>
         <div class="note" style="margin-top:9px"><p>Command Mode always asks you to review.</p></div>
       </div>
