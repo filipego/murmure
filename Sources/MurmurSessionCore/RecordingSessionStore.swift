@@ -5,6 +5,7 @@ public enum RecordingSessionStoreError: Error, Sendable, Equatable {
     case sessionNotFound(UUID)
     case conflictingCompletion(existing: UUID, requested: UUID)
     case sessionIsNotCompleted(UUID)
+    case sessionIsNotRecoverable(UUID)
 }
 
 public actor RecordingSessionStore {
@@ -111,6 +112,16 @@ public actor RecordingSessionStore {
             throw RecordingSessionStoreError.sessionIsNotCompleted(id)
         }
         try FileManager.default.removeItem(at: sessionDirectoryURL(for: id))
+    }
+
+    public func discardRecoverableSession(id: UUID) throws {
+        let manifest = try load(id: id)
+        switch manifest.status {
+        case .readyForTranscription, .processing, .processed, .failed:
+            try FileManager.default.removeItem(at: sessionDirectoryURL(for: id))
+        case .recording, .completed, .cancelled:
+            throw RecordingSessionStoreError.sessionIsNotRecoverable(id)
+        }
     }
 
     private func sessionDirectoryURL(for id: UUID) -> URL {

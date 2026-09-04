@@ -132,6 +132,14 @@ Correction saved; rule pending	Correction enregistrée ; règle en attente	Corre
 Play recoverable recording	Lire l’enregistrement récupérable	Reproducir grabación recuperable
 Stop recoverable recording	Arrêter l’enregistrement récupérable	Detener grabación recuperable
 Retranscribe recoverable recording	Retranscrire l’enregistrement récupérable	Volver a transcribir grabación recuperable
+Delete recoverable recording	Supprimer l’enregistrement récupérable	Eliminar grabación recuperable
+Delete recoverable recording?	Supprimer l’enregistrement récupérable ?	¿Eliminar la grabación recuperable?
+Delete recording	Supprimer l’enregistrement	Eliminar grabación
+Delete all	Tout supprimer	Eliminar todo
+Delete all recoverable recordings?	Supprimer tous les enregistrements récupérables ?	¿Eliminar todas las grabaciones recuperables?
+Delete all recordings	Supprimer tous les enregistrements	Eliminar todas las grabaciones
+This permanently deletes the saved audio. It does not change your Dictionary or Snippets.	Cette action supprime définitivement l’audio enregistré. Elle ne modifie ni votre dictionnaire ni vos extraits.	Esto elimina permanentemente el audio guardado. No cambia tu diccionario ni tus fragmentos.
+This permanently deletes every unfinished recording. Completed History, Dictionary, and Snippets stay unchanged.	Cette action supprime définitivement tous les enregistrements inachevés. L’historique terminé, le dictionnaire et les extraits restent inchangés.	Esto elimina permanentemente todas las grabaciones sin terminar. El historial completado, el diccionario y los fragmentos no cambian.
 This local recording is ready to retry.	Cet enregistrement local est prêt pour une nouvelle tentative.	Esta grabación local está lista para volver a intentarlo.
 Teach Murmure the words that matter to you.	Apprenez à Murmure les mots qui comptent pour vous.	Enseña a Murmure las palabras que te importan.
 Search terms and corrections	Rechercher des termes et corrections	Buscar términos y correcciones
@@ -368,6 +376,17 @@ External storage ready	Stockage externe prêt	Almacenamiento externo listo
 Reconnect external drive	Reconnectez le disque externe	Vuelve a conectar la unidad externa
 Local emergency storage	Stockage local d’urgence	Almacenamiento local de emergencia
 Audio, history, dictionary, and settings save to %@.	L’audio, l’historique, le dictionnaire et les réglages sont enregistrés dans %@.	El audio, el historial, el diccionario y los ajustes se guardan en %@.
+Automatically delete history older than	Supprimer automatiquement l’historique datant de plus de	Eliminar automáticamente el historial anterior a
+Never	Jamais	Nunca
+1 week	1 semaine	1 semana
+30 days	30 jours	30 días
+6 months	6 mois	6 meses
+1 year	1 an	1 año
+History cleanup deletes transcripts and their saved audio. Dictionary, Snippets, settings, and speech models are never removed.	Le nettoyage de l’historique supprime les transcriptions et leur audio enregistré. Le dictionnaire, les extraits, les réglages et les modèles vocaux ne sont jamais supprimés.	La limpieza del historial elimina las transcripciones y el audio guardado. El diccionario, los fragmentos, los ajustes y los modelos de voz nunca se eliminan.
+Delete all history now	Supprimer tout l’historique maintenant	Eliminar todo el historial ahora
+Delete all history?	Supprimer tout l’historique ?	¿Eliminar todo el historial?
+Delete all history	Supprimer tout l’historique	Eliminar todo el historial
+This permanently deletes every completed transcript and its saved audio. Dictionary, Snippets, settings, and speech models stay unchanged.	Cette action supprime définitivement toutes les transcriptions terminées et leur audio enregistré. Le dictionnaire, les extraits, les réglages et les modèles vocaux restent inchangés.	Esto elimina permanentemente todas las transcripciones completadas y el audio guardado. El diccionario, los fragmentos, los ajustes y los modelos de voz no cambian.
 Murmure cannot reach %@. Reconnect it before recording new audio.	Murmure ne peut pas accéder à %@. Reconnectez-le avant d’enregistrer un nouvel audio.	Murmure no puede acceder a %@. Vuelve a conectarla antes de grabar audio nuevo.
 The external drive was unavailable at launch, so new data is temporarily in %@.	Le disque externe était indisponible au lancement ; les nouvelles données sont temporairement stockées dans %@.	La unidad externa no estaba disponible al iniciar, por lo que los datos nuevos están temporalmente en %@.
 Legacy migration runs in the background after launch.	La migration des anciennes données s’exécute en arrière-plan après le lancement.	La migración de datos antiguos se ejecuta en segundo plano después de iniciar.

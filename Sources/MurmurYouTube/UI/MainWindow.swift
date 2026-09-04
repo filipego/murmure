@@ -213,6 +213,8 @@ private struct HomePanel: View {
     @State private var query = ""
     @State private var correctionRun: DictationRun?
     @State private var retranscriptionSource: RetranscriptionSource?
+    @State private var pendingRecoverableDeletion: RecoverableRecording?
+    @State private var confirmDeleteAllRecoverable = false
 
     private var filteredRuns: [DictationRun] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -306,7 +308,39 @@ private struct HomePanel: View {
         }) { source in
             RetranscriptionSheet(source: source, coordinator: retranscriptionCoordinator)
         }
-        .task { await recoverableStore.refresh() }
+        .task {
+            await RunLog.applyRetention(Settings.shared.historyRetention)
+            await recoverableStore.refresh()
+        }
+        .confirmationDialog(
+            L10n.text("Delete recoverable recording?"),
+            isPresented: Binding(
+                get: { pendingRecoverableDeletion != nil },
+                set: { if !$0 { pendingRecoverableDeletion = nil } }
+            )
+        ) {
+            Button(L10n.text("Delete recording"), role: .destructive) {
+                guard let recording = pendingRecoverableDeletion else { return }
+                audioPlayer.stop()
+                Task { _ = await recoverableStore.delete(id: recording.id) }
+                pendingRecoverableDeletion = nil
+            }
+            Button(L10n.text("Cancel"), role: .cancel) { pendingRecoverableDeletion = nil }
+        } message: {
+            Text(L10n.text("This permanently deletes the saved audio. It does not change your Dictionary or Snippets."))
+        }
+        .confirmationDialog(
+            L10n.text("Delete all recoverable recordings?"),
+            isPresented: $confirmDeleteAllRecoverable
+        ) {
+            Button(L10n.text("Delete all recordings"), role: .destructive) {
+                audioPlayer.stop()
+                Task { _ = await recoverableStore.deleteAll() }
+            }
+            Button(L10n.text("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L10n.text("This permanently deletes every unfinished recording. Completed History, Dictionary, and Snippets stay unchanged."))
+        }
     }
 
     private var recoverableSection: some View {
@@ -320,6 +354,11 @@ private struct HomePanel: View {
                     .font(DS.Font.eyebrow)
                     .tracking(DS.Font.silkscreenTracking)
                     .foregroundStyle(DS.Color.inkSecondary)
+                Button(L10n.text("Delete all")) {
+                    confirmDeleteAllRecoverable = true
+                }
+                .buttonStyle(.link)
+                .disabled(controller.state.isActive)
             }
             ForEach(recoverableStore.recordings) { recording in
                 RecoverableHistoryRow(
@@ -332,6 +371,9 @@ private struct HomePanel: View {
                     },
                     onRetranscribe: {
                         openRetranscription(.recoverable(recording))
+                    },
+                    onDelete: {
+                        pendingRecoverableDeletion = recording
                     }
                 )
             }
@@ -563,6 +605,7 @@ private struct RecoverableHistoryRow: View {
     let playbackMessage: String?
     let onPlay: () -> Void
     let onRetranscribe: () -> Void
+    let onDelete: () -> Void
 
     @State private var isHovering = false
 
@@ -616,6 +659,16 @@ private struct RecoverableHistoryRow: View {
                 .disabled(actionsDisabled)
                 .help(L10n.text(actionsDisabled ? "Finish the current dictation before recovery" : "Retranscribe recoverable recording"))
                 .accessibilityLabel(L10n.text("Retranscribe recoverable recording"))
+
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .frame(width: DS.Space.roomy, height: DS.Space.roomy)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(DS.Color.inkSecondary)
+                .disabled(actionsDisabled)
+                .help(L10n.text("Delete recoverable recording"))
+                .accessibilityLabel(L10n.text("Delete recoverable recording"))
             }
             .opacity(isHovering ? 1 : 0.55)
         }

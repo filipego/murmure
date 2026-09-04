@@ -115,6 +115,36 @@ struct RecordingSessionStoreTests {
             #expect(try await store.load(id: session.id) == session)
         }
     }
+
+    @Test("discard removes a recoverable session directory and its audio")
+    func discardRecoverableSession() async throws {
+        try await withTemporaryStore { _, store in
+            let session = RecordingSessionManifest.storeSample(status: .readyForTranscription)
+            try await store.create(session)
+            try Data("audio".utf8).write(to: await store.stagedAudioURL(for: session.id))
+
+            try await store.discardRecoverableSession(id: session.id)
+
+            await #expect(throws: RecordingSessionStoreError.self) {
+                try await store.load(id: session.id)
+            }
+        }
+    }
+
+    @Test("discard refuses a completed session")
+    func completedSessionIsNotDiscardedAsRecovery() async throws {
+        try await withTemporaryStore { _, store in
+            let session = RecordingSessionManifest.storeSample(
+                status: .completed(runID: UUID())
+            )
+            try await store.create(session)
+
+            await #expect(throws: RecordingSessionStoreError.self) {
+                try await store.discardRecoverableSession(id: session.id)
+            }
+            #expect(try await store.load(id: session.id) == session)
+        }
+    }
 }
 
 private func withTemporaryStore(

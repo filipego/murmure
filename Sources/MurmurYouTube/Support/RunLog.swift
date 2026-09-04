@@ -545,31 +545,65 @@ enum RunLog {
     static func deleteGroup(_ group: String) {
         Task { @MainActor in
             await ensureHistoryHydrated()
-            rewrite(load().filter { $0.group != group })
+            let removed = load().filter { $0.group == group }
+            guard !removed.isEmpty else { return }
+            let retained = load().filter { $0.group != group }
+            guard await rewrite(retained).value else { return }
+            await deleteArtifacts(for: removed, retainedRuns: retained)
         }
     }
 
     static func delete(ids: Set<UUID>) {
         Task { @MainActor in
             await ensureHistoryHydrated()
-            rewrite(load().filter { !ids.contains($0.id) })
+            let removed = load().filter { ids.contains($0.id) }
+            guard !removed.isEmpty else { return }
+            let retained = load().filter { !ids.contains($0.id) }
+            guard await rewrite(retained).value else { return }
+            await deleteArtifacts(for: removed, retainedRuns: retained)
         }
     }
 
     static func clear() {
         Task { @MainActor in
             await ensureHistoryHydrated()
-            rewrite([])
+            let removed = load()
+            guard await rewrite([]).value else { return }
+            await deleteArtifacts(for: removed, retainedRuns: [])
+        }
+    }
+
+    static func applyRetention(_ period: HistoryRetentionPeriod, now: Date = Date()) async {
+        await ensureHistoryHydrated()
+        let ids = period.expiredIDs(in: load(), now: now)
+        guard !ids.isEmpty else { return }
+        let removed = load().filter { ids.contains($0.id) }
+        let retained = load().filter { !ids.contains($0.id) }
+        guard await rewrite(retained).value else { return }
+        await deleteArtifacts(for: removed, retainedRuns: retained)
+    }
+
+    private static func deleteArtifacts(
+        for removedRuns: [DictationRun],
+        retainedRuns: [DictationRun]
+    ) async {
+        let retainedAudio = Set(retainedRuns.compactMap(\.audioFile))
+        let removableAudio = Set(removedRuns.compactMap(\.audioFile)).subtracting(retainedAudio)
+        await AudioHistoryStore.remove(relativePaths: removableAudio)
+        for id in Set(removedRuns.map(\.id)) {
+            try? await RecordingSessionRuntime.store.removeCompletedSession(id: id)
         }
     }
 
     /// Replaces the whole file through the same serialized snapshot writer used by recording.
     /// This also persists ids assigned to older runs during hydration.
-    private static func rewrite(_ runs: [DictationRun]) {
+    @discardableResult
+    private static func rewrite(_ runs: [DictationRun]) -> Task<Bool, Never> {
         cachedRuns = runs
-        _ = enqueueRewrite(runs)
+        let persistence = enqueueRewrite(runs)
         regenerate()
         RunStore.shared.reload()
+        return persistence
     }
 
     private static func enqueueAppend(_ run: DictationRun) -> Task<Bool, Never> {

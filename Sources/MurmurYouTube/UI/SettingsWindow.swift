@@ -1051,6 +1051,9 @@ private struct PendingHotkey {
 }
 
 private struct StorageCard: View {
+    @State private var settings = Settings.shared
+    @State private var confirmDeleteAllHistory = false
+
     private var isReady: Bool {
         MurmureDataStore.usesExternalStorage && MurmureDataStore.externalDriveConnected
     }
@@ -1083,6 +1086,43 @@ private struct StorageCard: View {
                 .font(DS.Font.caption)
                 .foregroundStyle(DS.Color.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            Picker(
+                L10n.text("Automatically delete history older than"),
+                selection: $settings.historyRetention
+            ) {
+                ForEach(HistoryRetentionPeriod.allCases, id: \.self) { period in
+                    Text(L10n.text(period.displayName)).tag(period)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(maxWidth: DS.Size.settingsPickerMaxWidth, alignment: .leading)
+            .onChange(of: settings.historyRetention) { _, period in
+                Task { await RunLog.applyRetention(period) }
+            }
+
+            Text(L10n.text("History cleanup deletes transcripts and their saved audio. Dictionary, Snippets, settings, and speech models are never removed."))
+                .font(DS.Font.caption)
+                .foregroundStyle(DS.Color.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button(L10n.text("Delete all history now"), role: .destructive) {
+                confirmDeleteAllHistory = true
+            }
+            .buttonStyle(.bordered)
+        }
+        .confirmationDialog(
+            L10n.text("Delete all history?"),
+            isPresented: $confirmDeleteAllHistory
+        ) {
+            Button(L10n.text("Delete all history"), role: .destructive) {
+                RunLog.clear()
+            }
+            Button(L10n.text("Cancel"), role: .cancel) {}
+        } message: {
+            Text(L10n.text("This permanently deletes every completed transcript and its saved audio. Dictionary, Snippets, settings, and speech models stay unchanged."))
         }
     }
 

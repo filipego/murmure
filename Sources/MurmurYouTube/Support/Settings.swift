@@ -116,6 +116,7 @@ struct SettingsSnapshot: Codable {
     let handsFreeBinding: HotkeyBinding?
     let commandModeEnabled: Bool?
     let commandModeBinding: HotkeyBinding?
+    let historyRetention: HistoryRetentionPeriod?
 
     var resolvedHandsFreeEnabled: Bool { handsFreeEnabled ?? false }
     var resolvedHandsFreeKey: PushToTalkKey {
@@ -141,6 +142,7 @@ struct SettingsSnapshot: Codable {
     var resolvedCommandModeBinding: HotkeyBinding {
         commandModeBinding ?? .commandModeDefault
     }
+    var resolvedHistoryRetention: HistoryRetentionPeriod { historyRetention ?? .never }
 }
 
 @MainActor
@@ -201,6 +203,10 @@ final class Settings {
         didSet { persist() }
     }
 
+    var historyRetention: HistoryRetentionPeriod {
+        didSet { persist() }
+    }
+
     private let defaults = UserDefaults.standard
     private var isHydrating = false
 
@@ -220,6 +226,7 @@ final class Settings {
         static let engine = "engine"
         static let smartCleanup = "smartCleanup"
         static let compareMode = "compareMode"
+        static let historyRetention = "historyRetention"
     }
 
     private init() {
@@ -290,6 +297,11 @@ final class Settings {
             ?? (defaults.object(forKey: Keys.compareMode) as? Bool ?? false)
         soundEnabled = snapshot?.soundEnabled
             ?? (defaults.object(forKey: Keys.soundEnabled) as? Bool ?? true)
+        historyRetention = snapshot?.resolvedHistoryRetention
+            ?? HistoryRetentionPeriod(
+                rawValue: defaults.string(forKey: Keys.historyRetention) ?? ""
+            )
+            ?? .never
 
         // External settings are hydrated off the launch path. The removable volume can take
         // an unbounded amount of time to answer its first file open, so the window starts with
@@ -313,7 +325,8 @@ final class Settings {
             Keys.soundEnabled,
             Keys.engine,
             Keys.smartCleanup,
-            Keys.compareMode
+            Keys.compareMode,
+            Keys.historyRetention
         ].contains { defaults.object(forKey: $0) != nil }
         guard hasAnyValue else { return nil }
 
@@ -340,7 +353,10 @@ final class Settings {
                 .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) },
             commandModeEnabled: defaults.object(forKey: Keys.commandModeEnabled) as? Bool,
             commandModeBinding: defaults.data(forKey: Keys.commandModeBinding)
-                .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) }
+                .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) },
+            historyRetention: HistoryRetentionPeriod(
+                rawValue: defaults.string(forKey: Keys.historyRetention) ?? ""
+            )
         )
     }
 
@@ -383,6 +399,7 @@ final class Settings {
                 settings.cleanupEnabled = snapshot.cleanupEnabled
                 settings.smartCleanup = snapshot.smartCleanup
                 settings.soundEnabled = snapshot.soundEnabled
+                settings.historyRetention = snapshot.resolvedHistoryRetention
                 settings.isHydrating = false
                 // Keep a local fallback for the next launch without synchronously rewriting
                 // the external file from the main actor. The authoritative snapshot is
@@ -408,6 +425,10 @@ final class Settings {
                 settings.defaults.set(settings.cleanupEnabled, forKey: Keys.cleanupEnabled)
                 settings.defaults.set(settings.smartCleanup, forKey: Keys.smartCleanup)
                 settings.defaults.set(settings.soundEnabled, forKey: Keys.soundEnabled)
+                settings.defaults.set(
+                    settings.historyRetention.rawValue,
+                    forKey: Keys.historyRetention
+                )
             }
         }
     }
@@ -511,7 +532,8 @@ final class Settings {
             pushToTalkBinding: pushToTalkBinding,
             handsFreeBinding: handsFreeBinding,
             commandModeEnabled: commandModeEnabled,
-            commandModeBinding: commandModeBinding
+            commandModeBinding: commandModeBinding,
+            historyRetention: historyRetention
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         defaults.set(snapshot.pushToTalkKey, forKey: Keys.pushToTalkKey)
@@ -529,6 +551,7 @@ final class Settings {
         defaults.set(snapshot.cleanupEnabled, forKey: Keys.cleanupEnabled)
         defaults.set(snapshot.smartCleanup, forKey: Keys.smartCleanup)
         defaults.set(snapshot.soundEnabled, forKey: Keys.soundEnabled)
+        defaults.set(snapshot.resolvedHistoryRetention.rawValue, forKey: Keys.historyRetention)
         let url = MurmureDataStore.settingsURL
         Task.detached(priority: .utility) {
             try? data.write(to: url, options: .atomic)

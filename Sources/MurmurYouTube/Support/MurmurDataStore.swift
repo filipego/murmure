@@ -358,6 +358,20 @@ enum AudioHistoryStore {
         MurmureDataStore.url(forRelativePath: relativePath)
     }
 
+    static func remove(relativePaths: Set<String>) async {
+        let urls = relativePaths.compactMap(url(for:))
+        await Task.detached(priority: .utility) {
+            let fileManager = FileManager.default
+            for url in urls where fileManager.fileExists(atPath: url.path) {
+                do {
+                    try fileManager.removeItem(at: url)
+                } catch {
+                    Log.audio.error("audio history delete failed: \(error.localizedDescription)")
+                }
+            }
+        }.value
+    }
+
     private static func matchingAudio(_ lhs: URL, _ rhs: URL) throws -> Bool {
         try fingerprint(lhs) == fingerprint(rhs)
     }

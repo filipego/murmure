@@ -205,6 +205,16 @@ actor RecordingSessionCoordinator {
         }
     }
 
+    func discardRecoverableRecording(id: UUID) async -> Bool {
+        do {
+            try await store.discardRecoverableSession(id: id)
+            return true
+        } catch {
+            Log.audio.error("recoverable recording delete failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
     private func complete(sessionID: UUID, run: DictationRun) async -> CompletionOutcome {
         guard let manifest = try? await store.load(id: sessionID) else { return .failed }
         if manifest.status.isCompleted { return .alreadyCompleted }
