@@ -62,6 +62,27 @@ struct LiveTextTargetCapture {
     let selectedText: String
 }
 
+enum LiveTextCapturePolicy {
+    static func selectedText(selection: NSRange, rangeText: String?) -> String? {
+        selection.length == 0 ? "" : rangeText
+    }
+}
+
+enum LiveTextOwnershipVerification {
+    static func isVerified(
+        expectedRange: NSRange,
+        actualRange: NSRange?,
+        expectedText: String,
+        selectedText: String?,
+        rangeText: String?
+    ) -> Bool {
+        guard actualRange == expectedRange,
+              selectedText == expectedText
+        else { return false }
+        return rangeText.map { $0 == expectedText } ?? true
+    }
+}
+
 @MainActor
 protocol LiveTextTargetCapturing {
     func capture() -> LiveTextTargetCapture?
@@ -392,7 +413,10 @@ final class AXLiveTextTargetCapturer: LiveTextTargetCapturing {
             element: focused.element,
             processIdentifier: focused.processIdentifier
         )
-        guard let selectedText = target.text(in: selection) else { return nil }
+        guard let selectedText = LiveTextCapturePolicy.selectedText(
+            selection: selection,
+            rangeText: target.text(in: selection)
+        ) else { return nil }
 
         return LiveTextTargetCapture(
             target: target,
@@ -422,8 +446,7 @@ private final class AXLiveTextTarget: LiveTextTarget {
     ) async -> LiveTextMutationResult {
         guard operationIsCurrent(),
               isFocused,
-              AXLiveTextSupport.selectedRange(of: element) == expectedSelection,
-              text(in: ownedRange) == expectedText
+              AXLiveTextSupport.selectedRange(of: element) == expectedSelection
         else { return .notMutated }
 
         let documentBefore = AXLiveTextSupport.documentText(of: element)
@@ -500,10 +523,13 @@ private final class AXLiveTextTarget: LiveTextTarget {
     }
 
     private func verifiedSelectedOwnedRange(_ range: NSRange, expectedText: String) -> Bool {
-        isFocused
-            && AXLiveTextSupport.selectedRange(of: element) == range
-            && AXLiveTextSupport.selectedText(of: element) == expectedText
-            && text(in: range) == expectedText
+        isFocused && LiveTextOwnershipVerification.isVerified(
+            expectedRange: range,
+            actualRange: AXLiveTextSupport.selectedRange(of: element),
+            expectedText: expectedText,
+            selectedText: AXLiveTextSupport.selectedText(of: element),
+            rangeText: text(in: range)
+        )
     }
 
     private func observeReplacement(
@@ -532,6 +558,15 @@ private final class AXLiveTextTarget: LiveTextTarget {
         }
 
         let currentSelection = AXLiveTextSupport.selectedRange(of: element)
+        if LiveTextOwnershipVerification.isVerified(
+            expectedRange: replacementRange,
+            actualRange: currentSelection,
+            expectedText: replacement,
+            selectedText: AXLiveTextSupport.selectedText(of: element),
+            rangeText: text(in: replacementRange)
+        ) {
+            return .verified
+        }
         if text(in: ownedRange) == expectedText, currentSelection == ownedRange {
             return replacement == expectedText ? .verified : .unchanged
         }
@@ -554,8 +589,7 @@ private final class AXLiveTextTarget: LiveTextTarget {
             startingAt: ownedRange.location,
             text: replacement
         ),
-        isFocused,
-        text(in: replacementRange) == replacement
+        isFocused
         else { return false }
 
         let currentSelection = AXLiveTextSupport.selectedRange(of: element)

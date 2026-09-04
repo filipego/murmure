@@ -30,6 +30,23 @@ struct SnippetStoreTests {
         #expect(await writes.latest?.map(\.trigger) == ["old", "new"])
     }
 
+    @Test("expansion waits for deferred hydration")
+    @MainActor
+    func hydrationBeforeExpansion() async {
+        let snippet = SnippetEntry(trigger: "contact card", replacement: "Private replacement")
+        let gate = SnippetHydrationGate()
+        let store = SnippetStore(
+            loadEntries: { .loaded(await gate.wait()) },
+            persistEntries: { _ in true }
+        )
+
+        store.beginDeferredHydration()
+        async let expansion = store.expand("contact card")
+        await gate.release([snippet])
+
+        #expect(await expansion.applied?.id == snippet.id)
+    }
+
     @Test("a failed write rolls back only the attempted mutation")
     @MainActor
     func failedWriteRollsBack() async {

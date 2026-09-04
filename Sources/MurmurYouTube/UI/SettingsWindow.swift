@@ -39,6 +39,15 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
     }
 }
 
+enum SettingsMicrophoneTestPolicy {
+    static func shouldStop(
+        from oldCategory: SettingsCategory,
+        to newCategory: SettingsCategory
+    ) -> Bool {
+        oldCategory == .microphoneAndSounds && newCategory != .microphoneAndSounds
+    }
+}
+
 /// Settings uses the same calm cards as Home. It can be shown as the standard Settings scene
 /// or embedded as the Settings destination in the main hub.
 struct SettingsWindow: View {
@@ -254,7 +263,7 @@ struct SettingsWindow: View {
                                     .tag(TextInsertionTiming.whileSpeaking)
                             }
                             .pickerStyle(.menu)
-                            .frame(maxWidth: DS.Size.settingsPickerMaxWidth, alignment: .leading)
+                            .frame(width: DS.Size.settingsTimingPickerWidth, alignment: .leading)
 
                             Text(L10n.text(liveTypingStatusText))
                                 .font(DS.Font.caption)
@@ -447,6 +456,12 @@ struct SettingsWindow: View {
             }
         }
         .onDisappear {
+            microphoneTest.stop()
+            controller.resumeHotkeyAfterModalInput()
+        }
+        .onChange(of: selectedCategory) { oldCategory, newCategory in
+            guard SettingsMicrophoneTestPolicy.shouldStop(from: oldCategory, to: newCategory)
+            else { return }
             microphoneTest.stop()
             controller.resumeHotkeyAfterModalInput()
         }

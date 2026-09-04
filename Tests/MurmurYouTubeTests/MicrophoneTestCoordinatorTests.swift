@@ -7,6 +7,22 @@ import Testing
 @Suite("Microphone test coordinator")
 @MainActor
 struct MicrophoneTestCoordinatorTests {
+    @Test("leaving microphone settings stops its capture session")
+    func leavingMicrophoneCategoryStopsTest() {
+        #expect(SettingsMicrophoneTestPolicy.shouldStop(
+            from: .microphoneAndSounds,
+            to: .dictation
+        ))
+        #expect(!SettingsMicrophoneTestPolicy.shouldStop(
+            from: .dictation,
+            to: .appearance
+        ))
+        #expect(!SettingsMicrophoneTestPolicy.shouldStop(
+            from: .microphoneAndSounds,
+            to: .microphoneAndSounds
+        ))
+    }
+
     @Test("authorized test capture starts and stops without producing content")
     func startsAndStops() async {
         let capture = FakeLevelCapture()

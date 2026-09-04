@@ -79,9 +79,9 @@ struct SnippetExpander: Sendable {
     let entries: [SnippetEntry]
 
     func expand(_ text: String) -> SnippetExpansionResult {
-        let key = SnippetValidator.comparisonKey(text)
+        let key = Self.utteranceKey(text)
         guard let entry = entries.first(where: {
-            $0.isEnabled && SnippetValidator.comparisonKey($0.trigger) == key
+            $0.isEnabled && Self.utteranceKey($0.trigger) == key
         }) else {
             return SnippetExpansionResult(
                 text: text.precomposedStringWithCanonicalMapping,
@@ -92,5 +92,12 @@ struct SnippetExpander: Sendable {
             text: entry.replacement.precomposedStringWithCanonicalMapping,
             applied: AppliedSnippet(id: entry.id, trigger: entry.trigger)
         )
+    }
+
+    private static func utteranceKey(_ value: String) -> String {
+        let normalized = value.precomposedStringWithCanonicalMapping
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: .punctuationCharacters)
+        return SnippetValidator.comparisonKey(normalized)
     }
 }

@@ -40,7 +40,7 @@ enum AudioConfigurationChangePolicy {
 /// The tap runs on a real-time audio thread, so everything it touches lives behind
 /// `nonisolated(unsafe)` and is only ever mutated from that one thread.
 final class AudioCapture: @unchecked Sendable {
-    private let engine = AVAudioEngine()
+    private var engine: AVAudioEngine?
     private nonisolated(unsafe) var converter: AVAudioConverter?
     private nonisolated(unsafe) var outputFormat: AVAudioFormat?
     private var isRunning = false
@@ -60,11 +60,14 @@ final class AudioCapture: @unchecked Sendable {
         onDeviceChange: @escaping @Sendable () -> Void
     ) throws {
         guard !isRunning else { return }
+        cleanup()
 
         self.onBuffer = onBuffer
         self.onLevel = onLevel
         self.outputFormat = outputFormat
 
+        let engine = AVAudioEngine()
+        self.engine = engine
         let input = engine.inputNode
         guard let audioUnit = input.audioUnit else {
             cleanup()
@@ -122,16 +125,18 @@ final class AudioCapture: @unchecked Sendable {
     }
 
     private func cleanup() {
-        if hasInputTap {
-            engine.inputNode.removeTap(onBus: 0)
-            hasInputTap = false
-        }
-        engine.stop()
         isRunning = false
+        if hasInputTap, let engine {
+            engine.inputNode.removeTap(onBus: 0)
+        }
+        hasInputTap = false
         if let configurationObserver {
             NotificationCenter.default.removeObserver(configurationObserver)
             self.configurationObserver = nil
         }
+        engine?.stop()
+        engine?.reset()
+        engine = nil
         converter = nil
         outputFormat = nil
         onBuffer = nil
@@ -142,6 +147,7 @@ final class AudioCapture: @unchecked Sendable {
     /// well as real unplug events (Bluetooth inputs do this immediately after opening). Keep
     /// the session when the same device is alive, restarting the engine if CoreAudio paused it.
     private func recoverConfigurationChange(for selectedDeviceID: AudioDeviceID) -> Bool {
+        guard let engine else { return false }
         guard let audioUnit = engine.inputNode.audioUnit else { return false }
 
         var currentDeviceID = AudioDeviceID(kAudioObjectUnknown)

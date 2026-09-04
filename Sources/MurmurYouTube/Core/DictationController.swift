@@ -842,7 +842,10 @@ final class DictationController {
             guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
                 return
             }
-            let expansion = SnippetStore.shared.expander.expand(cleaned)
+            let expansion = await SnippetStore.shared.expand(cleaned)
+            guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                return
+            }
             if expansion.applied != nil {
                 Log.speech.info("snippet · exact whole-utterance replacement applied")
             }

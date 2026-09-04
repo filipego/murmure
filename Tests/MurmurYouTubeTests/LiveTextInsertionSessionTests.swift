@@ -20,6 +20,50 @@ struct LiveTypingStatusScenario: Sendable {
 @Suite("Verified live text ownership")
 @MainActor
 struct LiveTextInsertionSessionTests {
+    @Test("a collapsed caret can be captured without range text support")
+    func collapsedCaretCapturePolicy() {
+        #expect(LiveTextCapturePolicy.selectedText(
+            selection: NSRange(location: 4, length: 0),
+            rangeText: nil
+        ) == "")
+    }
+
+    @Test("a non-empty selection still requires readable original text")
+    func selectedTextCapturePolicy() {
+        #expect(LiveTextCapturePolicy.selectedText(
+            selection: NSRange(location: 4, length: 3),
+            rangeText: nil
+        ) == nil)
+        #expect(LiveTextCapturePolicy.selectedText(
+            selection: NSRange(location: 4, length: 3),
+            rangeText: "abc"
+        ) == "abc")
+    }
+
+    @Test("selected text verifies an owned range when range text is unsupported")
+    func selectedTextFallbackVerification() {
+        #expect(LiveTextOwnershipVerification.isVerified(
+            expectedRange: NSRange(location: 2, length: 5),
+            actualRange: NSRange(location: 2, length: 5),
+            expectedText: "draft",
+            selectedText: "draft",
+            rangeText: nil
+        ))
+        #expect(!LiveTextOwnershipVerification.isVerified(
+            expectedRange: NSRange(location: 2, length: 5),
+            actualRange: NSRange(location: 2, length: 5),
+            expectedText: "draft",
+            selectedText: "changed",
+            rangeText: nil
+        ))
+        #expect(!LiveTextOwnershipVerification.isVerified(
+            expectedRange: NSRange(location: 2, length: 5),
+            actualRange: NSRange(location: 3, length: 5),
+            expectedText: "draft",
+            selectedText: "draft",
+            rangeText: nil
+        ))
+    }
     @Test("invalidated operation tokens cannot act and replacements are distinct")
     func operationTokenLifecycle() {
         var lifecycle = DictationOperationLifecycle()

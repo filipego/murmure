@@ -134,6 +134,11 @@ final class SnippetStore {
         return await persistOrRollBack(previous: previous)
     }
 
+    func expand(_ text: String) async -> SnippetExpansionResult {
+        _ = await ensureHydrated()
+        return expander.expand(text)
+    }
+
     var expander: SnippetExpander { SnippetExpander(entries: entries) }
 
     private func adopt(_ loaded: [SnippetEntry]) {

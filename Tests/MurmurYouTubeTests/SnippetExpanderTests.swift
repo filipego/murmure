@@ -14,6 +14,28 @@ struct SnippetExpanderTests {
         #expect(result.applied == AppliedSnippet(id: snippet.id, trigger: "my address"))
     }
 
+    @Test("normal trailing sentence punctuation does not prevent a whole-utterance expansion")
+    func trailingPunctuationExpansion() {
+        let snippet = SnippetEntry(trigger: "contact card", replacement: "Private replacement")
+
+        for utterance in ["Contact card.", "contact card!", "contact card?", "contact card,"] {
+            let result = SnippetExpander(entries: [snippet]).expand(utterance)
+
+            #expect(result.text == "Private replacement")
+            #expect(result.applied?.id == snippet.id)
+        }
+    }
+
+    @Test("trailing punctuation tolerance never permits added words")
+    func punctuationDoesNotPermitAddedWords() {
+        let snippet = SnippetEntry(trigger: "contact card", replacement: "Private replacement")
+
+        let result = SnippetExpander(entries: [snippet]).expand("Use contact card.")
+
+        #expect(result.text == "Use contact card.")
+        #expect(result.applied == nil)
+    }
+
     @Test("a trigger inside ordinary prose never expands")
     func noSubstringExpansion() {
         let snippet = SnippetEntry(trigger: "my address", replacement: "12 Rue de Rivoli")
