@@ -186,7 +186,8 @@ share: app
 		echo '   Review the proposal before replacing the selection, or copy it instead. Settings'; \
 		echo '   explains if Apple Intelligence is unavailable. There is no network fallback.'; \
 		echo; \
-		echo 'Snippets replace an exact whole spoken phrase with reusable local text. Automatic'; \
+		echo 'Say “Voice add,” then an exact snippet trigger, or say the trigger alone. Snippets'; \
+		echo 'replace the complete spoken phrase with reusable local text. Automatic'; \
 		echo 'recognition, deterministic cleanup, snippets, dictionary corrections, history, and audio'; \
 		echo 'all run locally. Model downloads and update checks are the only network operations.'; \
 		echo; \

@@ -189,10 +189,10 @@ Opening the selected microphone…	Ouverture du microphone sélectionné…	Abri
 Starting microphone	Démarrage du microphone	Iniciando micrófono
 Preparing microphone	Préparation du microphone	Preparando micrófono
 Snippets	Extraits	Fragmentos
-Say a complete phrase and replace it with reusable local text. Snippets run before dictionary corrections.	Prononcez une phrase complète pour la remplacer par un texte local réutilisable. Les extraits s’appliquent avant les corrections du dictionnaire.	Di una frase completa y reemplázala por texto local reutilizable. Los fragmentos se aplican antes que las correcciones del diccionario.
+Say “Voice add,” then the trigger, or say the trigger by itself. Snippets run before dictionary corrections.	Dites « Voice add », puis le déclencheur, ou prononcez uniquement le déclencheur. Les extraits s’appliquent avant les corrections du dictionnaire.	Di «Voice add» seguido del activador, o di solo el activador. Los fragmentos se aplican antes que las correcciones del diccionario.
 Add snippet	Ajouter un extrait	Añadir fragmento
-No snippets yet. Try “my address,” “email signature,” or any phrase you would say by itself.	Aucun extrait pour l’instant. Essayez « mon adresse », « signature e-mail » ou toute phrase prononcée seule.	Aún no hay fragmentos. Prueba «mi dirección», «firma de correo» o cualquier frase que dirías por sí sola.
-Murmure replaces only a complete matching utterance. It never changes a phrase inside ordinary prose.	Murmure remplace uniquement une expression complète correspondante. Il ne modifie jamais une phrase au milieu d’un texte ordinaire.	Murmure solo reemplaza una expresión completa coincidente. Nunca cambia una frase dentro de un texto normal.
+No snippets yet. Try “Voice add, my address” after creating a “my address” trigger.	Aucun extrait pour l’instant. Après avoir créé le déclencheur « mon adresse », essayez « Voice add, mon adresse ».	Aún no hay fragmentos. Después de crear el activador «mi dirección», prueba «Voice add, mi dirección».
+Murmure matches a complete trigger, either alone or after “Voice add.” It never changes a phrase inside ordinary prose.	Murmure reconnaît un déclencheur complet, seul ou après « Voice add ». Il ne modifie jamais une phrase au milieu d’un texte ordinaire.	Murmure reconoce un activador completo, solo o después de «Voice add». Nunca cambia una frase dentro de un texto normal.
 Line breaks are kept in the inserted text.	Les sauts de ligne sont conservés dans le texte inséré.	Los saltos de línea se conservan en el texto insertado.
 Permissions	Autorisations	Permisos
 Grant Microphone…	Autoriser le microphone…	Conceder micrófono…

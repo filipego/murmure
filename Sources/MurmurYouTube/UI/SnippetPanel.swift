@@ -35,7 +35,7 @@ struct SnippetPanel: View {
                         .foregroundStyle(DS.Color.ink)
                     Text(
                         L10n.text(
-                            "Say a complete phrase and replace it with reusable local text. Snippets run before dictionary corrections."
+                            "Say “Voice add,” then the trigger, or say the trigger by itself. Snippets run before dictionary corrections."
                         )
                     )
                     .font(DS.Font.label)
@@ -45,7 +45,7 @@ struct SnippetPanel: View {
                     if snippets.entries.isEmpty {
                         Text(
                             L10n.text(
-                                "No snippets yet. Try “my address,” “email signature,” or any phrase you would say by itself."
+                                "No snippets yet. Try “Voice add, my address” after creating a “my address” trigger."
                             )
                         )
                         .font(DS.Font.body)

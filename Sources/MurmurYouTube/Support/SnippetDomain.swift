@@ -109,7 +109,7 @@ struct SnippetExpander: Sendable {
             locale: Locale(identifier: "en_US_POSIX")
         )
 
-        for prefix in ["murmure add", "murmur add"] where folded.hasPrefix(prefix) {
+        for prefix in ["voice add"] where folded.hasPrefix(prefix) {
             let suffix = normalized.dropFirst(prefix.count)
             guard suffix.first.map({ $0.isWhitespace || $0.isPunctuation }) == true else {
                 continue

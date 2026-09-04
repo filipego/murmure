@@ -39,6 +39,29 @@ enum LiveTextReplacementObservation: Equatable, Sendable {
     case uncertain
 }
 
+struct LiveTextKeystrokePlan: Equatable, Sendable {
+    let deleteCount: Int
+    let insertion: String
+
+    init(deleteCount: Int, insertion: String) {
+        self.deleteCount = deleteCount
+        self.insertion = insertion
+    }
+
+    init(from currentText: String, to replacement: String) {
+        let current = Array(currentText)
+        let next = Array(replacement)
+        var commonPrefixCount = 0
+        while commonPrefixCount < min(current.count, next.count),
+              current[commonPrefixCount] == next[commonPrefixCount] {
+            commonPrefixCount += 1
+        }
+
+        deleteCount = current.count - commonPrefixCount
+        insertion = String(next.dropFirst(commonPrefixCount))
+    }
+}
+
 private func liveTextRange(startingAt location: Int, text: String) -> NSRange? {
     guard location != NSNotFound, location >= 0 else { return nil }
     let (end, overflow) = location.addingReportingOverflow(text.utf16.count)
@@ -407,9 +430,18 @@ final class LiveTextInsertionSession {
 @MainActor
 final class AXLiveTextTargetCapturer: LiveTextTargetCapturing {
     func capture() -> LiveTextTargetCapture? {
-        guard let focused = AXLiveTextSupport.focusedElement(),
-              let selection = AXLiveTextSupport.selectedRange(of: focused.element)
-        else { return nil }
+        guard let focused = AXLiveTextSupport.focusedElement() else { return nil }
+
+        guard let selection = AXLiveTextSupport.selectedRange(of: focused.element) else {
+            return LiveTextTargetCapture(
+                target: KeystrokeLiveTextTarget(
+                    element: focused.element,
+                    processIdentifier: focused.processIdentifier
+                ),
+                selection: NSRange(location: 0, length: 0),
+                selectedText: ""
+            )
+        }
 
         let target = AXLiveTextTarget(
             element: focused.element,
@@ -425,6 +457,40 @@ final class AXLiveTextTargetCapturer: LiveTextTargetCapturing {
             selection: selection,
             selectedText: selectedText
         )
+    }
+}
+
+@MainActor
+private final class KeystrokeLiveTextTarget: LiveTextTarget {
+    private let element: AXUIElement
+    private let processIdentifier: pid_t
+
+    init(element: AXUIElement, processIdentifier: pid_t) {
+        self.element = element
+        self.processIdentifier = processIdentifier
+    }
+
+    func replace(
+        expectedSelection: NSRange,
+        ownedRange: NSRange,
+        expectedText: String,
+        replacement: String,
+        allowsPasteFallback: Bool,
+        operationIsCurrent: @escaping @MainActor @Sendable () -> Bool
+    ) async -> LiveTextMutationResult {
+        guard operationIsCurrent(), isFocused else { return .notMutated }
+
+        let plan = LiveTextKeystrokePlan(from: expectedText, to: replacement)
+        guard TextInjector.applyLiveKeystrokePlan(plan) else { return .notMutated }
+
+        await Task.yield()
+        return isFocused ? .replaced : .uncertain
+    }
+
+    private var isFocused: Bool {
+        guard let focused = AXLiveTextSupport.focusedElement() else { return false }
+        return focused.processIdentifier == processIdentifier
+            && CFEqual(focused.element, element)
     }
 }
 
@@ -487,6 +553,20 @@ private final class AXLiveTextTarget: LiveTextTarget {
 
         guard verifiedSelectedOwnedRange(ownedRange, expectedText: expectedText) else {
             return .uncertain
+        }
+
+        // Some Electron-style fields accept AX writes but silently discard them. The
+        // owned text is selected at this point, so ordinary Unicode typing replaces it
+        // directly in the user's focused input without waiting on the pasteboard.
+        if TextInjector.applyLiveKeystrokePlan(.init(
+            deleteCount: 0,
+            insertion: replacement
+        )) {
+            await Task.yield()
+            if verifyAndCollapseCaret(ownedRange: ownedRange, replacement: replacement) {
+                return .replaced
+            }
+            return isFocused ? .replaced : .uncertain
         }
 
         let didPaste = await TextInjector.pasteViaCommandV(replacement) { [weak self] in

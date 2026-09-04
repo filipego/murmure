@@ -20,6 +20,30 @@ struct LiveTypingStatusScenario: Sendable {
 @Suite("Verified live text ownership")
 @MainActor
 struct LiveTextInsertionSessionTests {
+    @Test("keystroke fallback appends new speech without rewriting the stable prefix")
+    func keystrokeFallbackAppendPlan() {
+        #expect(LiveTextKeystrokePlan(from: "hello", to: "hello world") == .init(
+            deleteCount: 0,
+            insertion: " world"
+        ))
+    }
+
+    @Test("keystroke fallback revises only the changed speech tail")
+    func keystrokeFallbackRevisionPlan() {
+        #expect(LiveTextKeystrokePlan(from: "I scream", to: "ice cream") == .init(
+            deleteCount: 8,
+            insertion: "ice cream"
+        ))
+    }
+
+    @Test("keystroke fallback counts user-visible characters")
+    func keystrokeFallbackGraphemePlan() {
+        #expect(LiveTextKeystrokePlan(from: "go 👍🏽", to: "go now") == .init(
+            deleteCount: 1,
+            insertion: "now"
+        ))
+    }
+
     @Test("a collapsed caret can be captured without range text support")
     func collapsedCaretCapturePolicy() {
         #expect(LiveTextCapturePolicy.selectedText(

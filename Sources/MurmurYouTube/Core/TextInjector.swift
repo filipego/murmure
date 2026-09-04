@@ -222,6 +222,63 @@ enum TextInjector {
         return true
     }
 
+    /// Applies a provisional transcript edit using ordinary focused-field keyboard events.
+    /// This is reserved for live dictation targets whose accessibility range APIs are absent
+    /// or accept writes without applying them.
+    static func applyLiveKeystrokePlan(_ plan: LiveTextKeystrokePlan) -> Bool {
+        guard let source = CGEventSource(stateID: .privateState) else { return false }
+
+        for _ in 0..<plan.deleteCount {
+            guard let down = CGEvent(
+                keyboardEventSource: source,
+                virtualKey: 51,
+                keyDown: true
+            ),
+            let up = CGEvent(
+                keyboardEventSource: source,
+                virtualKey: 51,
+                keyDown: false
+            ) else { return false }
+            down.flags = []
+            up.flags = []
+            down.post(tap: .cghidEventTap)
+            up.post(tap: .cghidEventTap)
+        }
+
+        let utf16 = Array(plan.insertion.utf16)
+        for start in stride(from: 0, to: utf16.count, by: 20) {
+            let end = min(start + 20, utf16.count)
+            let chunk = Array(utf16[start..<end])
+            guard let down = CGEvent(
+                keyboardEventSource: source,
+                virtualKey: 0,
+                keyDown: true
+            ),
+            let up = CGEvent(
+                keyboardEventSource: source,
+                virtualKey: 0,
+                keyDown: false
+            ) else { return false }
+
+            chunk.withUnsafeBufferPointer { buffer in
+                down.keyboardSetUnicodeString(
+                    stringLength: buffer.count,
+                    unicodeString: buffer.baseAddress
+                )
+                up.keyboardSetUnicodeString(
+                    stringLength: buffer.count,
+                    unicodeString: buffer.baseAddress
+                )
+            }
+            down.flags = []
+            up.flags = []
+            down.post(tap: .cghidEventTap)
+            up.post(tap: .cghidEventTap)
+        }
+
+        return true
+    }
+
     private static func waitForPostedPasteObservation() async {
         await Task<Void, Never>.detached {
             try? await Task.sleep(for: .milliseconds(500))

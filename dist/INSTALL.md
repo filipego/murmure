@@ -25,7 +25,8 @@ Download the latest release: https://github.com/filipego/murmure/releases/latest
    Review the proposal before replacing the selection, or copy it instead. Settings
    explains if Apple Intelligence is unavailable. There is no network fallback.
 
-Snippets replace an exact whole spoken phrase with reusable local text. Automatic
+Say “Voice add,” then an exact snippet trigger, or say the trigger alone. Snippets
+replace the complete spoken phrase with reusable local text. Automatic
 recognition, deterministic cleanup, snippets, dictionary corrections, history, and audio
 all run locally. Model downloads and update checks are the only network operations.
 

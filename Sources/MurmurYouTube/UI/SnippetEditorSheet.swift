@@ -23,7 +23,7 @@ struct SnippetEditorSheet: View {
                 Text(L10n.text(original.trigger.isEmpty ? "Add snippet" : "Edit snippet"))
                     .font(DS.Font.title)
                     .foregroundStyle(DS.Color.ink)
-                Text(L10n.text("Murmure replaces only a complete matching utterance. It never changes a phrase inside ordinary prose."))
+                Text(L10n.text("Murmure matches a complete trigger, either alone or after “Voice add.” It never changes a phrase inside ordinary prose."))
                     .font(DS.Font.label)
                     .foregroundStyle(DS.Color.inkSecondary)
                     .fixedSize(horizontal: false, vertical: true)

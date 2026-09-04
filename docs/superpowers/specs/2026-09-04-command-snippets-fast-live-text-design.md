@@ -2,11 +2,11 @@
 
 ## Goal
 
-Make deliberate snippet commands and live dictation behave predictably. Saying `Murmure add, my address` invokes the `my address` snippet. The existing bare `my address` trigger remains supported. During ordinary dictation, preliminary text should appear as quickly as Apple's local recognizer permits. Releasing the shortcut must replace Murmure's preview with exactly one cleaned final result.
+Make deliberate snippet commands and live dictation behave predictably. Saying `Voice add, my address` invokes the `my address` snippet. The existing bare `my address` trigger remains supported. During ordinary dictation, preliminary text should appear as quickly as Apple's local recognizer permits. Releasing the shortcut must replace Murmure's preview with exactly one cleaned final result.
 
 ## Spoken command
 
-`Murmure add` is the fixed command prefix. Matching is case-insensitive, Unicode-normalized, whitespace-tolerant, and tolerant of ordinary punctuation between the prefix and trigger. The prefix is removed before exact whole-trigger matching. Extra words before or after the trigger do not match. A bare exact trigger continues to match for compatibility.
+`Voice add` is the fixed command prefix. Matching is case-insensitive, Unicode-normalized, whitespace-tolerant, and tolerant of ordinary punctuation between the prefix and trigger. The prefix is removed before exact whole-trigger matching. Extra words before or after the trigger do not match. A bare exact trigger continues to match for compatibility.
 
 ## Streaming behavior
 
@@ -14,7 +14,7 @@ Apple Speech uses volatile and fast results for responsive preliminary text. Pre
 
 ## Final replacement
 
-The live insertion session must distinguish an unobserved posted paste from lost ownership. It should retry observation for the bounded paste window and adopt the inserted range only when the destination, selection, and text prove ownership. Once ownership is proven, finalization replaces the complete preview. If ownership cannot be proven, the recording and final text remain in History without appending a duplicate.
+The live insertion session first uses verified Accessibility replacement. When the focused field does not expose the required range interface, a keystroke fallback keeps the stable transcript prefix, deletes only the revised tail, and inserts the new tail. The fallback remains active only while the original field stays focused. Once ownership is proven, finalization replaces the complete preview. If focus changes or ownership cannot be maintained, the recording and final text remain in History without appending a duplicate.
 
 ## Verification
 
