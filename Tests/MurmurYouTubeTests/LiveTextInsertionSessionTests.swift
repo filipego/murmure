@@ -20,6 +20,48 @@ struct LiveTypingStatusScenario: Sendable {
 @Suite("Verified live text ownership")
 @MainActor
 struct LiveTextInsertionSessionTests {
+    @Test("collapsed-caret dictation uses the editor-recreation-safe target")
+    func collapsedCaretUsesKeystrokeTarget() {
+        #expect(LiveTextCapturePolicy.usesKeystrokeTarget(
+            selection: NSRange(location: 37, length: 0)
+        ))
+        #expect(!LiveTextCapturePolicy.usesKeystrokeTarget(
+            selection: NSRange(location: 37, length: 4)
+        ))
+    }
+
+    @Test("a recreated accessibility element can retain the same owned destination")
+    func recreatedElementRebindsWhenOwnershipMatches() {
+        #expect(LiveTextElementRebindingPolicy.canRebind(
+            targetProcessIdentifier: 42,
+            focusedProcessIdentifier: 42,
+            expectedSelection: NSRange(location: 4, length: 0),
+            actualSelection: NSRange(location: 4, length: 0),
+            ownedText: "Let'",
+            actualOwnedText: "Let'"
+        ))
+    }
+
+    @Test("a recreated accessibility element cannot capture another destination")
+    func recreatedElementRejectsChangedDestination() {
+        #expect(!LiveTextElementRebindingPolicy.canRebind(
+            targetProcessIdentifier: 42,
+            focusedProcessIdentifier: 42,
+            expectedSelection: NSRange(location: 4, length: 0),
+            actualSelection: NSRange(location: 0, length: 0),
+            ownedText: "Let'",
+            actualOwnedText: ""
+        ))
+        #expect(!LiveTextElementRebindingPolicy.canRebind(
+            targetProcessIdentifier: 42,
+            focusedProcessIdentifier: 99,
+            expectedSelection: NSRange(location: 4, length: 0),
+            actualSelection: NSRange(location: 4, length: 0),
+            ownedText: "Let'",
+            actualOwnedText: "Let'"
+        ))
+    }
+
     @Test("application fallback remains owned only while its original app is frontmost")
     func applicationFallbackFocusPolicy() {
         #expect(LiveTextApplicationFocusPolicy.isStillFocused(
@@ -433,6 +475,20 @@ struct LiveTextInsertionSessionTests {
         #expect(target.replacements.map(\.replacement) == ["maybe landed"])
     }
 
+    @Test("an unverified follow-up snapshot retries on the next live result")
+    func unverifiedFollowUpSnapshotDoesNotStopLiveTyping() async {
+        let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
+        let session = LiveTextInsertionSession(capturer: target)
+
+        await session.render("first partial")
+        target.nextOutcome = .uncertainWithoutMutation
+        await session.render("second partial")
+
+        #expect(await session.finalize("complete sentence") == .alreadyInserted)
+        #expect(target.documentText == "complete sentence")
+        #expect(target.replacements.map(\.replacement) == ["first partial", "second partial", "complete sentence"])
+    }
+
     @Test("cancelling an uncertain first mutation keeps the recording recoverable")
     func uncertainFirstMutationCancellationIsRecoverable() async {
         let target = FakeLiveTextTarget(selection: NSRange(location: 0, length: 0), text: "")
@@ -590,6 +646,7 @@ private final class FakeLiveTextTarget: LiveTextTargetCapturing, LiveTextTarget 
         case normal
         case postedPasteUnchanged
         case uncertainAfterMutation
+        case uncertainWithoutMutation
     }
 
     var documentText: String
@@ -645,6 +702,12 @@ private final class FakeLiveTextTarget: LiveTextTargetCapturing, LiveTextTarget 
             nextOutcome = .normal
             replacements.append(requestedReplacement)
             return .afterPostedPaste(.unchanged)
+        }
+
+        if nextOutcome == .uncertainWithoutMutation {
+            nextOutcome = .normal
+            replacements.append(requestedReplacement)
+            return .uncertain
         }
 
         documentText = documentText.replacingCharacters(in: ownedRange, with: replacement)

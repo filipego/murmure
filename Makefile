@@ -27,7 +27,7 @@ CONTENTS := $(BUNDLE)/Contents
 HELPERS  := $(CONTENTS)/Helpers
 INBOX    := $(HOME)/Library/Application Support/MurmurYouTube/Updates
 DIST     := dist
-PINNED_REQUIREMENT := identifier "ai.pivotstudio.murmur-youtube" and certificate root = H"dd1175e05550d5ff2ac47ca8621caf97be7ab707"
+PINNED_REQUIREMENT := identifier "ai.pivotstudio.murmur-youtube" and certificate leaf = H"c058faaeb0ed858f6a39f616c01c5e7a9a3db28a"
 
 ## TCC keys the Accessibility grant to the code signature, so an ad-hoc signature — which
 ## changes on every build — makes the user re-grant after every `make`. Prefer a stable
@@ -37,7 +37,7 @@ SIGN_ID := $(shell security find-identity -v -p codesigning 2>/dev/null \
              | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/')
 ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := $(shell security find-identity -v -p codesigning 2>/dev/null \
-             | grep "Local Signing" | head -1 | sed -E 's/.*"(.*)".*/\1/')
+             | grep "Local Signing Murmure" | head -1 | sed -E 's/.*"(.*)".*/\1/')
 endif
 ifeq ($(strip $(SIGN_ID)),)
 SIGN_ID := -

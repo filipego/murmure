@@ -71,6 +71,22 @@ enum LiveTextApplicationFocusPolicy {
     }
 }
 
+enum LiveTextElementRebindingPolicy {
+    static func canRebind(
+        targetProcessIdentifier: pid_t,
+        focusedProcessIdentifier: pid_t,
+        expectedSelection: NSRange,
+        actualSelection: NSRange?,
+        ownedText: String,
+        actualOwnedText: String?
+    ) -> Bool {
+        focusedProcessIdentifier == targetProcessIdentifier
+            && !ownedText.isEmpty
+            && actualSelection == expectedSelection
+            && actualOwnedText == ownedText
+    }
+}
+
 private func liveTextRange(startingAt location: Int, text: String) -> NSRange? {
     guard location != NSNotFound, location >= 0 else { return nil }
     let (end, overflow) = location.addingReportingOverflow(text.utf16.count)
@@ -97,6 +113,10 @@ struct LiveTextTargetCapture {
 }
 
 enum LiveTextCapturePolicy {
+    static func usesKeystrokeTarget(selection: NSRange) -> Bool {
+        selection.length == 0
+    }
+
     static func selectedText(selection: NSRange, rangeText: String?) -> String? {
         selection.length == 0 ? "" : rangeText
     }
@@ -397,7 +417,14 @@ final class LiveTextInsertionSession {
                 ownership.hasVerifiedMutation ? .retainedInHistoryOnly : .useOneShotInsertion
             )
         case .uncertain:
-            state = .abandoned(ownership, .retainedInHistoryOnly)
+            // A target can reject one transient partial update without its field changing
+            // (Messages and web editors do this while reconciling a live selection). Keep
+            // the last *verified* ownership so the next recognizer result can retry instead
+            // of permanently stopping live typing mid-dictation. An uncertain first write
+            // remains fail-closed because it may already have landed.
+            state = ownership.hasVerifiedMutation
+                ? .active(ownership)
+                : .abandoned(ownership, .retainedInHistoryOnly)
         }
     }
 
@@ -466,6 +493,23 @@ final class AXLiveTextTargetCapturer: LiveTextTargetCapturing {
             )
         }
 
+
+        // Ordinary dictation starts at a caret. Reactive editors in Messages, Gmail,
+        // Codex and other WebKit/Electron surfaces routinely destroy and recreate their
+        // AX text element after each edit. Incremental keyboard edits survive that while
+        // remaining bound to the foreground application. Non-empty selections retain the
+        // stricter AX range-ownership path below.
+        if LiveTextCapturePolicy.usesKeystrokeTarget(selection: selection) {
+            return LiveTextTargetCapture(
+                target: KeystrokeLiveTextTarget(
+                    element: nil,
+                    processIdentifier: focused.processIdentifier
+                ),
+                selection: selection,
+                selectedText: ""
+            )
+        }
+
         let target = AXLiveTextTarget(
             element: focused.element,
             processIdentifier: focused.processIdentifier
@@ -526,7 +570,7 @@ private final class KeystrokeLiveTextTarget: LiveTextTarget {
 
 @MainActor
 private final class AXLiveTextTarget: LiveTextTarget {
-    private let element: AXUIElement
+    private var element: AXUIElement
     private let processIdentifier: pid_t
 
     init(element: AXUIElement, processIdentifier: pid_t) {
@@ -543,7 +587,11 @@ private final class AXLiveTextTarget: LiveTextTarget {
         operationIsCurrent: @escaping @MainActor @Sendable () -> Bool
     ) async -> LiveTextMutationResult {
         guard operationIsCurrent(),
-              isFocused,
+              bindToFocusedElementIfNeeded(
+                expectedSelection: expectedSelection,
+                ownedRange: ownedRange,
+                expectedText: expectedText
+              ),
               AXLiveTextSupport.selectedRange(of: element) == expectedSelection
         else { return .notMutated }
 
@@ -664,6 +712,34 @@ private final class AXLiveTextTarget: LiveTextTarget {
         guard let focused = AXLiveTextSupport.focusedElement() else { return false }
         return focused.processIdentifier == processIdentifier
             && CFEqual(focused.element, element)
+    }
+
+    /// WebKit, Electron and SwiftUI editors can replace their accessibility object while
+    /// preserving the same focused input. Continue only when the replacement belongs to
+    /// the same foreground process and still contains our exact owned text at the exact
+    /// expected caret. This keeps real destination changes fail-closed.
+    private func bindToFocusedElementIfNeeded(
+        expectedSelection: NSRange,
+        ownedRange: NSRange,
+        expectedText: String
+    ) -> Bool {
+        guard let focused = AXLiveTextSupport.focusedElement() else { return false }
+        if focused.processIdentifier == processIdentifier,
+           CFEqual(focused.element, element) {
+            return true
+        }
+
+        guard LiveTextElementRebindingPolicy.canRebind(
+            targetProcessIdentifier: processIdentifier,
+            focusedProcessIdentifier: focused.processIdentifier,
+            expectedSelection: expectedSelection,
+            actualSelection: AXLiveTextSupport.selectedRange(of: focused.element),
+            ownedText: expectedText,
+            actualOwnedText: AXLiveTextSupport.text(in: ownedRange, of: focused.element)
+        ) else { return false }
+
+        element = focused.element
+        return true
     }
 
     private func verifiedSelectedOwnedRange(_ range: NSRange, expectedText: String) -> Bool {
