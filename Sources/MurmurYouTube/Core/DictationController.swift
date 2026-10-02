@@ -136,6 +136,19 @@ enum DictationStartPolicy {
     }
 }
 
+enum DictationCaptureStartupReleasePolicy {
+    enum Action: Equatable {
+        case cancelStartup
+        case finishAfterStartup
+        case ignoreDuplicateRelease
+    }
+
+    static func action(captureIsReady: Bool, releaseAlreadyRequested: Bool) -> Action {
+        if releaseAlreadyRequested { return .ignoreDuplicateRelease }
+        return captureIsReady ? .finishAfterStartup : .cancelStartup
+    }
+}
+
 enum HandsFreeEventRoutingPolicy {
     static func handle(
         _ event: HandsFreeGesturePolicy.Event,
@@ -242,7 +255,7 @@ final class DictationController {
     let commandMode = LocalCommandController()
 
     private let hotkey = HotkeyMonitor()
-    private let capture = AudioCapture()
+    private let capture = SerializedAudioCapture()
     private let makeEngine: (@Sendable () -> any TranscriptionEngine)?
     private let sessionCoordinator: RecordingSessionCoordinator
     private var wantsHotkeyActive = false
@@ -278,6 +291,8 @@ final class DictationController {
     /// transcription is complete.
     private var feedTask: Task<[AudioChunk], Never>?
     private var audioContinuation: AsyncStream<AudioChunk>.Continuation?
+    private var captureReadyOperationID: UUID?
+    private var pendingCaptureReleaseAt: Date?
 
     /// Timestamps for the dashboard: when the key went down, and when it came up.
     private var holdStarted: Date?
@@ -448,6 +463,8 @@ final class DictationController {
               liveInsertion == nil
         else { return }
         let operation = operationLifecycle.begin()
+        captureReadyOperationID = nil
+        pendingCaptureReleaseAt = nil
         state = .starting
         activeTrigger = trigger
         transcript = ""
@@ -535,16 +552,6 @@ final class DictationController {
                 startedEngine = engine
                 self.engine = engine
 
-                let chunks = try await engine.start()
-                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
-                    await self.abandonStaleStartup(
-                        liveInsertion: liveInsertion,
-                        engine: startedEngine,
-                        sessionID: begunSessionID
-                    )
-                    return
-                }
-
                 // Compare mode captures in *Apple's* format, not a format of our choosing.
                 //
                 // SpeechAnalyzer enforces `Audio sample data must be 16-bit signed integers`
@@ -574,32 +581,15 @@ final class DictationController {
                     Log.audio.error("\(liveInput.resolution.statusText, privacy: .public)")
                 }
 
-                // Audio must reach the engine in capture order. A stream plus a single
-                // draining task guarantees that; spawning a Task per buffer would not. Keep
-                // the stream unbounded for the short-lived session so a busy transcription
-                // engine cannot drop older buffers that the audio archive still needs.
+                // Create the buffer before opening capture so it can hold audio while the
+                // speech engine prepares. The stream remains unbounded for this short session.
                 let (audioStream, audioContinuation) = AsyncStream<AudioChunk>.makeStream(
                     bufferingPolicy: .unbounded
                 )
                 self.audioContinuation = audioContinuation
 
-                // The recording is accumulated *inside* the ordered drain, not by spawning
-                // a task per buffer. Unstructured tasks have no ordering guarantee, so
-                // collecting them separately could assemble the replay audio out of order
-                // and silently produce word-salad from the comparison.
-                self.feedTask = Task.detached(priority: .userInitiated) {
-                    var recording: [AudioChunk] = []
-                    for await chunk in audioStream {
-                        // Keep one ordered copy for local audio history. This is done in the
-                        // same serial drain that feeds the engine, so the archive cannot be
-                        // assembled out of order.
-                        recording.append(chunk)
-                        await engine.feed(chunk)
-                    }
-                    return recording
-                }
-
-                try capture.start(
+                try await capture.start(
+                    operationID: operation.id,
                     deviceID: liveInput.objectID,
                     outputFormat: format,
                     onBuffer: { chunk in
@@ -624,7 +614,8 @@ final class DictationController {
                     }
                 )
 
-                // Bail out if the user already let go while we were spinning up.
+                // A release before capture is ready cancels this startup. Once this token is
+                // marked ready, release closes capture but lets engine preparation finish.
                 guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
                     await self.abandonStaleStartup(
                         liveInsertion: liveInsertion,
@@ -633,13 +624,43 @@ final class DictationController {
                     )
                     return
                 }
+                self.captureReadyOperationID = operation.id
                 guard case .starting = self.state else {
                     self.cancelDictation()
                     return
                 }
 
-                self.state = .listening
-                if soundEnabled { NSSound(named: "Tink")?.play() }
+                let chunks = try await engine.start()
+                guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
+                    await self.abandonStaleStartup(
+                        liveInsertion: liveInsertion,
+                        engine: startedEngine,
+                        sessionID: begunSessionID
+                    )
+                    return
+                }
+
+                // Drain captured buffers only after the engine has successfully prepared.
+                // The single consumer preserves order for feeding and recording.
+                self.feedTask = Task.detached(priority: .userInitiated) {
+                    var recording: [AudioChunk] = []
+                    for await chunk in audioStream {
+                        recording.append(chunk)
+                        await engine.feed(chunk)
+                    }
+                    return recording
+                }
+
+                let releaseAfterStartup = self.pendingCaptureReleaseAt
+                self.pendingCaptureReleaseAt = nil
+                self.captureReadyOperationID = nil
+
+                if releaseAfterStartup == nil {
+                    self.state = .listening
+                    if soundEnabled { NSSound(named: "Tink")?.play() }
+                } else {
+                    self.state = .finishing
+                }
 
                 self.consumeTask = Task { @MainActor in
                     do {
@@ -662,6 +683,12 @@ final class DictationController {
                     }
                 }
                 self.startupTask = nil
+                if let releaseAfterStartup {
+                    self.endDictation(
+                        releasedAt: releaseAfterStartup,
+                        captureAlreadyStopped: true
+                    )
+                }
             } catch {
                 guard self.operationLifecycle.isCurrent(operation), !Task.isCancelled else {
                     await self.abandonStaleStartup(
@@ -690,7 +717,10 @@ final class DictationController {
         )
     }
 
-    private func endDictation() {
+    private func endDictation(
+        releasedAt requestedReleaseDate: Date? = nil,
+        captureAlreadyStopped: Bool = false
+    ) {
         if handsFreePolicy.isActive,
            case .handsFree = activeTrigger {
             _ = handsFreePolicy.handle(.enterPressed)
@@ -701,20 +731,49 @@ final class DictationController {
         // run the whole tail again — re-reading `transcript` before the first pass cleared
         // it and pasting the same utterance twice. The window is wide: Parakeet transcribes
         // inside `finish()`, and smart cleanup adds up to 4s on top.
-        guard state.isActive, state != .finishing else { return }
+        guard state.isActive, (state != .finishing || captureAlreadyStopped) else { return }
         guard state != .starting else {
-            cancelDictation()
+            let action = DictationCaptureStartupReleasePolicy.action(
+                captureIsReady: operationLifecycle.currentToken.map {
+                    captureReadyOperationID == $0.id
+                } ?? false,
+                releaseAlreadyRequested: pendingCaptureReleaseAt != nil
+            )
+            switch action {
+            case .cancelStartup:
+                cancelDictation()
+            case .finishAfterStartup:
+                guard let operation = operationLifecycle.currentToken else {
+                    cancelDictation()
+                    return
+                }
+                capture.stop(operationID: operation.id)
+                captureReadyOperationID = nil
+                let releaseDate = Date()
+                pendingCaptureReleaseAt = releaseDate
+                releasedAt = releaseDate
+                state = .finishing
+                level = 0
+                audioContinuation?.finish()
+                audioContinuation = nil
+            case .ignoreDuplicateRelease:
+                break
+            }
             return
         }
         guard let operation = operationLifecycle.currentToken else { return }
         state = .finishing
-        capture.stop()
+        if !captureAlreadyStopped {
+            capture.stop(operationID: operation.id)
+        }
         level = 0
-        let releasedAt = Date()
+        let releasedAt = requestedReleaseDate ?? Date()
         self.releasedAt = releasedAt
 
-        audioContinuation?.finish()
-        audioContinuation = nil
+        if !captureAlreadyStopped {
+            audioContinuation?.finish()
+            audioContinuation = nil
+        }
         let feedTask = self.feedTask
         let engine = self.engine
         let consumeTask = self.consumeTask
@@ -952,9 +1011,13 @@ final class DictationController {
             return
         }
 
+        let captureOperationID = operationLifecycle.currentToken?.id
         let cancellation = operationLifecycle.beginCancellation()
         state = .idle
-        let stopped = stopCurrentOperation(liveInsertion: liveInsertion)
+        let stopped = stopCurrentOperation(
+            liveInsertion: liveInsertion,
+            captureOperationID: captureOperationID
+        )
         Task { await stopped.engine?.finish() }
         transcript = ""
         level = 0
@@ -1126,14 +1189,19 @@ final class DictationController {
     }
 
     private func stopCurrentOperation(
-        liveInsertion ownedLiveInsertion: LiveTextInsertionSession?
+        liveInsertion ownedLiveInsertion: LiveTextInsertionSession?,
+        captureOperationID: UUID?
     ) -> StoppedDictationResources {
         startupTask?.cancel()
         startupTask = nil
         finishingTask?.cancel()
         finishingTask = nil
 
-        capture.stop()
+        if let captureOperationID {
+            capture.stop(operationID: captureOperationID)
+        }
+        captureReadyOperationID = nil
+        pendingCaptureReleaseAt = nil
         audioContinuation?.finish()
         audioContinuation = nil
         feedTask?.cancel()
@@ -1175,8 +1243,12 @@ final class DictationController {
     ) {
         if let operation, !operationLifecycle.isCurrent(operation) { return }
         Log.app.error("\(message)")
+        let captureOperationID = operation?.id ?? operationLifecycle.currentToken?.id
         let cancellation = operationLifecycle.beginCancellation()
-        let stopped = stopCurrentOperation(liveInsertion: liveInsertion)
+        let stopped = stopCurrentOperation(
+            liveInsertion: liveInsertion,
+            captureOperationID: captureOperationID
+        )
         Task { await stopped.engine?.finish() }
         if let sessionID = stopped.sessionID {
             let failure = RecordingFailure(stage: .transcription, message: message)
