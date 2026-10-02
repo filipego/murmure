@@ -27,10 +27,16 @@ enum AudioConfigurationChangePolicy {
     static func action(
         selectedDeviceID: AudioDeviceID,
         currentDeviceID: AudioDeviceID,
+        activeSubDeviceIDs: [AudioDeviceID] = [],
         isAlive: Bool,
         engineIsRunning: Bool
     ) -> Action {
-        guard selectedDeviceID == currentDeviceID, isAlive else { return .fail }
+        guard selectedDeviceID != AudioDeviceID(kAudioObjectUnknown),
+              currentDeviceID != AudioDeviceID(kAudioObjectUnknown)
+        else { return .fail }
+        let directMatch = selectedDeviceID == currentDeviceID
+        let activeAggregateMatch = activeSubDeviceIDs.contains(selectedDeviceID)
+        guard (directMatch || activeAggregateMatch), isAlive else { return .fail }
         return engineIsRunning ? .ignore : .restart
     }
 }
@@ -39,13 +45,19 @@ enum AudioConfigurationChangePolicy {
 ///
 /// The tap runs on a real-time audio thread, so everything it touches lives behind
 /// `nonisolated(unsafe)` and is only ever mutated from that one thread.
-final class AudioCapture: @unchecked Sendable {
+final class AudioCapture: AudioCaptureBackend, @unchecked Sendable {
     private var engine: AVAudioEngine?
     private nonisolated(unsafe) var converter: AVAudioConverter?
     private nonisolated(unsafe) var outputFormat: AVAudioFormat?
     private var isRunning = false
     private var hasInputTap = false
     private var configurationObserver: NSObjectProtocol?
+    private var configurationObserverID: UUID?
+    private let configurationObserverQueue: OperationQueue
+
+    init(configurationObserverQueue: OperationQueue = .main) {
+        self.configurationObserverQueue = configurationObserverQueue
+    }
 
     /// Called on the audio thread with each converted buffer.
     private nonisolated(unsafe) var onBuffer: (@Sendable (AudioChunk) -> Void)?
@@ -68,23 +80,42 @@ final class AudioCapture: @unchecked Sendable {
 
         let engine = AVAudioEngine()
         self.engine = engine
+        let observerID = UUID()
+        configurationObserverID = observerID
         let input = engine.inputNode
         guard let audioUnit = input.audioUnit else {
             cleanup()
             throw AudioCaptureError.inputUnitUnavailable
         }
-        var selectedDeviceID = deviceID
-        let deviceStatus = AudioUnitSetProperty(
+
+        var preSetDeviceID = AudioDeviceID(kAudioObjectUnknown)
+        var preSetSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let preSetStatus = AudioUnitGetProperty(
             audioUnit,
             kAudioOutputUnitProperty_CurrentDevice,
             kAudioUnitScope_Global,
             0,
-            &selectedDeviceID,
-            UInt32(MemoryLayout<AudioDeviceID>.size)
+            &preSetDeviceID,
+            &preSetSize
         )
-        guard deviceStatus == noErr else {
-            cleanup()
-            throw AudioCaptureError.deviceConfigurationFailed(deviceStatus)
+
+        let routeAlreadySelected = preSetStatus == noErr
+            && (preSetDeviceID == deviceID
+                || Self.activeSubDeviceIDs(of: preSetDeviceID)?.contains(deviceID) == true)
+        if !routeAlreadySelected {
+            var selectedDeviceID = deviceID
+            let deviceStatus = AudioUnitSetProperty(
+                audioUnit,
+                kAudioOutputUnitProperty_CurrentDevice,
+                kAudioUnitScope_Global,
+                0,
+                &selectedDeviceID,
+                UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+            guard deviceStatus == noErr else {
+                cleanup()
+                throw AudioCaptureError.deviceConfigurationFailed(deviceStatus)
+            }
         }
         let nativeFormat = input.outputFormat(forBus: 0)
 
@@ -109,11 +140,16 @@ final class AudioCapture: @unchecked Sendable {
         configurationObserver = NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange,
             object: engine,
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
-            guard let self, self.isRunning else { return }
-            if self.recoverConfigurationChange(for: deviceID) { return }
-            onDeviceChange()
+            self?.configurationObserverQueue.addOperation { [weak self] in
+                guard let self,
+                      self.configurationObserverID == observerID,
+                      self.isRunning
+                else { return }
+                if self.recoverConfigurationChange(for: deviceID) { return }
+                onDeviceChange()
+            }
         }
         Log.audio.info("capture started — native \(nativeFormat.sampleRate)Hz → engine \(outputFormat.sampleRate)Hz")
     }
@@ -134,6 +170,7 @@ final class AudioCapture: @unchecked Sendable {
             NotificationCenter.default.removeObserver(configurationObserver)
             self.configurationObserver = nil
         }
+        configurationObserverID = nil
         engine?.stop()
         engine?.reset()
         engine = nil
@@ -152,17 +189,15 @@ final class AudioCapture: @unchecked Sendable {
 
         var currentDeviceID = AudioDeviceID(kAudioObjectUnknown)
         var currentSize = UInt32(MemoryLayout<AudioDeviceID>.size)
-        guard AudioUnitGetProperty(
+        let currentStatus = AudioUnitGetProperty(
             audioUnit,
             kAudioOutputUnitProperty_CurrentDevice,
             kAudioUnitScope_Global,
             0,
             &currentDeviceID,
             &currentSize
-        ) == noErr,
-        currentDeviceID == selectedDeviceID else {
-            return false
-        }
+        )
+        guard currentStatus == noErr else { return false }
 
         var aliveAddress = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceIsAlive,
@@ -185,6 +220,7 @@ final class AudioCapture: @unchecked Sendable {
         switch AudioConfigurationChangePolicy.action(
             selectedDeviceID: selectedDeviceID,
             currentDeviceID: currentDeviceID,
+            activeSubDeviceIDs: Self.activeSubDeviceIDs(of: currentDeviceID) ?? [],
             isAlive: isAlive != 0,
             engineIsRunning: engine.isRunning
         ) {
@@ -203,6 +239,48 @@ final class AudioCapture: @unchecked Sendable {
                 return false
             }
         }
+    }
+
+    /// A route can expose an aggregate as the engine device while the user selected one of
+    /// its physical inputs. Trust membership only when the current object is an aggregate
+    /// and CoreAudio successfully returns its active subdevice list.
+    private static func activeSubDeviceIDs(of deviceID: AudioDeviceID) -> [AudioDeviceID]? {
+        var classAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyClass,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var objectClass = AudioClassID(0)
+        var classSize = UInt32(MemoryLayout<AudioClassID>.size)
+        guard AudioObjectGetPropertyData(
+            deviceID,
+            &classAddress,
+            0,
+            nil,
+            &classSize,
+            &objectClass
+        ) == noErr, objectClass == kAudioAggregateDeviceClassID else {
+            return nil
+        }
+
+        var membersAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioAggregateDevicePropertyActiveSubDeviceList,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(deviceID, &membersAddress, 0, nil, &size) == noErr,
+              size > 0,
+              size.isMultiple(of: UInt32(MemoryLayout<AudioDeviceID>.size))
+        else {
+            return nil
+        }
+
+        var members = Array(repeating: AudioDeviceID(kAudioObjectUnknown), count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+        let status = members.withUnsafeMutableBytes { bytes in
+            AudioObjectGetPropertyData(deviceID, &membersAddress, 0, nil, &size, bytes.baseAddress!)
+        }
+        return status == noErr ? members : nil
     }
 
     // MARK: - Audio thread
